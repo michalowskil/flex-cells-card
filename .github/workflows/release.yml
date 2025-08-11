@@ -7,18 +7,18 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Install deps
         run: npm ci
@@ -26,9 +26,18 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Create GitHub Release / upload asset
+      # Jeśli workflow wywołał *release published* → tylko dołącz asset
+      - name: Upload asset to existing release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/flex-cells-card.js
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Jeśli workflow wywołał *push tag* → utwórz release i dołącz asset
+      - name: Create release from tag and upload asset
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/flex-cells-card.js
