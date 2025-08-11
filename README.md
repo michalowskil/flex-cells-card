@@ -18,6 +18,15 @@ A Lovelace card for Home Assistant that lets you add **icons**, **text**, or **e
 
 ## Usage
 Add the card in the UI and configure everything from the visual editor.
+
+### Screenshots
+
+**Main configuration view**
+![Flex Cells main config](images/flex-cells-card-configuration1.png)
+
+**Row and cell configuration**
+![Flex Cells row config](images/flex-cells-card-configuration2.png)
+
 Example YAML:
 ```yaml
 type: 'custom:flex-cells-card'
