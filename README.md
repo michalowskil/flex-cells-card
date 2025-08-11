@@ -22,11 +22,12 @@ Add the card in the UI and configure everything from the visual editor.
 ### Screenshots
 
 **Main configuration view**
-![Flex Cells main config](images/flex-cells-card-configuration1.png)
+<img src="images/flex-cells-card-configuration1.png" alt="Flex Cells config" style="border:3px solid grey;" />
 
 **Row and cell configuration**
-![Flex Cells row config](images/flex-cells-card-configuration2.png)
+<img src="images/flex-cells-card-configuration2.png" alt="Flex Cells config" style="border:3px solid grey;" />
 
 Example YAML:
 ```yaml
 type: 'custom:flex-cells-card'
+```
