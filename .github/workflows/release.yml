@@ -1,0 +1,37 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: npm i
+
+      - name: Build
+        run: npm run build
+
+      - name: HACS validation (plugin)
+        uses: hacs/action@main
+        with:
+          category: "plugin"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/flex-cells-card.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
