@@ -11,7 +11,7 @@ A Lovelace card for Home Assistant that lets you add **icons**, **text**, or **e
 
 ## Installation (HACS – Custom repository)
 1. HACS → ⋮ → **Custom repositories** → add:
-   `https://github.com/michalowskil/flex-cells-card` (Category: **Plugin**)
+   `https://github.com/michalowskil/flex-cells-card` (Type: **Dashboard**)
 2. Install **Flex Cells Card**.
 3. Resource is added automatically as `/hacsfiles/flex-cells-card/flex-cells-card.js`.
 4. Reload browser cache or refresh resources in HA if needed.
