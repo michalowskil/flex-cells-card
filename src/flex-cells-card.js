@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import './flex-cells-card-editor.js';
 
 class FlexCellsCard extends LitElement {
   static properties = { config: {}, hass: {} };
