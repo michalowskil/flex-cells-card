@@ -2,6 +2,9 @@
 
 A Lovelace card for Home Assistant that lets you add **icons**, **text**, or **entities** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
 
+If you like this card, please consider giving it a ⭐ on GitHub:  
+[![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
+
 ## Features
 - Mix cells with **Icon / Text / Entity**
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
