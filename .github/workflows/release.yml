@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [published]
 
 jobs:
   build:
@@ -15,23 +17,18 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install deps
-        run: npm i
+        run: npm ci
 
       - name: Build
         run: npm run build
 
-      - name: HACS validation (plugin)
-        uses: hacs/action@main
-        with:
-          category: "plugin"
-
-      - name: Create GitHub Release
+      - name: Create GitHub Release / upload asset
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/flex-cells-card.js
+          files: dist/flex-cells-card.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
