@@ -9,7 +9,7 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 - Mix cells with **Icon / Text / Entity**
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
-- Built-in **icon suggestions** (HA `ha-icon-picker` if available)
+- **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Visual editor, drag-and-drop rows/columns, zebra rows, responsive columns
 
 ## Installation (HACS – Custom repository)
@@ -30,6 +30,10 @@ Add the card in the UI and configure everything from the visual editor.
 
 **Row and cell configuration**
 | ![Flex Cells main config](images/flex-cells-card-configuration2.png) |
+|---|
+
+**Tap & Hold Actions**
+| ![Flex Cells main config](images/flex-cells-card-configuration3.png) |
 |---|
 
 Example YAML:

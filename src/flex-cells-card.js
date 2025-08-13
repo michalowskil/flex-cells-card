@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { t } from './localize/localize.js';
 import './flex-cells-card-editor.js';
 
 class FlexCellsCard extends LitElement {
@@ -23,7 +24,15 @@ class FlexCellsCard extends LitElement {
     .datatable.zebra tbody tr:nth-child(even) td {
       background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
     }
-    .clickable { cursor: pointer; }
+
+    /* === NEW: blokada zaznaczania/kontekstu tylko dla klikanych pól === */
+    .clickable, .icon.clickable, td.clickable, th.clickable {
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      /* nie ustawiamy touch-action:none, żeby nie zabić scrolla; to wystarcza */
+    }
+
     .icon ha-icon { color: var(--state-icon-color, var(--primary-text-color)); }
     .celltext { display: inline-block; white-space: nowrap; }
     .datatable td, .datatable th { line-height: 1.15; }
@@ -50,6 +59,7 @@ class FlexCellsCard extends LitElement {
     };
   }
 
+  // ---------- helpers ----------
   _openMoreInfo(entityId) {
     if (!entityId) return;
     this.dispatchEvent(new CustomEvent('hass-more-info', {
@@ -111,38 +121,344 @@ class FlexCellsCard extends LitElement {
     return parts.join(';');
   }
 
+  // ---------- Actions ----------
+  _hasAction(cfg) { return !!(cfg && cfg.action && cfg.action !== 'none'); }
+
+  // filter out more-info/toggle for icon/string
+  _sanitizeActionForCell(cell, actionCfg) {
+    if (!actionCfg) return undefined;
+    const type = (cell?.type || 'string').toLowerCase();
+    const a = actionCfg?.action;
+    if ((type === 'icon' || type === 'string') && (a === 'more-info' || a === 'toggle')) {
+      return undefined;
+    }
+    return actionCfg;
+  }
+  _getSanitizedActions(cell) {
+    return {
+      tap: this._sanitizeActionForCell(cell, cell?.tap_action),
+      hold: this._sanitizeActionForCell(cell, cell?.hold_action),
+      dbl: this._sanitizeActionForCell(cell, cell?.double_tap_action),
+    };
+  }
+  _hasCellActions(cell) {
+    const s = this._getSanitizedActions(cell);
+    return this._hasAction(s.tap) || this._hasAction(s.hold) || this._hasAction(s.dbl);
+  }
+
+  _ensureTarget(target, entityId) {
+    const t = { ...(target || {}) };
+    if (!t.entity_id && entityId) t.entity_id = entityId;
+    return Object.keys(t).length ? t : undefined;
+  }
+
+  _callService(domain, service, data, target) {
+    const t = target && Object.keys(target).length ? target : undefined;
+    const hasEntity = t && t.entity_id;
+    if (hasEntity) {
+      const d = { ...(data || {}) };
+      if (d.entity_id === undefined) d.entity_id = t.entity_id;
+      return this.hass?.callService(domain, service, d);
+    }
+    return this.hass?.callService(domain, service, data, t);
+  }
+
+  async _runPerformAction(inner, entityId, outerTarget) {
+    if (typeof inner === 'string') {
+      const [domain, service] = String(inner).split('.', 2);
+      if (domain && service) {
+        const target = this._ensureTarget(outerTarget, entityId);
+        return this._callService(domain, service, undefined, target);
+      }
+      return;
+    }
+    const obj = inner || {};
+    const action = obj.action;
+    const target = this._ensureTarget(obj.target || outerTarget, entityId);
+    const payload = obj.data || obj.service_data || undefined;
+
+    if (action === 'toggle') {
+      return this._callService('homeassistant', 'toggle', undefined, target);
+    }
+    if (action === 'call_service' || action === 'call-service' || obj.service) {
+      const svc = obj.service || '';
+      const [domain, service] = svc.split('.', 2);
+      if (!domain || !service) return;
+      return this._callService(domain, service, payload, target);
+    }
+  }
+
+  async _runAction(actionCfg = {}, entityId) {
+    if (actionCfg?.action === 'perform-action' || actionCfg?.action === 'perform_action') {
+      const inner = actionCfg.perform_action || actionCfg.performAction || {};
+      return this._runPerformAction(inner, entityId, actionCfg.target);
+    }
+
+    const a = actionCfg?.action;
+    if (!a || a === 'none') return;
+
+    const actionEntity = actionCfg.entity || entityId;
+    const target = this._ensureTarget(actionCfg.target, actionEntity);
+    const payload = actionCfg.data || actionCfg.service_data || undefined;
+
+    switch (a) {
+      case 'more-info':
+        this._openMoreInfo(actionEntity || target?.entity_id);
+        break;
+      case 'toggle':
+        this._callService('homeassistant', 'toggle', undefined, target);
+        break;
+      case 'call-service': {
+        const svc = actionCfg.service || '';
+        const [domain, service] = svc.split('.', 2);
+        if (!domain || !service) return;
+        this._callService(domain, service, payload, target);
+        break;
+      }
+      case 'navigate': {
+        const path = actionCfg.navigation_path || '/';
+        try {
+          window.history.pushState(null, '', path);
+          this.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false }, bubbles: true, composed: true }));
+        } catch {
+          window.location.assign(path);
+        }
+        break;
+      }
+      case 'url': {
+        const url = actionCfg.url_path || '/';
+        const t = actionCfg.new_tab ? '_blank' : '_self';
+        window.open(url, t);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  // --- input handling: tap / double-tap / hold ---
+  _onCellKeydown(e, cell, entityId) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const tap = this._sanitizeActionForCell(cell, cell?.tap_action);
+    if (this._hasAction(tap)) {
+      this._runAction(tap, entityId);
+    } else if (!this._hasCellActions(cell) && cell?.type === 'entity' && entityId) {
+      this._openMoreInfo(entityId);
+    }
+  }
+
+  _onCellPointerDown(e, cell, entityId) {
+    e.stopPropagation();
+    /* NEW: zgaś domyślne (zaznaczanie/callout) – zwłaszcza iOS */
+    try { e.preventDefault(); } catch(_) {}
+    const el = e.currentTarget;
+    el.__lastTapTs = el.__lastTapTs || 0;
+
+    const hold = this._sanitizeActionForCell(cell, cell?.hold_action);
+    if (this._hasAction(hold)) {
+      el.__holdFired = false;
+      el.__holdTimer = window.setTimeout(() => {
+        el.__holdFired = true;
+        if (el.__tapTimer) { clearTimeout(el.__tapTimer); el.__tapTimer = null; }
+        this._runAction(hold, entityId);
+      }, 550);
+    }
+  }
+  _cancelTimers(el) { if (!el) return; if (el.__holdTimer) { clearTimeout(el.__holdTimer); el.__holdTimer = null; } }
+  _onCellPointerCancel(e) { e.stopPropagation(); this._cancelTimers(e.currentTarget); }
+
+  _onCellPointerUp(e, cell, entityId) {
+    e.stopPropagation();
+    const el = e.currentTarget;
+    if (el.__holdFired) { this._cancelTimers(el); return; }
+    this._cancelTimers(el);
+
+    const dblWindow = 360;
+    const now = e.timeStamp || Date.now();
+    const since = now - (el.__lastTapTs || 0);
+
+    const dbl = this._sanitizeActionForCell(cell, cell?.double_tap_action);
+    const tap = this._sanitizeActionForCell(cell, cell?.tap_action);
+
+    const hasDouble = this._hasAction(dbl);
+    const hasTap = this._hasAction(tap);
+
+    if (hasDouble && since > 0 && since < dblWindow && el.__tapTimer) {
+      clearTimeout(el.__tapTimer);
+      el.__tapTimer = null;
+      el.__lastTapTs = 0;
+      this._runAction(dbl, entityId);
+      return;
+    }
+
+    if (hasDouble) {
+      if (el.__tapTimer) clearTimeout(el.__tapTimer);
+      el.__lastTapTs = now;
+      el.__tapTimer = window.setTimeout(() => {
+        el.__tapTimer = null;
+        el.__lastTapTs = 0;
+        if (hasTap) {
+          this._runAction(tap, entityId);
+        } else if (!this._hasCellActions(cell) && cell?.type === 'entity' && entityId) {
+          this._openMoreInfo(entityId);
+        }
+      }, dblWindow);
+      return;
+    }
+
+    if (hasTap) {
+      this._runAction(tap, entityId);
+    } else if (!this._hasCellActions(cell) && cell?.type === 'entity' && entityId) {
+      this._openMoreInfo(entityId);
+    }
+  }
+
+  // ---------- render ----------
   _renderHeaderCell(cell) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
     const align = cell?.align || 'left';
     const thStyle = this._buildTextStyle(cell, type, align);
+    const hasActions = this._hasCellActions(cell);
 
     if (type === 'icon') {
       const iconStyle = this._buildIconStyle(cell);
+      if (hasActions) {
+        const aria = val || 'icon';
+        return html`
+          <th class="icon clickable"
+              style=${thStyle}
+              role="button"
+              tabindex="0"
+              aria-label=${aria}
+              @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
+              @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
+              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
+              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
+              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+            ${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}
+          </th>
+        `;
+      }
       return html`<th class="icon" style=${thStyle}>${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}</th>`;
     }
+
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
-      return html`<th style=${thStyle}>${display}</th>`;
+      const aria = stateObj ? `${val}: ${display}` : val;
+
+      if (hasActions) {
+        return html`
+          <th class="clickable"
+              style=${thStyle}
+              title=${val}
+              role="button"
+              tabindex="0"
+              aria-label=${aria}
+              @pointerdown=${(e)=>this._onCellPointerDown(e, cell, val)}
+              @pointerup=${(e)=>this._onCellPointerUp(e, cell, val)}
+              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
+              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
+              @keydown=${(e)=>this._onCellKeydown(e, cell, val)}>
+            ${display}
+          </th>
+        `;
+      }
+
+      // Domyślne 'more-info' dla encji w nagłówku, jeśli brak własnych akcji
+      return html`
+        <th class="clickable"
+            style=${thStyle}
+            title=${val}
+            role="button"
+            tabindex="0"
+            aria-label=${aria}
+            @click=${() => this._openMoreInfo(val)}
+            @keydown=${(e) => this._onEntityKeydown(e, val)}>
+          ${display}
+        </th>
+      `;
     }
+
+    if (hasActions) {
+      const aria = String(val || 'text');
+      return html`
+        <th class="clickable"
+            style=${thStyle}
+            role="button"
+            tabindex="0"
+            aria-label=${aria}
+            @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
+            @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
+            @pointercancel=${(e)=>this._onCellPointerCancel(e)}
+            @mouseleave=${(e)=>this._onCellPointerCancel(e)}
+            @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+          ${val ?? ''}
+        </th>
+      `;
+    }
+
     return html`<th style=${thStyle}>${val ?? ''}</th>`;
   }
+
 
   _renderBodyCell(cell) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
     const align = cell?.align || 'right';
     const tdStyle = this._buildTextStyle(cell, type, align);
+    const hasActions = this._hasCellActions(cell);
 
     if (type === 'icon') {
       const iconStyle = this._buildIconStyle(cell);
+      if (hasActions) {
+        const aria = val || 'icon';
+        return html`
+          <td class="icon clickable"
+              style=${tdStyle}
+              role="button"
+              tabindex="0"
+              aria-label=${aria}
+              @contextmenu=${(e)=>e.preventDefault()}
+              @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
+              @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
+              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
+              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
+              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+            ${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}
+          </td>
+        `;
+      }
       return html`<td class="icon" style=${tdStyle}>${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}</td>`;
     }
+
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const aria = stateObj ? `${val}: ${display}` : val;
+
+      if (hasActions) {
+        return html`
+          <td class="clickable"
+              style=${tdStyle}
+              title=${val}
+              role="button"
+              tabindex="0"
+              aria-label=${aria}
+              @contextmenu=${(e)=>e.preventDefault()}
+              @pointerdown=${(e)=>this._onCellPointerDown(e, cell, val)}
+              @pointerup=${(e)=>this._onCellPointerUp(e, cell, val)}
+              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
+              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
+              @keydown=${(e)=>this._onCellKeydown(e, cell, val)}>
+            ${display}
+          </td>
+        `;
+      }
+
       return html`
         <td class="clickable"
             style=${tdStyle}
@@ -156,6 +472,26 @@ class FlexCellsCard extends LitElement {
         </td>
       `;
     }
+
+    if (hasActions) {
+      const aria = String(val || 'text');
+      return html`
+        <td class="clickable"
+            style=${tdStyle}
+            role="button"
+            tabindex="0"
+            aria-label=${aria}
+            @contextmenu=${(e)=>e.preventDefault()}
+            @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
+            @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
+            @pointercancel=${(e)=>this._onCellPointerCancel(e)}
+            @mouseleave=${(e)=>this._onCellPointerCancel(e)}
+            @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+          ${val ?? ''}
+        </td>
+      `;
+    }
+
     return html`<td style=${tdStyle}>${val ?? ''}</td>`;
   }
 
@@ -172,7 +508,7 @@ class FlexCellsCard extends LitElement {
     const padVal = this._resolveCardPadding();
 
     if (!cfg.rows || !Array.isArray(cfg.rows) || cfg.rows.length === 0) {
-      return html`<div class="card" style="padding:${padVal}px;">Brak wierszy do wyświetlenia.</div>`;
+      return html`<div class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</div>`;
     }
 
     const hasHeader = !!cfg.header_from_first_row && cfg.rows.length > 0;
@@ -244,7 +580,11 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
-  static getConfigElement() {
+  // NEW: fallback import — gdyby przeglądarka wczytała wersję bez edytora lub cache „zgubił” definicję
+  static async getConfigElement() {
+    if (!customElements.get('flex-cells-card-editor')) {
+      try { await import('./flex-cells-card-editor.js'); } catch (_e) {}
+    }
     return document.createElement('flex-cells-card-editor');
   }
 }

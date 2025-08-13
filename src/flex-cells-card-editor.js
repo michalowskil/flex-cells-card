@@ -18,7 +18,11 @@ class FlexCellsCardEditor extends LitElement {
       outline: none; box-shadow: 0 0 4px rgba(3,169,244,.4);
     }
     .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .cols4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr; /* było: repeat(4, 1fr) */
+      gap: 8px;
+    }
     .cols21 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
 
     .cell-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -43,7 +47,7 @@ class FlexCellsCardEditor extends LitElement {
     .option.unit span.label { flex: 0 0 auto; }
     .option.unit ha-textfield { flex: 1 1 auto; margin: 0; }
     .option.group { cursor: default; flex-wrap: wrap; }
-    .option.full { width: 100%; } /* dla pojedynczych checkboxów na pełną szerokość */
+    .option.full { width: 100%; }
 
     .tabs { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
     .tab {
@@ -56,7 +60,7 @@ class FlexCellsCardEditor extends LitElement {
     }
 
     .rowbox { touch-action: pan-y; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 10px; background: var(--card-background-color, #fff); overflow: hidden; }
-    .rowhdr { display: grid; grid-template-columns: auto auto auto 1fr auto; gap: 8px; align-items: center; padding: 10px 8px; border-bottom: 1px solid var(--divider-color, #e0e0e0); 
+    .rowhdr { display: grid; grid-template-columns: auto auto auto 1fr auto; gap: 8px; align-items: center; padding: 10px 8px; border-bottom: 1px solid var(--divider-color, #e0e0e0);
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
 
@@ -303,15 +307,29 @@ class FlexCellsCardEditor extends LitElement {
   /* ==== DnD kolumn (jak wcześniej) ==== */
   __mapIndexAfterMove(oldIndex, from, to){
     if (from === to) return oldIndex;
-    if (to > from) { if (oldIndex === from) return to; if (oldIndex > from && oldIndex <= to) return oldIndex - 1; return oldIndex; }
-    else { if (oldIndex === from) return to; if (oldIndex >= to && oldIndex < from) return oldIndex + 1; return oldIndex; }
+    if (to > from) {
+      if (oldIndex === from) return to;
+      if (oldIndex > from && oldIndex <= to) return oldIndex - 1;
+      return oldIndex;
+    } else {
+      if (oldIndex === from) return to;
+      if (oldIndex >= to && oldIndex < from) return oldIndex + 1;
+      return oldIndex;
+    }
   }
   __reorderColumn(from, to){
     const count = this.config.column_count || 1;
     if (from === null || to === null || from < 0 || to < 0 || from >= count || to >= count || from === to) return;
-    const rows = (this.config.rows || []).map(r=>{ const cells=[...(r.cells||[])]; const [m]=cells.splice(from,1); cells.splice(to,0,m); return { ...r, cells }; });
+    const rows = (this.config.rows || []).map(r=>{
+      const cells=[...(r.cells||[])];
+      const [m]=cells.splice(from,1);
+      cells.splice(to,0,m);
+      return { ...r, cells };
+    });
     if (Array.isArray(this._fullCells) && this._fullCells.length === rows.length) {
-      this._fullCells = this._fullCells.map(arr => { const a=[...arr]; const [m]=a.splice(from,1); a.splice(to,0,m); return a; });
+      this._fullCells = this._fullCells.map(arr => {
+        const a=[...arr]; const [m]=a.splice(from,1); a.splice(to,0,m); return a;
+      });
     }
     let widths = this.config.column_widths;
     if (Array.isArray(widths) && widths.length){ widths=[...widths]; const [w]=widths.splice(from,1); widths.splice(to,0,w); }
@@ -328,11 +346,18 @@ class FlexCellsCardEditor extends LitElement {
   _deleteColumn(idx){
     const count=this.config.column_count||1; if(count<=1) return;
     const newCount=count-1;
-    const rows=(this.config.rows||[]).map(r=>{ const cells=[...r.cells]; cells.splice(idx,1); while(cells.length<newCount) cells.push({ type:'string', value:'', align:'right' }); return { ...r, cells }; });
-    if (Array.isArray(this._fullCells) && this._fullCells.length === rows.length) this._fullCells = this._fullCells.map(a=>{ const b=[...a]; b.splice(idx,1); return b; });
+    const rows=(this.config.rows||[]).map(r=>{
+      const cells=[...r.cells]; cells.splice(idx,1);
+      while(cells.length<newCount) cells.push({ type:'string', value:'', align:'right' });
+      return { ...r, cells };
+    });
+    if (Array.isArray(this._fullCells) && this._fullCells.length === rows.length)
+      this._fullCells = this._fullCells.map(a=>{ const b=[...a]; b.splice(idx,1); return b; });
     let widths=this.config.column_widths; if(Array.isArray(widths)&&widths.length){ widths=[...widths]; widths.splice(idx,1); }
     let hide=this.config.hide_on_narrow;
-    if(Array.isArray(hide)&&hide.length){ hide=hide.filter(v=>v!==idx+1).map(v=> v>idx+1 ? v-1 : v).filter((v,i,self)=> self.indexOf(v)===i).sort((a,b)=>a-b); }
+    if(Array.isArray(hide)&&hide.length){
+      hide=hide.filter(v=>v!==idx+1).map(v=> v>idx+1 ? v-1 : v).filter((v,i,self)=> self.indexOf(v)===i).sort((a,b)=>a-b);
+    }
     const tabs={}; rows.forEach((_,ri)=>{ const cur=this._activeTabs[ri]||0; tabs[ri]=Math.min(cur, newCount-1); });
     this.config={...this.config, rows, column_count:newCount, column_widths: widths, hide_on_narrow: hide};
     this._activeTabs=tabs; this._fireConfigChanged();
@@ -356,11 +381,15 @@ class FlexCellsCardEditor extends LitElement {
     e.preventDefault();
     const chips = Array.from(this.renderRoot.querySelectorAll('.colstrip .colchip'));
     const x=e.clientX,y=e.clientY; let over=null;
-    for(let idx=0; idx<chips.length; idx++){ const r=chips[idx].getBoundingClientRect(); if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){ over=idx; break; } }
+    for(let idx=0; idx<chips.length; idx++){
+      const r=chips[idx].getBoundingClientRect();
+      if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){ over=idx; break; }
+    }
     this._colDragOver=over; this.requestUpdate(); this._autoScrollColstrip(e.clientX);
   }
   _onColPointerUp(e){
-    if (this._colDragActive && this._colDragFrom!==null && this._colDragOver!==null) this.__reorderColumn(this._colDragFrom, this._colDragOver);
+    if (this._colDragActive && this._colDragFrom!==null && this._colDragOver!==null)
+      this.__reorderColumn(this._colDragFrom, this._colDragOver);
     try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
     this._colDragFrom=null; this._colDragActive=false; this._colDragOver=null;
     window.removeEventListener('pointermove', this._boundPointerMove);
@@ -406,11 +435,15 @@ class FlexCellsCardEditor extends LitElement {
     e.preventDefault();
     const boxes = Array.from(this.renderRoot.querySelectorAll('.rowbox'));
     const x=e.clientX,y=e.clientY; let over=null;
-    for(let idx=0; idx<boxes.length; idx++){ const r=boxes[idx].getBoundingClientRect(); if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){ over=idx; break; } }
+    for(let idx=0; idx<boxes.length; idx++){
+      const r=boxes[idx].getBoundingClientRect();
+      if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){ over=idx; break; }
+    }
     this._dragOverIndex=over; this.requestUpdate();
   }
   _onRowPointerUp(e){
-    if(this._rowDragActive && this._rowDragFrom!==null && this._dragOverIndex!==null) this.__reorderRows(this._rowDragFrom, this._dragOverIndex);
+    if(this._rowDragActive && this._rowDragFrom!==null && this._dragOverIndex!==null)
+      this.__reorderRows(this._rowDragFrom, this._dragOverIndex);
     try { e.currentTarget?.releasePointerCapture?.(e.pointerId); } catch {}
     this._rowDragFrom=null; this._rowDragActive=false; this._dragOverIndex=null;
     window.removeEventListener('pointermove', this._boundRowPointerMove);
@@ -492,12 +525,62 @@ class FlexCellsCardEditor extends LitElement {
   }
   _onTypeSelect(rIdx, cIdx, e) { this._cellTypeChanged(rIdx, cIdx, { target: { value: e.target.value } }); }
 
+  // === Actions (Tap/Hold/Double) ===
+
+  // Dozwolone akcje dla danego typu komórki (dla icon/string usuwamy 'more-info' i 'toggle')
+  _allowedUiActionsForCellType(cellType) {
+    if (cellType === 'icon' || cellType === 'string') {
+      return ['navigate', 'url', 'assist', 'perform-action', 'none'];
+    }
+    // entity — pełna lista domyślna (nie narzucamy)
+    return undefined;
+  }
+
+  _onActionsChanged(rIdx, cIdx, ev) {
+    const v = ev.detail?.value || {};
+    const cellType = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.type;
+    const isIconOrString = cellType === 'icon' || cellType === 'string';
+
+    const clean = (obj) => {
+      if (!obj || !obj.action || obj.action === 'none') return undefined;
+      const out = JSON.parse(JSON.stringify(obj));
+
+      // SANETYZACJA: dla icon/string blokujemy 'more-info' i 'toggle'
+      if (isIconOrString && (out.action === 'more-info' || out.action === 'toggle')) {
+        return { action: 'none' };
+      }
+
+      if (!out.service) delete out.service;
+      if (!out.data && !out.service_data) { delete out.data; delete out.service_data; }
+      if (out.target && !Object.keys(out.target).length) delete out.target;
+      if (!out.entity) delete out.entity;
+      return out;
+    };
+
+    this._patchCell(rIdx, cIdx, {
+      tap_action: clean(v.tap_action),
+      hold_action: clean(v.hold_action),
+      double_tap_action: clean(v.double_tap_action),
+    });
+  }
+
+  _computeActionLabel = (schema) => {
+    switch (schema.name) {
+      case 'tap_action': return t(this.hass, 'editor.tap_action');
+      case 'hold_action': return t(this.hass, 'editor.hold_action');
+      case 'double_tap_action': return t(this.hass, 'editor.double_tap_action');
+      default: return '';
+    }
+  };
+
   render(){
     if(!this.config || !Array.isArray(this.config.rows)) return html`<div>—</div>`;
     const colCount=this.config.column_count||1;
     const widthsStr=Array.isArray(this.config.column_widths)?this.config.column_widths.join(', '):'';
     const hideStr=Array.isArray(this.config.hide_on_narrow)?this.config.hide_on_narrow.join(','):'';
     const cp=this.config.cell_padding||{top:4,right:0,bottom:4,left:0};
+
+    const dclone = (o)=> (o ? JSON.parse(JSON.stringify(o)) : undefined);
 
     return html`
       <div class="row">
@@ -650,6 +733,12 @@ class FlexCellsCardEditor extends LitElement {
                     const isIcon = cell.type === 'icon';
                     const isNumeric = isEntity && this._isEntityNumeric(cell);
                     const st = cell.style || {};
+
+                    // selektory akcji (dla icon/string z ograniczoną listą)
+                    const allowed = this._allowedUiActionsForCellType(cell.type);
+                    const mkSelector = () => allowed
+                      ? { ui_action: { actions: allowed, allowed_actions: allowed } }
+                      : { ui_action: {} };
 
                     return html`
                       <!-- TYP KOMÓRKI -->
@@ -806,7 +895,7 @@ class FlexCellsCardEditor extends LitElement {
                           </ha-textfield>
                         </div>
 
-                        <!-- POJEDYNCZE CHECKBOXY – każdy w swojej ramce, pełna szerokość -->
+                        <!-- POJEDYNCZE CHECKBOXY -->
                         <div class="cell-grid cell-wide">
                           <label class="option full">
                             <input type="checkbox" .checked=${!!st.bold} @change=${(e)=>this._styleToggle(rIdx,cIdx,'bold',e)} />
@@ -833,11 +922,11 @@ class FlexCellsCardEditor extends LitElement {
                         </div>
                       ` : ''}
 
-                      ${cell.type === 'icon' ? html`
+                      ${isIcon ? html`
                         <div class="cell-grid cell-wide">
                           <ha-textfield
                             .label=${t(this.hass,"editor.icon_color")}
-                            .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                            .placeholder=${"#ff5722 | red | var(--primary-color)"},
                             .value=${st.color || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
                           </ha-textfield>
@@ -851,6 +940,35 @@ class FlexCellsCardEditor extends LitElement {
                           </ha-textfield>
                         </div>
                       ` : ''}
+
+                      <!-- Tap & Hold Actions -->
+                      <details style="margin-top:12px;">
+                        <summary style="cursor:pointer;font-weight:600;">
+                          ${t(this.hass, 'editor.advanced')}
+                        </summary>
+
+                        <div class="cell-grid cell-wide" style="margin-top:8px;">
+                          <ha-form
+                            .hass=${this.hass}
+                            .data=${{
+                              tap_action: dclone(cell.tap_action),
+                              hold_action: dclone(cell.hold_action),
+                              double_tap_action: dclone(cell.double_tap_action),
+                            }}
+                            .schema=${[
+                              { name: 'tap_action', selector: mkSelector() },
+                              { name: 'hold_action', selector: mkSelector() },
+                              { name: 'double_tap_action', selector: mkSelector() },
+                            ]}
+                            .computeLabel=${this._computeActionLabel}
+                            @value-changed=${(ev) => this._onActionsChanged(rIdx, cIdx, ev)}
+                          ></ha-form>
+                        </div>
+
+                        <div class="muted">
+                          ${t(this.hass, 'editor.actions_hint')}
+                        </div>
+                      </details>
                     `;
                   })()}
                 </div>

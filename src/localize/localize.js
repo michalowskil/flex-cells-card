@@ -45,7 +45,13 @@ const DICTS = {
       cell_type: "Cell type",
       entity_label: "Entity",
       string_label: "Text",
-      icon_label: "Icon"
+      icon_label: "Icon",
+      tap_action: "Tap action",
+      hold_action: "Hold action",
+      double_tap_action: "Double-tap action",
+      advanced: "Tap & Hold Actions",
+      actions_hint:
+        "If any action is set, the default 'more-info' for an entity will be disabled."
     },
     type: { entity: "entity", string: "string", icon: "icon" },
     placeholder: {
@@ -55,7 +61,10 @@ const DICTS = {
     },
     align: { left: "left", center: "center", right: "right" },
     precision: { two: "two decimals", one: "one decimal", int: "integer" },
-    style: { bold: "bold", italic: "italic", underline: "underline", strike: "strikethrough" }
+    style: { bold: "bold", italic: "italic", underline: "underline", strike: "strikethrough" },
+    card: {
+      no_rows: "No rows to display."
+    }
   },
 
   pl: {
@@ -63,7 +72,7 @@ const DICTS = {
       card_title: "Konfiguracja karty Flex Cells",
       columns_count: "Liczba kolumn",
       text_size_global: "Rozmiar tekstu (domyślny)",
-      card_padding: "Card padding",
+      card_padding: "Padding karty",
       cell_padding_top: "Padding komórki – góra",
       cell_padding_right: "Padding komórki – prawa",
       cell_padding_bottom: "Padding komórki – dół",
@@ -104,7 +113,13 @@ const DICTS = {
       cell_type: "Typ komórki",
       entity_label: "Encja",
       string_label: "Tekst",
-      icon_label: "Ikona"
+      icon_label: "Ikona",
+      tap_action: "Akcja po kliknięciu",
+      hold_action: "Akcja po przytrzymaniu",
+      double_tap_action: "Akcja po dwukliku",
+      advanced: "Akcje dotknięcia i przytrzymania",
+      actions_hint:
+        "Jeśli ustawisz jakąkolwiek akcję, domyślne 'more-info' dla encji zostanie wyłączone."
     },
     type: { entity: "encja", string: "string", icon: "ikona" },
     placeholder: {
@@ -114,13 +129,16 @@ const DICTS = {
     },
     align: { left: "lewo", center: "środek", right: "prawo" },
     precision: { two: "dwa miejsca", one: "jedno miejsce", int: "liczba całkowita" },
-    style: { bold: "pogrubienie", italic: "kursywa", underline: "podkreślenie", strike: "przekreślenie" }
+    style: { bold: "pogrubienie", italic: "kursywa", underline: "podkreślenie", strike: "przekreślenie" },
+    card: {
+      no_rows: "Brak wierszy do wyświetlenia."
+    }
   }
 };
 
 export function t(hass, key) {
-  const lang = (hass?.locale?.language || 'en').toLowerCase().startsWith('pl') ? 'pl' : 'en';
-  const parts = key.split('.');
+  const lang = (hass?.locale?.language || "en").toLowerCase().startsWith("pl") ? "pl" : "en";
+  const parts = key.split(".");
   let node = DICTS[lang];
   for (const p of parts) {
     node = node?.[p];
