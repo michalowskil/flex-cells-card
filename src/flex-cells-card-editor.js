@@ -573,6 +573,111 @@ class FlexCellsCardEditor extends LitElement {
     }
   };
 
+  _onPaletteClick(ev, rIdx, cIdx) {
+    const current = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.style?.color || "#ffffff";
+
+    const toHex = (v) => {
+      const s = String(v || "").trim();
+      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) {
+        return s.length === 4 ? "#" + s.slice(1).split("").map(c => c + c).join("") : s;
+      }
+      const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      return m ? "#" + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2,"0")).join("") : "#ffffff";
+    };
+
+    // Pozycja: kursor lub rect klikniętego elementu
+    const tgt  = ev?.currentTarget || ev?.target;
+    const rect = tgt?.getBoundingClientRect?.();
+    let x = (typeof ev?.clientX === "number") ? ev.clientX : (rect ? rect.right - 8 : 24);
+    let y = (typeof ev?.clientY === "number") ? ev.clientY : (rect ? rect.bottom + 8 : 24);
+
+    // Kotwiczenie w ha-dialog (jeśli jest)
+    const dialog = this.closest?.("ha-dialog");
+    let container = document.body;
+    let position = "fixed";
+    if (dialog?.shadowRoot) {
+      const surface =
+        dialog.shadowRoot.querySelector(".mdc-dialog__surface") ||
+        dialog.shadowRoot.querySelector(".mdc-dialog") ||
+        dialog.shadowRoot.querySelector(".mdc-dialog__container");
+      if (surface) {
+        const srect = surface.getBoundingClientRect();
+        x -= srect.left; y -= srect.top;
+        container = surface; position = "absolute";
+      }
+    }
+
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = toHex(current);
+    input.tabIndex = -1;
+
+    Object.assign(input.style, {
+      position,
+      left: `${Math.round(x)}px`,
+      top: `${Math.round(y)}px`,
+      transform: "translate(-10px, -10px)",
+      width: "18px",
+      height: "18px",
+      opacity: "0.001",
+      pointerEvents: "auto",
+      border: "0",
+      padding: "0",
+      margin: "0",
+      zIndex: "2147483647",
+    });
+
+    // (opcjonalnie) live preview
+    const scope = dialog || document;
+    const previewCard = scope.querySelector?.("flex-cells-card") || null;
+    const varName = `--fcc-cell-r${rIdx}-c${cIdx}-color`;
+
+    let raf = 0, lastHex = null;
+    const pushThrottled = (hex) => {
+      lastHex = hex;
+      if (!raf) {
+        raf = requestAnimationFrame(() => { raf = 0; this._patchCellStyle(rIdx, cIdx, { color: lastHex }); });
+      }
+    };
+    const setLive = (hex) => { if (previewCard) previewCard.style.setProperty(varName, hex); else pushThrottled(hex); };
+
+    // --- Sprzątanie: bez 'blur' / bez 'window.focus' ---
+    let cleaned = false, armed = false;
+    const cleanup = () => {
+      if (cleaned) return; cleaned = true;
+      input.removeEventListener("input", onInput);
+      input.removeEventListener("change", onChange);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("pointerdown", onOutsidePointer, true);
+      if (previewCard) previewCard.style.removeProperty(varName);
+      input.remove();
+    };
+
+    const onInput = (e) => setLive(e.target.value);                // podgląd
+    const onChange = (e) => { this._patchCellStyle(rIdx, cIdx, { color: e.target.value }); cleanup(); };
+    const onKeyDown = (e) => { if (e.key === "Escape") cleanup(); };
+    const onOutsidePointer = (e) => { if (!armed) return; if (e.target !== input) cleanup(); };
+
+    input.addEventListener("input", onInput);
+    input.addEventListener("change", onChange);
+    window.addEventListener("keydown", onKeyDown, true);
+    // uzbrój „klik poza” dopiero po chwili, żeby nie wyłapać kliknięcia, które otworzyło picker
+    setTimeout(() => { armed = true; window.addEventListener("pointerdown", onOutsidePointer, true); }, 250);
+
+    container.appendChild(input);
+    void input.offsetWidth;                     // wymuś layout
+    try { input.focus({ preventScroll: true }); } catch {}
+
+    // otwórz picker po klatce
+    requestAnimationFrame(() => {
+      try { (typeof input.showPicker === "function" ? input.showPicker() : input.click()); }
+      catch { input.click(); }
+    });
+
+    // awaryjne sprzątanie po 60s (gdyby user anulował gestami systemowymi itd.)
+    setTimeout(() => cleanup(), 60000);
+  }
+
   render(){
     if(!this.config || !Array.isArray(this.config.rows)) return html`<div>—</div>`;
     const colCount=this.config.column_count||1;
@@ -867,13 +972,18 @@ class FlexCellsCardEditor extends LitElement {
                       ${(cell.type === 'string' || cell.type === 'entity') ? html`
                         <!-- KOLOR -->
                         <div class="cell-grid cell-wide">
-                          <ha-textfield
+                          <div class="inline">
+                            <ha-textfield
                             .label=${t(this.hass,"editor.text_color")}
                             .placeholder=${"#ff5722 | red | var(--color)"}
                             .value=${st.color || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
-                          </ha-textfield>
-                        </div>
+                            </ha-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx)}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+
+                          </div>
 
                         <!-- ROZMIAR -->
                         <div class="cell-grid cell-wide">
@@ -924,13 +1034,18 @@ class FlexCellsCardEditor extends LitElement {
 
                       ${isIcon ? html`
                         <div class="cell-grid cell-wide">
-                          <ha-textfield
+                          <div class="inline">
+                            <ha-textfield
                             .label=${t(this.hass,"editor.icon_color")}
                             .placeholder=${"#ff5722 | red | var(--primary-color)"},
                             .value=${st.color || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
-                          </ha-textfield>
-                        </div>
+                            </ha-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx)}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+
+                          </div>
                         <div class="cell-grid cell-wide">
                           <ha-textfield
                             .label=${t(this.hass,"editor.icon_size")}
