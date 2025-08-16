@@ -17,7 +17,8 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 ### HACS – Custom repository
 
 1. HACS → ⋮ → **Custom repositories** → add:
-   `https://github.com/michalowskil/flex-cells-card` (Type: **Dashboard**)
+   `https://github.com/michalowskil/flex-cells-card` (Type: **Dashboard**) or just click the button below to do the same:  
+   [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=michalowskil&repository=flex-cells-card&category=plugin)
 2. Install **Flex Cells Card**.
 3. Resource is added automatically as `/hacsfiles/flex-cells-card/flex-cells-card.js`.
 4. Reload browser cache or refresh resources in HA if needed.
@@ -36,7 +37,9 @@ Add the card in the UI and configure everything from the visual editor.
 ## Changelog
 - v0.3.x — Added **inline color picker** with live preview.
 - v0.2.x — Added per-cell actions: **tap / hold / double-tap**.
-- v0.1.x — First basic release of the card.
+- v0.1.x — First basic release of the card.  
+&nbsp;  
+   [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
 
 ### Screenshots
 

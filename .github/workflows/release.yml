@@ -15,10 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
       - name: Install deps
         run: npm ci
@@ -26,16 +29,49 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Jeśli workflow wywołał *release published* → tylko dołącz asset
+      # Pobierz treść adnotacji taga przez GitHub API (działa zawsze)
+      - name: Read tag annotation via GitHub API
+        id: tagbody
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const { owner, repo } = context.repo;
+
+            // ref -> typ obiektu pod tagiem
+            const ref = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+            const type = ref.data.object.type; // 'tag' (annotated) lub 'commit' (lightweight)
+            core.setOutput('annotated', String(type === 'tag'));
+
+            if (type === 'tag') {
+              const t = await github.rest.git.getTag({ owner, repo, tag_sha: ref.data.object.sha });
+              core.setOutput('body', t.data.message || '');
+              core.info(`Annotated tag: message length ${ (t.data.message || '').length }`);
+            } else {
+              core.info('Lightweight tag: no annotation message.');
+            }
+
+      # Jeśli release publikujesz ręcznie → tylko dołącz asset
       - name: Upload asset to existing release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/flex-cells-card.js
 
-      # Jeśli workflow wywołał *push tag* → utwórz release i dołącz asset
-      - name: Create release from tag and upload asset
-        if: github.event_name == 'push'
+      # Utwórz release z body z adnotacji (annotated tag)
+      - name: Create release (annotated tag)
+        if: github.event_name == 'push' && steps.tagbody.outputs.annotated == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body: ${{ steps.tagbody.outputs.body }}
+          generate_release_notes: true
+          files: dist/flex-cells-card.js
+
+      # Utwórz release bez body (lightweight tag) – tylko auto-notes
+      - name: Create release (lightweight tag)
+        if: github.event_name == 'push' && steps.tagbody.outputs.annotated != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
