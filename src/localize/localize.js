@@ -1,3 +1,4 @@
+// localize/localize.js
 const DICTS = {
   en: {
     editor: {
@@ -24,6 +25,7 @@ const DICTS = {
       align: "Alignment",
       unit: "Unit",
       unit_from_entity: "Use unit from entity",
+      attribute: "Attribute (optional)",
       precision: "Precision",
       text_style: "Text style",
       text_color: "Text color",
@@ -50,14 +52,20 @@ const DICTS = {
       hold_action: "Hold action",
       double_tap_action: "Double-tap action",
       advanced: "Tap & Hold Actions",
-      actions_hint:
-        "If any action is set, the default 'more-info' for an entity will be disabled."
+      actions_hint: "If any action is set, the default 'more-info' for an entity will be disabled.",
+      scale_title: "Rescale",
+      scale_in_min: "Input min",
+      scale_in_max: "Input max",
+      scale_out_min: "Output min",
+      scale_out_max: "Output max",
+      scale_hint: "Map a numeric value from one range to another (e.g., 0–255 → 0–100).",
     },
     type: { entity: "entity", string: "string", icon: "icon" },
     placeholder: {
       entity: "Select entity",
       string: "Text to display",
-      icon: "mdi:icon-name"
+      icon: "mdi:icon-name",
+      attribute_path: "Attribute path (e.g. a.b[0].c)"
     },
     align: { left: "left", center: "center", right: "right" },
     precision: { two: "two decimals", one: "one decimal", int: "integer" },
@@ -67,6 +75,7 @@ const DICTS = {
     }
   },
 
+  
   pl: {
     editor: {
       card_title: "Konfiguracja karty Flex Cells",
@@ -92,6 +101,7 @@ const DICTS = {
       align: "Wyrównanie",
       unit: "Jednostka",
       unit_from_entity: "Jednostka z encji",
+      attribute: "Atrybut (opcjonalnie)",
       precision: "Precyzja",
       text_style: "Styl tekstu",
       text_color: "Tekst kolor",
@@ -118,14 +128,20 @@ const DICTS = {
       hold_action: "Akcja po przytrzymaniu",
       double_tap_action: "Akcja po dwukliku",
       advanced: "Akcje dotknięcia i przytrzymania",
-      actions_hint:
-        "Jeśli ustawisz jakąkolwiek akcję, domyślne 'more-info' dla encji zostanie wyłączone."
+      actions_hint: "Jeśli ustawisz jakąkolwiek akcję, domyślne 'more-info' dla encji zostanie wyłączone.",
+      scale_title: "Przeskalowanie",
+      scale_in_min: "Wejście min",
+      scale_in_max: "Wejście max",
+      scale_out_min: "Wyjście min",
+      scale_out_max: "Wyjście max",
+      scale_hint: "Mapuj wartość z jednego zakresu na inny (np. 0–255 → 0–100).",
     },
     type: { entity: "encja", string: "string", icon: "ikona" },
     placeholder: {
       entity: "Wybierz encję",
       string: "Tekst do wyświetlenia",
-      icon: "mdi:nazwa-ikony"
+      icon: "mdi:nazwa-ikony",
+      attribute_path: "Ścieżka atrybutu (np. a.b[0].c)"
     },
     align: { left: "lewo", center: "środek", right: "prawo" },
     precision: { two: "dwa miejsca", one: "jedno miejsce", int: "liczba całkowita" },

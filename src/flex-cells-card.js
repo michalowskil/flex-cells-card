@@ -13,7 +13,8 @@ class FlexCellsCard extends LitElement {
       font-size: 16px;
       border: 1px solid var(--ha-card-border-color, var(--divider-color, #e0e0e0));
     }
-    .wrap { width: 100%; }
+    .wrap { width: 100%; border-radius: inherit; overflow: hidden; }
+    .scroller { width: 100%; display: block; }
     .datatable { width: 100%; border-collapse: collapse; }
     td, th { padding: 0; vertical-align: middle; white-space: nowrap; }
     thead th {
@@ -72,14 +73,70 @@ class FlexCellsCard extends LitElement {
 
   _isNumericState(state) { const n = Number(state); return Number.isFinite(n); }
 
-  _formatEntityCell(cell, stateObj) {
-    const raw = stateObj?.state ?? 'n/a';
-    let text = raw;
-    if (this._isNumericState(raw) && (cell?.precision === 0 || cell?.precision === 1 || cell?.precision === 2)) {
-      text = Number(raw).toFixed(cell.precision);
+  _getByPath(obj, path) {
+    if (!obj || !path) return undefined;
+    // Normalize bracket notation: a[0].b -> a.0.b
+    const norm = String(path).replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+    let cur = obj;
+    for (const key of norm) {
+      const k = (Array.isArray(cur) && /^\d+$/.test(key)) ? Number(key) : key;
+      if (cur == null || !(k in cur)) return undefined;
+      cur = cur[k];
     }
-    const useEntityUnit = cell?.use_entity_unit !== false;
-    const unit = useEntityUnit ? (stateObj?.attributes?.unit_of_measurement ?? '') : (cell?.unit ?? '');
+    return cur;
+  }
+
+  _rescaleIfConfigured(cell, n) {
+    const a = Number(cell?.scale_in_min);
+    const b = Number(cell?.scale_in_max);
+    const c = Number(cell?.scale_out_min);
+    const d = Number(cell?.scale_out_max);
+    if (![a,b,c,d].every(Number.isFinite) || a === b) return n;
+    let t = (n - a) / (b - a);
+    // domyślnie: clamp do [0,1] — zachowuje się „intuicyjnie” dla zakresów typu 0–255 -> 0–100
+    t = Math.max(0, Math.min(1, t));
+    return c + t * (d - c);
+  }
+
+  _formatEntityCell(cell, stateObj) {
+    // Show attribute value if requested; otherwise show the entity state
+    const isAttr = !!cell?.attribute;
+    let source;
+    if (isAttr) {
+      const attr = cell?.attribute;
+      if (typeof attr === 'string' && attr.includes('.')) {
+        source = this._getByPath(stateObj?.attributes, attr);
+      } else {
+        source = stateObj?.attributes?.[attr];
+      }
+    } else {
+      source = stateObj?.state;
+    }
+    const raw = (source !== undefined && source !== null) ? source : 'n/a';
+    let text;
+    if (this._isNumericState(raw)) {
+      let num = Number(raw);
+      num = this._rescaleIfConfigured(cell, num);
+      if (cell?.precision === 0 || cell?.precision === 1 || cell?.precision === 2) {
+        text = num.toFixed(cell.precision);
+      } else {
+        text = String(num);
+      }
+    } else {
+      text = (typeof raw === 'object' && raw !== null) ? JSON.stringify(raw) : raw;
+    }
+
+    // Unit logic:
+    // - for attribute: prefer explicit 'unit' on cell; otherwise no automatic unit
+    // - for state: allow using the entity's native unit unless disabled
+    let unit = '';
+    if (isAttr) {
+      unit = cell?.unit ?? '';
+    } else {
+      const useEntityUnit = cell?.use_entity_unit !== false;
+      unit = useEntityUnit ? (stateObj?.attributes?.unit_of_measurement ?? '') : (cell?.unit ?? '');
+    }
+
     return `${text}${unit ? ` ${unit}` : ''}`;
   }
 
@@ -163,19 +220,17 @@ class FlexCellsCard extends LitElement {
     return this.hass?.callService(domain, service, data, t);
   }
 
-  async _runPerformAction(inner, entityId, outerTarget) {
+  async _runPerformAction(inner, entityId, outerTarget, outerData) {
+    // ujednolicenie: string -> obiekt
+    let obj = inner;
     if (typeof inner === 'string') {
-      const [domain, service] = String(inner).split('.', 2);
-      if (domain && service) {
-        const target = this._ensureTarget(outerTarget, entityId);
-        return this._callService(domain, service, undefined, target);
-      }
-      return;
+      obj = { service: inner };
     }
-    const obj = inner || {};
+
+    obj = obj || {};
     const action = obj.action;
     const target = this._ensureTarget(obj.target || outerTarget, entityId);
-    const payload = obj.data || obj.service_data || undefined;
+    const payload = obj.data || obj.service_data || outerData || undefined;
 
     if (action === 'toggle') {
       return this._callService('homeassistant', 'toggle', undefined, target);
@@ -191,7 +246,9 @@ class FlexCellsCard extends LitElement {
   async _runAction(actionCfg = {}, entityId) {
     if (actionCfg?.action === 'perform-action' || actionCfg?.action === 'perform_action') {
       const inner = actionCfg.perform_action || actionCfg.performAction || {};
-      return this._runPerformAction(inner, entityId, actionCfg.target);
+      const outerTarget = actionCfg.target;
+      const outerData = actionCfg.data || actionCfg.service_data;
+      return this._runPerformAction(inner, entityId, outerTarget, outerData);
     }
 
     const a = actionCfg?.action;
@@ -575,7 +632,9 @@ class FlexCellsCard extends LitElement {
 
     return html`
       <div class="card" style="padding:${padVal}px;">
-        ${cfg.overflow_x ? html`<div class="wrap" style="overflow-x:auto">${table}</div>` : table}
+        ${cfg.overflow_x
+          ? html`<div class="wrap"><div class="scroller" style="overflow-x:auto; overflow-y:hidden">${table}</div></div>`
+          : html`<div class="wrap">${table}</div>`}
       </div>
     `;
   }
@@ -597,5 +656,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'flex-cells-card',
   name: 'Flex Cells Card',
-  description: 'A Lovelace card for Home Assistant that lets you add icons, text, or entities in flexible cell layouts — fully configurable from a visual editor with no documentation required.',
+  description: 'A Lovelace card for Home Assistant that lets you add icons, text, entities, or attributes in flexible cell layouts — fully configurable from a visual editor with no documentation required.',
 });

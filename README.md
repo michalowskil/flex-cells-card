@@ -1,6 +1,6 @@
 # Flex Cells Card
 
-A Lovelace card for Home Assistant that lets you add **icons**, **text**, or **entities** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
+A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, or **attributes** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
 
 If you like this card, please consider giving it a ⭐ on GitHub:  
 [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
@@ -35,6 +35,10 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 Add the card in the UI and configure everything from the visual editor.
 
 ## Changelog
+- v0.4.x —
+  - Added **entity attributes** with per-attribute **rescaling** (Input/Output min/max).
+  - Fixed **tap & hold** so secondary actions (e.g., setting brightness) work alongside the primary action.
+  - Fixed **header/last row background** overflow when card padding is set to `0`.
 - v0.3.x — Added **inline color picker** with live preview.
 - v0.2.x — Added per-cell actions: **tap / hold / double-tap**.
 - v0.1.x — First basic release of the card.  
@@ -42,6 +46,9 @@ Add the card in the UI and configure everything from the visual editor.
    [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
 
 ### Screenshots
+
+| ![Flex Cells card](images/flex-cells-card-1.png) | ![Flex Cells card](images/flex-cells-card-2.png) |
+|---|---|
 
 **Main configuration view**
 | ![Flex Cells main config](images/flex-cells-card-configuration1.png) |
