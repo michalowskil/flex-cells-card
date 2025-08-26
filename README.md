@@ -47,8 +47,15 @@ Add the card in the UI and configure everything from the visual editor.
 
 ### Screenshots
 
-| ![Flex Cells card](images/flex-cells-card-1.png) | ![Flex Cells card](images/flex-cells-card-2.png) |
-|---|---|
+<table>
+  <tr>
+    <td><img src="images/flex-cells-card-1.png" alt="Flex Cells card"></td>
+    <td><img src="images/flex-cells-card-2.png" alt="Flex Cells card"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="images/flex-cells-card-3.png" alt="Flex Cells card inside Grid Card"></td>
+  </tr>
+</table>
 
 **Main configuration view**
 | ![Flex Cells main config](images/flex-cells-card-configuration1.png) |
