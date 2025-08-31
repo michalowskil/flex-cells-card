@@ -28,6 +28,7 @@ class FlexCellsCard extends LitElement {
 
     /* === NEW: blokada zaznaczania/kontekstu tylko dla klikanych pól === */
     .clickable, .icon.clickable, td.clickable, th.clickable {
+      cursor: pointer;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
@@ -37,7 +38,8 @@ class FlexCellsCard extends LitElement {
     .icon ha-icon { color: var(--state-icon-color, var(--primary-text-color)); }
     .celltext { display: inline-block; white-space: nowrap; }
     .datatable td, .datatable th { line-height: 1.15; }
-  `;
+  
+    .icon-mask { display:inline-block; vertical-align:middle; }`;
 
   setConfig(config) {
     const colCount =
@@ -139,8 +141,149 @@ class FlexCellsCard extends LitElement {
 
     return `${text}${unit ? ` ${unit}` : ''}`;
   }
+  // === Dynamic coloring helpers (simple rules) ===
+  _coerceNumber(v) {
+    if (v === null || v === undefined) return NaN;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+    // normalize decimal comma and trim
+    const s = String(v).trim().replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
 
-  _buildTextStyle(cell, type, align) {
+    _evaluateDynColor(cell, type, displayText) {
+    const rules = Array.isArray(cell?.dyn_color) ? cell.dyn_color : [];
+    if (!rules.length) return null;
+
+    const res = { }; // { bg, fg, hide, mask }
+    const resolvePath = (obj, path) => {
+      if (!obj || !path) return undefined;
+      const norm = String(path).replace(/\[(\d+)\]/g, '.$1');
+      const parts = norm.split('.').filter(Boolean);
+      let cur = obj;
+      for (const p of parts) {
+        if (cur && typeof cur === 'object' && p in cur) cur = cur[p];
+        else return undefined;
+      }
+      return cur;
+    };
+    const getAttr = (stObj, attr) => {
+      if (!stObj || !attr) return undefined;
+      if (typeof attr === 'string' && attr.includes('.')) {
+        return resolvePath(stObj.attributes, attr);
+      }
+      return stObj.attributes?.[attr];
+    };
+
+    for (const r of rules) {
+      if (!r || typeof r !== 'object') continue;
+      const op = r.op || '=';
+      let sourceVal;
+      let isThisEntity = false; // for rescale
+
+      if (r.entity) {
+        // NEW: always read from selected entity/attribute
+        const stObj = this.hass?.states?.[r.entity];
+        sourceVal = r.attr ? getAttr(stObj, r.attr) : stObj?.state;
+        isThisEntity = (type === 'entity' && r.entity === cell?.value);
+      } else if (r.src) {
+        // LEGACY support
+        const src = r.src || 'this_display';
+        if (src === 'this_display') {
+          sourceVal = displayText ?? (cell?.value ?? '');
+        } else if (src === 'this_state') {
+          if (type === 'entity') {
+            const stObj = this.hass?.states?.[cell?.value];
+            sourceVal = stObj?.state;
+          } else {
+            sourceVal = displayText ?? (cell?.value ?? '');
+          }
+        } else if (src === 'this_attr') {
+          if (type === 'entity') {
+            const stObj = this.hass?.states?.[cell?.value];
+            sourceVal = getAttr(stObj, r.attr);
+          }
+        } else if (src === 'other_state') {
+          const stObj = this.hass?.states?.[r.entity];
+          sourceVal = stObj?.state;
+        } else if (src === 'other_attr') {
+          const stObj = this.hass?.states?.[r.entity];
+          sourceVal = getAttr(stObj, r.attr);
+        } else {
+          sourceVal = displayText ?? (cell?.value ?? '');
+        }
+        isThisEntity =
+          (type === 'entity') &&
+          (src === 'this_display' || src === 'this_state' || src === 'this_attr');
+      } else {
+        // default: this cell visible value
+        sourceVal = displayText ?? (cell?.value ?? '');
+        isThisEntity = (type === 'entity');
+      }
+
+      // numeric operators
+      const isNumOp = op === '>' || op === '>=' || op === '<' || op === '<=' || op === 'between';
+      let match = false;
+
+      if (isNumOp) {
+        let num = this._coerceNumber(sourceVal);
+        if (isThisEntity && Number.isFinite(num)) {
+          num = this._rescaleIfConfigured(cell, num);
+        }
+        if (!Number.isFinite(num)) {
+          match = false;
+        } else if (op === 'between') {
+          const a = this._coerceNumber(r.val);
+          const b = this._coerceNumber(r.val2);
+          if (Number.isFinite(a) && Number.isFinite(b)) {
+            const min = Math.min(a, b);
+            const max = Math.max(a, b);
+            match = (num >= min && num <= max);
+          } else {
+            match = false;
+          }
+        } else {
+          const ref = this._coerceNumber(r.val);
+          if (!Number.isFinite(ref)) {
+            match = false;
+          } else {
+            if (op === '>') match = num > ref;
+            else if (op === '>=') match = num >= ref;
+            else if (op === '<') match = num < ref;
+            else if (op === '<=') match = num <= ref;
+          }
+        }
+      } else if (op === 'contains' || op === 'not_contains') {
+        const s = String(sourceVal ?? '').toLowerCase();
+        const needle = String(r.val ?? '').toLowerCase();
+        match = s.includes(needle);
+        if (op === 'not_contains') match = !match;
+      } else {
+        // '=' or '!=' : try numeric if both numeric, else case-insensitive string
+        const leftNum = this._coerceNumber(sourceVal);
+        const rightNum = this._coerceNumber(r.val);
+        if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
+          match = (leftNum === rightNum);
+        } else {
+          const a = String(sourceVal ?? '').toLowerCase();
+          const b = String(r.val ?? '').toLowerCase();
+          match = (a === b);
+        }
+        if (op === '!=') match = !match;
+      }
+
+      if (match) {
+        if (r.bg) res.bg = r.bg;
+        if (r.fg) res.fg = r.fg;
+        if (r.hide !== undefined) res.hide = !!r.hide;
+        if (r.mask !== undefined) res.mask = r.mask;
+      }
+    }
+    return res;
+  }
+
+
+  _buildTextStyle(cell, type, align, dyn){
     const st = cell?.style || {};
     const pad = this.config?.cell_padding || { top: 4, right: 0, bottom: 4, left: 0 };
     const parts = [
@@ -165,13 +308,16 @@ class FlexCellsCard extends LitElement {
 
     if (st.text_transform) parts.push(`text-transform:${st.text_transform}`);
     if (st.letter_spacing) parts.push(`letter-spacing:${st.letter_spacing}`);
+    if (dyn && dyn.bg) parts.push(`background:${dyn.bg}`);
+    if (dyn && dyn.fg) parts.push(`color:${dyn.fg}`);
     return parts.join(';');
   }
 
-  _buildIconStyle(cell) {
+  _buildIconStyle(cell, dyn){
     const st = cell?.style || {};
     const parts = [];
     if (st.color) parts.push(`color:${st.color}`);
+    if (dyn && dyn.fg) parts.push(`color:${dyn.fg}`);
     const globalSize = this.config?.text_size;
     const iconSize = st.icon_size || globalSize || '';
     if (iconSize) parts.push(`--mdc-icon-size:${iconSize}`);
@@ -373,17 +519,22 @@ class FlexCellsCard extends LitElement {
   }
 
   // ---------- render ----------
+  
   _renderHeaderCell(cell) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
     const align = cell?.align || 'left';
-    const thStyle = this._buildTextStyle(cell, type, align);
-    const hasActions = this._hasCellActions(cell);
 
     if (type === 'icon') {
-      const iconStyle = this._buildIconStyle(cell);
+      const display = val;
+      const dyn = this._evaluateDynColor(cell, type, display);
+      const thStyle = this._buildTextStyle(cell, type, align, dyn);
+      const hasActions = this._hasCellActions(cell);
+      const iconStyle = this._buildIconStyle(cell, dyn);
+      const content = (dyn && dyn.hide) ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '') : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : '');
+
       if (hasActions) {
-        const aria = val || 'icon';
+        const aria = display || 'icon';
         return html`
           <th class="icon clickable"
               style=${thStyle}
@@ -395,16 +546,20 @@ class FlexCellsCard extends LitElement {
               @pointercancel=${(e)=>this._onCellPointerCancel(e)}
               @mouseleave=${(e)=>this._onCellPointerCancel(e)}
               @keydown=${(e)=>this._onCellKeydown(e, cell)}>
-            ${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}
+            ${content}
           </th>
         `;
       }
-      return html`<th class="icon" style=${thStyle}>${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}</th>`;
+      return html`<th class="icon" style=${thStyle}>${content}</th>`;
     }
 
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
+      const dyn = this._evaluateDynColor(cell, type, display);
+      const thStyle = this._buildTextStyle(cell, type, align, dyn);
+      const hasActions = this._hasCellActions(cell);
+      const shown = (dyn && dyn.hide) ? (dyn.mask || '') : display;
       const aria = stateObj ? `${val}: ${display}` : val;
 
       if (hasActions) {
@@ -419,13 +574,13 @@ class FlexCellsCard extends LitElement {
               @pointerup=${(e)=>this._onCellPointerUp(e, cell, val)}
               @pointercancel=${(e)=>this._onCellPointerCancel(e)}
               @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-              @keydown=${(e)=>this._onCellKeydown(e, cell, val)}>
-            ${display}
+              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+            ${shown}
           </th>
         `;
       }
 
-      // Domyślne 'more-info' dla encji w nagłówku, jeśli brak własnych akcji
+      // Default 'more-info' for header entity if no actions
       return html`
         <th class="clickable"
             style=${thStyle}
@@ -435,10 +590,16 @@ class FlexCellsCard extends LitElement {
             aria-label=${aria}
             @click=${() => this._openMoreInfo(val)}
             @keydown=${(e) => this._onEntityKeydown(e, val)}>
-          ${display}
+          ${shown}
         </th>
       `;
     }
+
+    const display = val ?? '';
+    const dyn = this._evaluateDynColor(cell, type, display);
+    const thStyle = this._buildTextStyle(cell, type, align, dyn);
+    const hasActions = this._hasCellActions(cell);
+    const shown = (dyn && dyn.hide) ? (dyn.mask || '') : (val ?? '');
 
     if (hasActions) {
       const aria = String(val || 'text');
@@ -453,26 +614,32 @@ class FlexCellsCard extends LitElement {
             @pointercancel=${(e)=>this._onCellPointerCancel(e)}
             @mouseleave=${(e)=>this._onCellPointerCancel(e)}
             @keydown=${(e)=>this._onCellKeydown(e, cell)}>
-          ${val ?? ''}
+          ${shown}
         </th>
       `;
     }
 
-    return html`<th style=${thStyle}>${val ?? ''}</th>`;
+    return html`<th style=${thStyle}>${shown}</th>`;
   }
 
 
+
+  
   _renderBodyCell(cell) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
     const align = cell?.align || 'right';
-    const tdStyle = this._buildTextStyle(cell, type, align);
-    const hasActions = this._hasCellActions(cell);
 
     if (type === 'icon') {
-      const iconStyle = this._buildIconStyle(cell);
+      const display = val;
+      const dyn = this._evaluateDynColor(cell, type, display);
+      const tdStyle = this._buildTextStyle(cell, type, align, dyn);
+      const hasActions = this._hasCellActions(cell);
+      const iconStyle = this._buildIconStyle(cell, dyn);
+      const content = (dyn && dyn.hide) ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '') : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : '');
+
       if (hasActions) {
-        const aria = val || 'icon';
+        const aria = display || 'icon';
         return html`
           <td class="icon clickable"
               style=${tdStyle}
@@ -485,16 +652,20 @@ class FlexCellsCard extends LitElement {
               @pointercancel=${(e)=>this._onCellPointerCancel(e)}
               @mouseleave=${(e)=>this._onCellPointerCancel(e)}
               @keydown=${(e)=>this._onCellKeydown(e, cell)}>
-            ${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}
+            ${content}
           </td>
         `;
       }
-      return html`<td class="icon" style=${tdStyle}>${val ? html`<ha-icon style=${iconStyle} icon="${val}"></ha-icon>` : ''}</td>`;
+      return html`<td class="icon" style=${tdStyle}>${content}</td>`;
     }
 
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
+      const dyn = this._evaluateDynColor(cell, type, display);
+      const tdStyle = this._buildTextStyle(cell, type, align, dyn);
+      const hasActions = this._hasCellActions(cell);
+      const shown = (dyn && dyn.hide) ? (dyn.mask || '') : display;
       const aria = stateObj ? `${val}: ${display}` : val;
 
       if (hasActions) {
@@ -510,8 +681,8 @@ class FlexCellsCard extends LitElement {
               @pointerup=${(e)=>this._onCellPointerUp(e, cell, val)}
               @pointercancel=${(e)=>this._onCellPointerCancel(e)}
               @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-              @keydown=${(e)=>this._onCellKeydown(e, cell, val)}>
-            ${display}
+              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+            ${shown}
           </td>
         `;
       }
@@ -525,10 +696,17 @@ class FlexCellsCard extends LitElement {
             aria-label=${aria}
             @click=${() => this._openMoreInfo(val)}
             @keydown=${(e) => this._onEntityKeydown(e, val)}>
-          ${display}
+          ${shown}
         </td>
       `;
     }
+
+    // string
+    const display = val ?? '';
+    const dyn = this._evaluateDynColor(cell, type, display);
+    const tdStyle = this._buildTextStyle(cell, type, align, dyn);
+    const hasActions = this._hasCellActions(cell);
+    const shown = (dyn && dyn.hide) ? (dyn.mask || '') : (val ?? '');
 
     if (hasActions) {
       const aria = String(val || 'text');
@@ -544,13 +722,14 @@ class FlexCellsCard extends LitElement {
             @pointercancel=${(e)=>this._onCellPointerCancel(e)}
             @mouseleave=${(e)=>this._onCellPointerCancel(e)}
             @keydown=${(e)=>this._onCellKeydown(e, cell)}>
-          ${val ?? ''}
+          ${shown}
         </td>
       `;
     }
 
-    return html`<td style=${tdStyle}>${val ?? ''}</td>`;
+    return html`<td style=${tdStyle}>${shown}</td>`;
   }
+
 
   _resolveCardPadding() {
     const v = this.config?.card_padding;

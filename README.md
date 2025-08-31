@@ -6,10 +6,11 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
 
 ## Features
-- Mix cells with **Icon / Text / Entity**
+- Mix cells with **Icon / Text / Entity / Attribute**
+- Dynamic background and content coloring, dynamic hiding, dynamic mask
+- **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
-- **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Visual editor, drag-and-drop rows/columns, zebra rows, responsive columns
 
 ## Installation
@@ -35,12 +36,15 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 Add the card in the UI and configure everything from the visual editor.
 
 ## Changelog
-- v0.4.x —
+- v0.5.0 —
+  - Added **dynamic coloring/hiding/masking**.
+  - Minor visual improvements.
+- v0.4.0 —
   - Added **entity attributes** with per-attribute **rescaling** (Input/Output min/max).
   - Fixed **tap & hold** so secondary actions (e.g., setting brightness) work alongside the primary action.
   - Fixed **header/last row background** overflow when card padding is set to `0`.
-- v0.3.x — Added **inline color picker** with live preview.
-- v0.2.x — Added per-cell actions: **tap / hold / double-tap**.
+- v0.3.0 — Added **inline color picker** with live preview.
+- v0.2.0 — Added per-cell actions: **tap / hold / double-tap**.
 - v0.1.x — First basic release of the card.  
 &nbsp;  
    [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
@@ -48,6 +52,10 @@ Add the card in the UI and configure everything from the visual editor.
 ### Screenshots
 
 <table>
+  <tr>
+    <td><img src="images/flex-cells-card-7.png" alt="Flex Cells card"></td>
+    <td><img src="images/flex-cells-card-8.png" alt="Flex Cells card"></td>
+  </tr>
   <tr>
     <td><img src="images/flex-cells-card-4.png" alt="Flex Cells card"></td>
     <td><img src="images/flex-cells-card-5.png" alt="Flex Cells card"></td>

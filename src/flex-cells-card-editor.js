@@ -18,19 +18,30 @@ class FlexCellsCardEditor extends LitElement {
       outline: none; box-shadow: 0 0 4px rgba(3,169,244,.4);
     }
     .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .cols2 > * { min-width: 0; }
+    .cols2 {
+      /* prevent overflow from MWC internals */
+       display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; }
+    .cols2 > * { min-width: 0; }
+    .option.group .cols1, .option.group .cols2, .option.group .cols3 { width: 100%; }
+    .cols1 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .cols2 > * { min-width: 0; }
     .cols4 {
       display: grid;
       grid-template-columns: 1fr 1fr; /* było: repeat(4, 1fr) */
       gap: 8px;
     }
     .cols21 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+    .cols2 > * { min-width: 0; }
 
     .cell-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
     .cell-wide { grid-template-columns: 1fr; }
 
     .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .inline { display: inline-flex; align-items: center; gap: 8px; }
+    .cols2 > * { min-width: 0; }
     .muted { color: #888; font-size: 12px; margin-top: -4px; margin-bottom: 8px; }
+    .rulehdr { color: #888; font-size: 12px; margin: 0 0 4px; }
     .mini { width: 140px; padding: 6px 8px; font-size: 13px; margin: 0; }
     .mini-wide { width: 220px; padding: 6px 8px; font-size: 13px; margin: 0; }
     button { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--divider-color, #ddd); background: var(--card-background-color, #fff); cursor: pointer; }
@@ -46,7 +57,7 @@ class FlexCellsCardEditor extends LitElement {
     .option.unit { align-items: center; gap: 12px; }
     .option.unit span.label { flex: 0 0 auto; }
     .option.unit ha-textfield { flex: 1 1 auto; margin: 0; }
-    .option.group { cursor: default; flex-wrap: wrap; }
+    .option.group { display:block; cursor: default; margin-bottom:12px; }
     .option.full { width: 100%; box-sizing: border-box; }
 
     .tabs { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
@@ -166,7 +177,15 @@ class FlexCellsCardEditor extends LitElement {
       box-shadow: none;
     }
     .chiptools button:disabled { opacity:.5; cursor:not-allowed; }
-  `;
+  
+    .right { display: flex; justify-content: flex-end; }
+    .dyn-hint { margin-top: 6px; }
+    .option.group .attr-input { margin-top: 8px; margin-bottom: 8px; }
+    .option.group button.danger { margin-top: 8px; }
+    .option.group button.danger.mini { width: auto; }
+
+    .option.group .mask-input { margin-top: 8px; }
+`;
 
   constructor() {
     super();
@@ -263,6 +282,25 @@ class FlexCellsCardEditor extends LitElement {
 
     return filtered.map(k => (basePath ? basePath + '.' : '') + k);
   }
+  _buildAttrSuggestionsForEntity(entityId, inputValue) {
+    const attrs = (this.hass?.states?.[entityId]?.attributes) || {};
+    const val = String(inputValue || '');
+    if (val === '') return Object.keys(attrs).sort();
+    const norm = val.replace(/\[(\d+)\]/g, '.$1');
+    const parts = norm.split('.');
+    const endsWithDot = norm.endsWith('.');
+    const last = endsWithDot ? '' : parts[parts.length - 1];
+    const basePath = parts.length > 1 ? parts.slice(0, -1).join('.') : '';
+    let node = attrs;
+    if (parts.length > 1) {
+      node = this._resolvePath(attrs, parts.slice(0, -1).join('.'));
+      if (node === undefined) return [];
+    }
+    const children = this._listKeys(node).sort();
+    const filtered = last ? children.filter(k => k.startsWith(last)) : children;
+    return filtered.map(k => (basePath ? basePath + '.' : '') + k);
+  }
+
   
 
   async _ensureEntityPickerLoaded() {
@@ -598,6 +636,43 @@ class FlexCellsCardEditor extends LitElement {
   _styleToggle(r,c,key,e){ this._patchCellStyle(r,c,{ [key]: !!e.target.checked }); }
   _styleValue(r,c,key,e){ this._patchCellStyle(r,c,{ [key]: e.target.value }); }
 
+  _ruleTitle(idx) {
+    const lang = (this.hass?.locale?.language || 'en').toLowerCase();
+    const isPl = lang.startsWith('pl');
+    return isPl ? `Reguła ${idx + 1}` : `Rule ${idx + 1}`;
+  }
+
+  // === Dynamic coloring: simple rules ===
+  _getCellRules(r,c){
+    try { return Array.isArray(this.config?.rows?.[r]?.cells?.[c]?.dyn_color) ? [...this.config.rows[r].cells[c].dyn_color] : []; }
+    catch(_) { return []; }
+  }
+  _setCellRules(r,c,rules){
+    const rows = [...(this.config.rows||[])];
+    const row = { ...rows[r] };
+    const cells = [...(row.cells||[])];
+    const cell = { ...cells[c], dyn_color: rules };
+    cells[c] = cell; rows[r] = { ...row, cells };
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged();
+  }
+  _addRule(r,c){
+    const rules = this._getCellRules(r,c);
+    rules.push({ entity:'', attr:'', op:'=', val:'', bg:'', fg:'', hide:false });
+    this._setCellRules(r,c,rules);
+  }
+  _removeRule(r,c,idx){
+    const rules = this._getCellRules(r,c);
+    rules.splice(idx,1);
+    this._setCellRules(r,c,rules);
+  }
+  _updateRule(r,c,idx,patch){
+    const rules = this._getCellRules(r,c);
+    rules[idx] = { ...(rules[idx]||{}), ...(patch||{}) };
+    this._setCellRules(r,c,rules);
+  }
+
+
   _setActiveTab(rowIdx,tab){ this._activeTabs={...this._activeTabs,[rowIdx]:tab}; this.requestUpdate(); }
   _copyActiveCell(rowIdx){
     const colCount=this.config.column_count||1; const active=Math.min(this._activeTabs[rowIdx]||0,colCount-1);
@@ -619,14 +694,44 @@ class FlexCellsCardEditor extends LitElement {
   _toggleCollapse(i){ const a=Array.from(this._collapsed||[]); a[i]=!a[i]; this._collapsed=a; this.requestUpdate(); }
   _moveRow(i,dir){ const target=i+dir; if(target<0 || target>=(this.config.rows||[]).length) return; this.__reorderRows(i,target); }
 
-  /* podgląd wiersza */
-  _rowPreview(row){
-    const out=[]; const cells=Array.isArray(row?.cells)?row.cells:[];
-    const iconCell=cells.find(c=>c?.type==='icon'&&c.value); if(iconCell) out.push(html`<ha-icon icon="${iconCell.value}" style="--mdc-icon-size:18px;margin-right:6px;"></ha-icon>`);
-    const strCell=cells.find(c=>c?.type==='string'&&c.value); if(strCell) out.push(html`<span>${strCell.value}</span>`);
-    const entCells=cells.filter(c=>c?.type==='entity'&&c.value).slice(0,2);
-    entCells.forEach(c=>{ const st=this.hass?.states?.[c.value]; const name=st?.attributes?.friendly_name||c.value; out.push(html`<span> • ${name}</span>`); });
-    return out.length?html`${out}`:html`—`;
+  /* podgląd wiersza – wersja "po kolei" */
+  _rowPreview(row) {
+    const cells = Array.isArray(row?.cells) ? row.cells : [];
+    const out = [];
+    let textCount = 0; // liczymy tylko elementy tekstowe (string/entity), żeby wstawić " • " pomiędzy nimi
+
+    for (const c of cells) {
+      if (!c || !c.value) continue;
+
+      if (c.type === 'icon') {
+        out.push(html`<ha-icon
+          .icon=${c.value}
+          style="--mdc-icon-size:18px; margin-right:6px;"
+        ></ha-icon>`);
+        continue;
+      }
+
+      if (c.type === 'string') {
+        const v = String(c.value);
+        if (!v) continue;
+        if (textCount > 0) out.push(html`<span> • </span>`);
+        out.push(html`<span>${v}</span>`);
+        textCount++;
+        continue;
+      }
+
+      if (c.type === 'entity') {
+        const st = this.hass?.states?.[c.value];
+        const name = st?.attributes?.friendly_name || c.value;
+        if (!name) continue;
+        if (textCount > 0) out.push(html`<span> • </span>`);
+        out.push(html`<span>${name}</span>`);
+        textCount++;
+        continue;
+      }
+    }
+
+    return out.length ? html`${out}` : html`—`;
   }
 
   firstUpdated() { this._ensureEntityPickerLoaded(); }
@@ -684,111 +789,186 @@ class FlexCellsCardEditor extends LitElement {
     }
   };
 
-_onPaletteClick(ev, rIdx, cIdx) {
-  const current = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.style?.color || "#ffffff";
+  _onPaletteClick(ev, rIdx, cIdx) {
+    const current = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.style?.color || "#ffffff";
 
-  const toHex = (v) => {
-    const s = String(v || "").trim();
-    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) {
-      return s.length === 4 ? "#" + s.slice(1).split("").map(c => c + c).join("") : s;
+    const toHex = (v) => {
+      const s = String(v || "").trim();
+      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s)) {
+        return s.length === 4 ? "#" + s.slice(1).split("").map(c => c + c).join("") : s;
+      }
+      const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      return m ? "#" + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2,"0")).join("") : "#ffffff";
+    };
+
+    // Pozycja: kursor lub rect klikniętego elementu
+    const tgt  = ev?.currentTarget || ev?.target;
+    const rect = tgt?.getBoundingClientRect?.();
+    let x = (typeof ev?.clientX === "number") ? ev.clientX : (rect ? rect.right - 8 : 24);
+    let y = (typeof ev?.clientY === "number") ? ev.clientY : (rect ? rect.bottom + 8 : 24);
+
+    // Kotwiczenie w ha-dialog (jeśli jest)
+    const dialog = this.closest?.("ha-dialog");
+    let container = document.body;
+    let position = "fixed";
+    if (dialog?.shadowRoot) {
+      const surface =
+        dialog.shadowRoot.querySelector(".mdc-dialog__surface") ||
+        dialog.shadowRoot.querySelector(".mdc-dialog") ||
+        dialog.shadowRoot.querySelector(".mdc-dialog__container");
+      if (surface) {
+        const srect = surface.getBoundingClientRect();
+        x -= srect.left; y -= srect.top;
+        container = surface; position = "absolute";
+      }
     }
-    const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    return m ? "#" + [m[1], m[2], m[3]].map(n => (+n).toString(16).padStart(2,"0")).join("") : "#ffffff";
-  };
 
-  // Pozycja: kursor lub rect klikniętego elementu
-  const tgt  = ev?.currentTarget || ev?.target;
-  const rect = tgt?.getBoundingClientRect?.();
-  let x = (typeof ev?.clientX === "number") ? ev.clientX : (rect ? rect.right - 8 : 24);
-  let y = (typeof ev?.clientY === "number") ? ev.clientY : (rect ? rect.bottom + 8 : 24);
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = toHex(current);
+    input.tabIndex = -1;
 
-  // Kotwiczenie w ha-dialog (jeśli jest)
-  const dialog = this.closest?.("ha-dialog");
-  let container = document.body;
-  let position = "fixed";
-  if (dialog?.shadowRoot) {
-    const surface =
-      dialog.shadowRoot.querySelector(".mdc-dialog__surface") ||
-      dialog.shadowRoot.querySelector(".mdc-dialog") ||
-      dialog.shadowRoot.querySelector(".mdc-dialog__container");
-    if (surface) {
-      const srect = surface.getBoundingClientRect();
-      x -= srect.left; y -= srect.top;
-      container = surface; position = "absolute";
-    }
+    Object.assign(input.style, {
+      position,
+      left: `${Math.round(x)}px`,
+      top: `${Math.round(y)}px`,
+      transform: "translate(-10px, -10px)",
+      width: "18px",
+      height: "18px",
+      opacity: "0.001",         // nie 0!
+      pointerEvents: "auto",     // pozwól pułapce focusu zaakceptować element
+      border: "0",
+      padding: "0",
+      margin: "0",
+      zIndex: "2147483647",
+    });
+
+    // (opcjonalnie) live preview
+    const scope = dialog || document;
+    const previewCard = scope.querySelector?.("flex-cells-card") || null;
+    const varName = `--fcc-cell-r${rIdx}-c${cIdx}-color`;
+
+    let raf = 0, lastHex = null;
+    const pushThrottled = (hex) => {
+      lastHex = hex;
+      if (!raf) {
+        raf = requestAnimationFrame(() => { raf = 0; this._patchCellStyle(rIdx, cIdx, { color: lastHex }); });
+      }
+    };
+    const setLive = (hex) => { if (previewCard) previewCard.style.setProperty(varName, hex); else pushThrottled(hex); };
+
+    // --- Sprzątanie: bez 'blur' / bez 'window.focus' ---
+    let cleaned = false, armed = false;
+    const cleanup = () => {
+      if (cleaned) return; cleaned = true;
+      input.removeEventListener("input", onInput);
+      input.removeEventListener("change", onChange);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("pointerdown", onOutsidePointer, true);
+      if (previewCard) previewCard.style.removeProperty(varName);
+      input.remove();
+    };
+
+    const onInput = (e) => setLive(e.target.value);                // podgląd
+    const onChange = (e) => { this._patchCellStyle(rIdx, cIdx, { color: e.target.value }); cleanup(); };
+    const onKeyDown = (e) => { if (e.key === "Escape") cleanup(); };
+    const onOutsidePointer = (e) => { if (!armed) return; if (e.target !== input) cleanup(); };
+
+    input.addEventListener("input", onInput);
+    input.addEventListener("change", onChange);
+    window.addEventListener("keydown", onKeyDown, true);
+    // uzbrój „klik poza” dopiero po chwili, żeby nie wyłapać kliknięcia, które otworzyło picker
+    setTimeout(() => { armed = true; window.addEventListener("pointerdown", onOutsidePointer, true); }, 250);
+
+    container.appendChild(input);
+    void input.offsetWidth;                     // wymuś layout
+    try { input.focus({ preventScroll: true }); } catch {}
+
+    // otwórz picker po klatce
+    requestAnimationFrame(() => {
+      try { (typeof input.showPicker === "function" ? input.showPicker() : input.click()); }
+      catch { input.click(); }
+    });
+
+    // awaryjne sprzątanie po 60s (gdyby user anulował gestami systemowymi itd.)
+    setTimeout(() => cleanup(), 60000);
   }
 
-  const input = document.createElement("input");
-  input.type = "color";
-  input.value = toHex(current);
-  input.tabIndex = -1;
+  // Picker dla reguł dynamicznego kolorowania (bg/fg) – płynny i zakotwiczony przy przycisku
+  _onRuleColorPicker(ev, rIdx, cIdx, ruleIdx, key /* 'bg' | 'fg' */) {
+    ev.stopPropagation();
 
-  Object.assign(input.style, {
-    position,
-    left: `${Math.round(x)}px`,
-    top: `${Math.round(y)}px`,
-    transform: "translate(-10px, -10px)",
-    width: "18px",
-    height: "18px",
-    opacity: "0.001",         // nie 0!
-    pointerEvents: "auto",     // pozwól pułapce focusu zaakceptować element
-    border: "0",
-    padding: "0",
-    margin: "0",
-    zIndex: "2147483647",
-  });
+    const rules = this._getCellRules?.(rIdx, cIdx) || (this.config?.rows?.[rIdx]?.cells?.[cIdx]?.dyn_color) || [];
+    const current = rules?.[ruleIdx]?.[key] || '#ff0000';
 
-  // (opcjonalnie) live preview
-  const scope = dialog || document;
-  const previewCard = scope.querySelector?.("flex-cells-card") || null;
-  const varName = `--fcc-cell-r${rIdx}-c${cIdx}-color`;
+    // Pozycjonowanie przy przycisku + wsparcie dla ha-dialog
+    const btn  = ev.currentTarget || ev.target;
+    const rect = btn?.getBoundingClientRect?.();
+    let x = rect ? rect.right - 8 : 24;
+    let y = rect ? rect.bottom + 8 : 24;
 
-  let raf = 0, lastHex = null;
-  const pushThrottled = (hex) => {
-    lastHex = hex;
-    if (!raf) {
-      raf = requestAnimationFrame(() => { raf = 0; this._patchCellStyle(rIdx, cIdx, { color: lastHex }); });
+    let container = document.body;
+    let position  = 'fixed';
+    const dialog  = this.closest?.('ha-dialog');
+    if (dialog?.shadowRoot) {
+      const surface = dialog.shadowRoot.querySelector('.mdc-dialog__surface') || dialog;
+      if (surface) {
+        const srect = surface.getBoundingClientRect();
+        x -= srect.left; y -= srect.top;
+        container = surface; position = 'absolute';
+      }
     }
-  };
-  const setLive = (hex) => { if (previewCard) previewCard.style.setProperty(varName, hex); else pushThrottled(hex); };
 
-  // --- Sprzątanie: bez 'blur' / bez 'window.focus' ---
-  let cleaned = false, armed = false;
-  const cleanup = () => {
-    if (cleaned) return; cleaned = true;
-    input.removeEventListener("input", onInput);
-    input.removeEventListener("change", onChange);
-    window.removeEventListener("keydown", onKeyDown, true);
-    window.removeEventListener("pointerdown", onOutsidePointer, true);
-    if (previewCard) previewCard.style.removeProperty(varName);
-    input.remove();
-  };
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = current;
+    Object.assign(input.style, {
+      position,
+      left: `${Math.round(x)}px`,
+      top: `${Math.round(y)}px`,
+      transform: 'translate(-10px,-10px)',
+      width: '18px',
+      height: '18px',
+      opacity: '0.001',       // nie 0 – musi łapać focus
+      pointerEvents: 'auto',
+      border: '0', padding: '0', margin: '0',
+      zIndex: '2147483647',
+    });
 
-  const onInput = (e) => setLive(e.target.value);                // podgląd
-  const onChange = (e) => { this._patchCellStyle(rIdx, cIdx, { color: e.target.value }); cleanup(); };
-  const onKeyDown = (e) => { if (e.key === "Escape") cleanup(); };
-  const onOutsidePointer = (e) => { if (!armed) return; if (e.target !== input) cleanup(); };
+    // Podgląd w polu obok (bez pełnego re-renderu)
+    const textfield = btn.parentElement?.querySelector('ha-textfield') || null;
 
-  input.addEventListener("input", onInput);
-  input.addEventListener("change", onChange);
-  window.addEventListener("keydown", onKeyDown, true);
-  // uzbrój „klik poza” dopiero po chwili, żeby nie wyłapać kliknięcia, które otworzyło picker
-  setTimeout(() => { armed = true; window.addEventListener("pointerdown", onOutsidePointer, true); }, 250);
+    let pending = null;
+    let tid = 0;
+    const commit = () => {
+      tid = 0;
+      if (pending != null) this._updateRule(rIdx, cIdx, ruleIdx, { [key]: pending });
+    };
 
-  container.appendChild(input);
-  void input.offsetWidth;                     // wymuś layout
-  try { input.focus({ preventScroll: true }); } catch {}
+    const onInput  = (e) => {
+      pending = e.target.value;
+      if (textfield) { textfield.value = pending; textfield.requestUpdate?.(); }
+      if (!tid) tid = setTimeout(commit, 50);      // throttle
+    };
+    const onChange = (e) => { pending = e.target.value; clearTimeout(tid); commit(); cleanup(); };
+    const onKey    = (e) => { if (e.key === 'Escape') cleanup(); };
 
-  // otwórz picker po klatce
-  requestAnimationFrame(() => {
-    try { (typeof input.showPicker === "function" ? input.showPicker() : input.click()); }
-    catch { input.click(); }
-  });
+    const cleanup = () => {
+      input.removeEventListener('input', onInput);
+      input.removeEventListener('change', onChange);
+      window.removeEventListener('keydown', onKey, true);
+      input.remove();
+    };
 
-  // awaryjne sprzątanie po 60s (gdyby user anulował gestami systemowymi itd.)
-  setTimeout(() => cleanup(), 60000);
-}
+    input.addEventListener('input', onInput);
+    input.addEventListener('change', onChange);
+    window.addEventListener('keydown', onKey, true);
 
+    container.appendChild(input);
+    void input.offsetWidth;
+    try { input.showPicker?.(); } catch { input.click(); }
+    setTimeout(cleanup, 60000);
+  }
 
   render(){
     if(!this.config || !Array.isArray(this.config.rows)) return html`<div>—</div>`;
@@ -1220,6 +1400,9 @@ _onPaletteClick(ev, rIdx, cIdx) {
                           ${t(this.hass, 'editor.advanced')}
                         </summary>
 
+                        <div class="muted dyn-hint">${t(this.hass, 'editor.actions_hint')}</div>
+
+
                         <div class="cell-grid cell-wide" style="margin-top:8px;">
                           <ha-form
                             .hass=${this.hass}
@@ -1238,8 +1421,144 @@ _onPaletteClick(ev, rIdx, cIdx) {
                           ></ha-form>
                         </div>
 
-                        <div class="muted">
-                          ${t(this.hass, 'editor.actions_hint')}
+                        
+                      </details>
+                      <!-- DYNAMIC COLORING -->
+                      <details style="margin-top:12px;">
+                        <summary style="cursor:pointer;font-weight:600;">
+                          ${t(this.hass, 'editor.dynamic_title')}
+                        </summary>
+
+                        <div class="muted dyn-hint">${t(this.hass, 'editor.dynamic_hint')}</div>
+
+                        ${ (Array.isArray(cell?.dyn_color) ? cell.dyn_color : []).map((rule, ridx) => html`
+                          <div class="option group full">
+                            <!-- Entity full width -->
+                            <div class="cols1">
+                              <div class="rulehdr">${this._ruleTitle(ridx)}</div>
+                              <ha-entity-picker
+                                .hass=${this.hass}
+                                .value=${rule.entity || ''}
+                                allow-custom-entity
+                                @value-changed=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ entity: e.detail?.value || e.target.value })}>
+                              </ha-entity-picker>
+                            </div>
+
+                            <!-- Attribute full width with spacing -->
+                            <div class="cols1">
+                              <input
+                                class="text-input attr-input"
+                                list=${`dynattr-list-${rIdx}-${cIdx}-${ridx}`}
+                                .value=${rule.attr || ''}
+                                placeholder=${t(this.hass,"placeholder.attribute_path")}
+                                @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ attr: (e.target.value||'') }) }
+                              />
+                              <datalist id=${`dynattr-list-${rIdx}-${cIdx}-${ridx}`}>
+                                ${ (this._buildAttrSuggestionsForEntity(rule.entity, rule.attr || '') || [])
+                                    .map(opt => html`<option value="${opt}"></option>`) }
+                              </datalist>
+                            </div>
+
+                            <!-- Operator + Value row (50/50) -->
+                            <div class="cols2">
+                              <ha-select
+                                .label=${t(this.hass, 'dynamic.operator')}
+                                .value=${rule.op || '='}
+                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ op: e.target.value })}
+                                @closed=${(e)=>e.stopPropagation()}>
+                                <mwc-list-item value=">">&gt;</mwc-list-item>
+                                <mwc-list-item value=">=">&ge;</mwc-list-item>
+                                <mwc-list-item value="<">&lt;</mwc-list-item>
+                                <mwc-list-item value="<=">&le;</mwc-list-item>
+                                <mwc-list-item value="=">=</mwc-list-item>
+                                <mwc-list-item value="!=">≠</mwc-list-item>
+                                <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
+                                <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
+                                <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
+                              </ha-select>
+
+                              ${ rule && rule.op === 'between' ? html`
+                                <div class="cols2">
+                                  <ha-textfield
+                                    .label=${t(this.hass, 'dynamic.min')}
+                                    .value=${rule.val || ''}
+                                    @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ val: e.target.value })}>
+                                  </ha-textfield>
+                                  <ha-textfield
+                                    .label=${t(this.hass, 'dynamic.max')}
+                                    .value=${rule.val2 || ''}
+                                    @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ val2: e.target.value })}>
+                                  </ha-textfield>
+                                </div>
+                              ` : html`
+                                <ha-textfield
+                                  .label=${t(this.hass, 'editor.value')}
+                                  .value=${rule.val || ''}
+                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ val: e.target.value })}>
+                                </ha-textfield>
+                              ` }
+                            </div>
+
+                            <!-- Colors row: Background + Content 50/50 with pickers -->
+                            <div class="cols2">
+                              <div class="inline">
+                                <ha-textfield
+                                  .label=${t(this.hass, 'dynamic.bg')}
+                                  .value=${rule.bg || ''}
+                                  .placeholder=${"transparent | #ff5722 | red | var(--color)"}
+                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ bg: e.target.value })}>
+                                </ha-textfield>
+                                <button class="toggle" title="Palette"
+                                  @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, cIdx, ridx, 'bg')}>
+                                  <ha-icon icon="mdi:palette"></ha-icon>
+                                </button>
+                              </div>
+
+                              <div class="inline">
+                                <ha-textfield
+                                  .label=${t(this.hass, 'dynamic.fg')}
+                                  .value=${rule.fg || ''}
+                                  .placeholder=${"transparent | #ff5722 | red | var(--color)"}
+                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ fg: e.target.value })}>
+                                </ha-textfield>
+                                <button class="toggle" title="Palette"
+                                  @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, cIdx, ridx, 'fg')}>
+                                  <ha-icon icon="mdi:palette"></ha-icon>
+                                </button>
+                              </div>
+                            </div>
+
+                            <!-- Hide toggle full width -->
+                            <div class="cols1">
+                              <label class="option">
+                                <input type="checkbox" .checked=${!!rule.hide}
+                                  @change=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ hide: !!e.target.checked })} />
+                                ${t(this.hass, 'dynamic.hide')}
+                              </label>
+                            </div>
+
+                            ${ rule.hide ? html`
+                              <div class="cols1">
+                                <ha-textfield class="mask-input"
+                                  .label=${t(this.hass, 'dynamic.mask')}
+                                  .value=${rule.mask || ''}
+                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ mask: e.target.value })}>
+                                </ha-textfield>
+                              </div>
+                            ` : html`` }
+
+                            <!-- Delete aligned right, auto width -->
+                            <div class="cols1 right">
+                              <button class="danger mini" @click=${()=>this._removeRule(rIdx,cIdx,ridx)}>
+                                ${t(this.hass, 'dynamic.delete_rule')}
+                              </button>
+                            </div>
+                          </div>
+                        `)}
+
+                        <div class="flex" style="margin-top:6px;">
+                          <button class="mini" @click=${()=>this._addRule(rIdx,cIdx)}>➕ ${t(this.hass,'dynamic.add_rule')}</button>
+                          
                         </div>
                       </details>
                     `;
