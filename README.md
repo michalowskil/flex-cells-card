@@ -7,7 +7,7 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 
 ## Features
 - Mix cells with **Icon / Text / Entity / Attribute**
-- Dynamic background and content coloring, dynamic hiding, dynamic mask
+- **Dynamic Rules**: Color & Content Overrides
 - **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
@@ -36,6 +36,8 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 Add the card in the UI and configure everything from the visual editor.
 
 ## Changelog
+- v0.6.0 —
+  - Added **dynamic icons**.
 - v0.5.0 —
   - Added **dynamic coloring/hiding/masking**.
   - Minor visual improvements.
@@ -51,34 +53,28 @@ Add the card in the UI and configure everything from the visual editor.
 
 ### Screenshots
 
-<table>
-  <tr>
-    <td><img src="images/flex-cells-card-7.png" alt="Flex Cells card"></td>
-    <td><img src="images/flex-cells-card-8.png" alt="Flex Cells card"></td>
-  </tr>
-  <tr>
-    <td><img src="images/flex-cells-card-4.png" alt="Flex Cells card"></td>
-    <td><img src="images/flex-cells-card-5.png" alt="Flex Cells card"></td>
-  </tr>
-  <tr>
-    <td><img src="images/flex-cells-card-1.png" alt="Flex Cells card"></td>
-    <td><img src="images/flex-cells-card-2.png" alt="Flex Cells card"></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="images/flex-cells-card-6.png" alt="Flex Cells card inside Grid Card"></td>
-  </tr>
-</table>
+| ![Flex Cells Card](images/flex-cells-card-9.png) | ![Flex Cells Card](images/flex-cells-card-8.png) |
+|---|---|
+
+| ![Flex Cells Card](images/flex-cells-card-4.png) | ![Flex Cells Card](images/flex-cells-card-5.png) |
+|---|---|
+
+| ![Flex Cells Card](images/flex-cells-card-1.png) | ![Flex Cells Card](images/flex-cells-card-2.png) |
+|---|---|
+
+| ![Flex Cells Card config](images/flex-cells-card-6.png) |
+|---|
 
 **Main configuration view**
-| ![Flex Cells main config](images/flex-cells-card-configuration1.png) |
+| ![Flex Cells Card config](images/flex-cells-card-configuration1.png) |
 |---|
 
 **Row and cell configuration**
-| ![Flex Cells main config](images/flex-cells-card-configuration2.png) |
+| ![Flex Cells Card config](images/flex-cells-card-configuration2.png) |
 |---|
 
 **Tap & Hold Actions**
-| ![Flex Cells main config](images/flex-cells-card-configuration3.png) |
+| ![Flex Cells Card config](images/flex-cells-card-configuration3.png) |
 |---|
 
 Example YAML:

@@ -658,7 +658,7 @@ class FlexCellsCardEditor extends LitElement {
   }
   _addRule(r,c){
     const rules = this._getCellRules(r,c);
-    rules.push({ entity:'', attr:'', op:'=', val:'', bg:'', fg:'', hide:false });
+    rules.push({ entity:'', attr:'', op:'=', val:'', bg:'', fg:'', overwrite:'' });
     this._setCellRules(r,c,rules);
   }
   _removeRule(r,c,idx){
@@ -1528,22 +1528,47 @@ class FlexCellsCardEditor extends LitElement {
                               </div>
                             </div>
 
-                            <!-- Hide toggle full width -->
+                            <!-- Overwrite select -->
                             <div class="cols1">
-                              <label class="option">
-                                <input type="checkbox" .checked=${!!rule.hide}
-                                  @change=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ hide: !!e.target.checked })} />
-                                ${t(this.hass, 'dynamic.hide')}
-                              </label>
+                              <ha-select
+                                .label=${t(this.hass, 'dynamic.overwrite_label')}
+                                .value=${rule.overwrite || ''}
+                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite: e.target.value })}
+                                @closed=${(e)=>e.stopPropagation()}>
+                                <mwc-list-item value=""></mwc-list-item>
+                                <mwc-list-item value="hide">${t(this.hass, 'dynamic.overwrite_hide')}</mwc-list-item>
+                                <mwc-list-item value="text">${t(this.hass, 'dynamic.overwrite_text')}</mwc-list-item>
+                                <mwc-list-item value="icon">${t(this.hass, 'dynamic.overwrite_icon')}</mwc-list-item>
+                              </ha-select>
                             </div>
 
-                            ${ rule.hide ? html`
+                            ${ (rule.overwrite || '') === 'text' ? html`
                               <div class="cols1">
                                 <ha-textfield class="mask-input"
-                                  .label=${t(this.hass, 'dynamic.mask')}
-                                  .value=${rule.mask || ''}
-                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ mask: e.target.value })}>
+                                  .label=${t(this.hass, 'dynamic.text')}
+                                  .value=${rule.text || ''}
+                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ text: e.target.value })}>
                                 </ha-textfield>
+                              </div>
+                            ` : html`` }
+
+                            ${ (rule.overwrite || '') === 'icon' ? html`
+                              <div class="cols1">
+                                ${customElements.get('ha-icon-picker') ? html`
+                                  <ha-icon-picker
+                                    .hass=${this.hass}
+                                    .label=${t(this.hass,"editor.icon_label")}
+                                    .value=${rule.icon || ''}
+                                    @value-changed=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ icon: e.detail?.value || '' })}>
+                                  </ha-icon-picker>
+                                ` : html`
+                                  <ha-textfield
+                                    .label=${t(this.hass,"editor.icon_label")}
+                                    .value=${rule.icon || ''}
+                                    .placeholder=${t(this.hass,"placeholder.icon")}
+                                    @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon: e.target.value })}>
+                                  </ha-textfield>
+                                `}
                               </div>
                             ` : html`` }
 

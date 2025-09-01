@@ -56,8 +56,8 @@ const DICTS = {
     scale_out_min: "Output min",
     scale_out_max: "Output max",
     scale_hint: "Map a numeric value from one range to another (e.g., 0-255 → 0-100).",
-    dynamic_title: "Dynamic Coloring/Hiding/Mask",
-    dynamic_hint: "Evaluate rules from top to bottom; the last match wins.",
+    dynamic_title: "Dynamic Rules: Color & Content Overrides",
+    dynamic_hint: "Evaluate rules from top to bottom, the last match wins.",
     value: "Value"
   },
   placeholder: {
@@ -77,9 +77,11 @@ const DICTS = {
     max: "Max",
     bg: "Background color",
     fg: "Content color",
-    hide: "Hide content",
-    mask: "Mask (optional)",
-    rule_prefix: "Rule"
+    overwrite_label: "Overwrite content",
+    overwrite_hide: "Hide",
+    overwrite_text: "Overwrite with text",
+    overwrite_icon: "Overwrite with icon",
+    text: "Text",
   },
   align: {
     left: "left",
@@ -158,8 +160,8 @@ const DICTS = {
     scale_out_min: "Wyjście min",
     scale_out_max: "Wyjście max",
     scale_hint: "Mapuj wartość z jednego zakresu na inny (np. 0-255 → 0-100).",
-    dynamic_title: "Dynamiczne kolorowanie/chowanie/maska",
-    dynamic_hint: "Reguły sprawdzane są od góry do dołu; ostatnia dopasowana wygrywa.",
+    dynamic_title: "Reguły dynamiczne: kolor i nadpisywanie treści",
+    dynamic_hint: "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa.",
     value: "Wartość"
   },
   placeholder: {
@@ -179,9 +181,11 @@ const DICTS = {
     max: "Max",
     bg: "Kolor tła",
     fg: "Kolor zawartości",
-    hide: "Ukryj zawartość",
-    mask: "Maska (opcjonalnie)",
-    rule_prefix: "Reguła"
+    overwrite_label: "Nadpisz zawartość",
+    overwrite_hide: "Ukryj",
+    overwrite_text: "Nadpisz tekstem",
+    overwrite_icon: "Nadpisz ikoną",
+    text: "Tekst",
   },
   align: {
     left: "lewo",

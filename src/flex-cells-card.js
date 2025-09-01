@@ -273,11 +273,29 @@ class FlexCellsCard extends LitElement {
       }
 
       if (match) {
-        if (r.bg) res.bg = r.bg;
+                if (r.bg) res.bg = r.bg;
         if (r.fg) res.fg = r.fg;
-        if (r.hide !== undefined) res.hide = !!r.hide;
-        if (r.mask !== undefined) res.mask = r.mask;
-      }
+        // New overwrite API
+        const ow = (r.overwrite || '').toLowerCase();
+        if (ow === 'hide') {
+          res.hide = true;
+          res.mask = '';
+          res.overwrite = 'hide';
+        } else if (ow === 'text') {
+          res.hide = true;
+          res.mask = r.text || '';
+          res.overwrite = 'text';
+          res.text = r.text || '';
+        } else if (ow === 'icon') {
+          res.hide = true; // hide original
+          res.overwrite = 'icon';
+          res.icon = r.icon || '';
+        } else {
+          // Legacy support
+          if (r.hide !== undefined) res.hide = !!r.hide;
+          if (r.mask !== undefined) res.mask = r.mask;
+        }
+    }
     }
     return res;
   }
@@ -531,7 +549,11 @@ class FlexCellsCard extends LitElement {
       const thStyle = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
-      const content = (dyn && dyn.hide) ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '') : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : '');
+      const content = (dyn && dyn.overwrite === 'icon')
+        ? (dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '')
+        : ((dyn && dyn.hide)
+            ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '')
+            : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : ''));
 
       if (hasActions) {
         const aria = display || 'icon';
@@ -559,7 +581,8 @@ class FlexCellsCard extends LitElement {
       const dyn = this._evaluateDynColor(cell, type, display);
       const thStyle = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
-      const shown = (dyn && dyn.hide) ? (dyn.mask || '') : display;
+      const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
+      const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : display);
       const aria = stateObj ? `${val}: ${display}` : val;
 
       if (hasActions) {
@@ -599,7 +622,8 @@ class FlexCellsCard extends LitElement {
     const dyn = this._evaluateDynColor(cell, type, display);
     const thStyle = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
-    const shown = (dyn && dyn.hide) ? (dyn.mask || '') : (val ?? '');
+    const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
+    const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : (val ?? ''));
 
     if (hasActions) {
       const aria = String(val || 'text');
@@ -636,7 +660,11 @@ class FlexCellsCard extends LitElement {
       const tdStyle = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
-      const content = (dyn && dyn.hide) ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '') : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : '');
+      const content = (dyn && dyn.overwrite === 'icon')
+        ? (dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '')
+        : ((dyn && dyn.hide)
+            ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '')
+            : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : ''));
 
       if (hasActions) {
         const aria = display || 'icon';
@@ -665,7 +693,8 @@ class FlexCellsCard extends LitElement {
       const dyn = this._evaluateDynColor(cell, type, display);
       const tdStyle = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
-      const shown = (dyn && dyn.hide) ? (dyn.mask || '') : display;
+      const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
+      const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : display);
       const aria = stateObj ? `${val}: ${display}` : val;
 
       if (hasActions) {
@@ -706,7 +735,8 @@ class FlexCellsCard extends LitElement {
     const dyn = this._evaluateDynColor(cell, type, display);
     const tdStyle = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
-    const shown = (dyn && dyn.hide) ? (dyn.mask || '') : (val ?? '');
+    const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
+    const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : (val ?? ''));
 
     if (hasActions) {
       const aria = String(val || 'text');
