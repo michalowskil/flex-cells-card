@@ -2,6 +2,7 @@
 const DICTS = {
   en: {
   editor: {
+    appearance: "Appearance & Style",
     card_title: "Flex Cells card configuration",
     columns_count: "Columns",
     text_size_global: "Text size (default)",
@@ -25,6 +26,8 @@ const DICTS = {
     align: "Alignment",
     unit_from_entity: "Use unit from entity",
     precision: "Precision",
+    show_control: "Show control",
+    press: "Press",
     text_color: "Text color",
     text_size: "Text size",
     text_transform: "Text transform",
@@ -106,6 +109,7 @@ const DICTS = {
 
   pl: {
   editor: {
+    appearance: "Wygląd i styl",
     card_title: "Konfiguracja karty Flex Cells",
     columns_count: "Liczba kolumn",
     text_size_global: "Rozmiar tekstu (domyślny)",
@@ -129,6 +133,8 @@ const DICTS = {
     align: "Wyrównanie",
     unit_from_entity: "Jednostka z encji",
     precision: "Precyzja",
+    show_control: "Pokaż kontrolkę",
+    press: "Wciśnij",
     text_color: "Tekst kolor",
     text_size: "Tekst rozmiar",
     text_transform: "Tekst transformacja",

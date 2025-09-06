@@ -1,12 +1,12 @@
 # Flex Cells Card
 
-A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, or **attributes** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
+A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, **attributes**, or **input controls** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
 
 If you like this card, please consider giving it a ⭐ on GitHub:  
 [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
 
 ## Features
-- Mix cells with **Icon / Text / Entity / Attribute**
+- Mix cells with **Icon / Text / Entity / Attribute / Input Control**
 - **Dynamic Rules**: Color & Content Overrides
 - **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
@@ -36,6 +36,9 @@ If you like this card, please consider giving it a ⭐ on GitHub:
 Add the card in the UI and configure everything from the visual editor.
 
 ## Changelog
+- v0.7.0 —
+  - Added **controls for input types**: boolean, number, select, button, datetime, text.
+  - Added **"Appearance & Style" section** in the card editor for easier navigation.
 - v0.6.0 —
   - Added **dynamic icons**.
 - v0.5.0 —
@@ -52,6 +55,9 @@ Add the card in the UI and configure everything from the visual editor.
    [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
 
 ### Screenshots
+
+| ![Flex Cells Card config](images/flex-cells-card-10.png) |
+|---|
 
 | ![Flex Cells Card](images/flex-cells-card-9.png) | ![Flex Cells Card](images/flex-cells-card-8.png) |
 |---|---|

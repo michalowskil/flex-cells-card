@@ -1,0 +1,18 @@
+name: Auto Assign Issues
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign issue to repo owner
+        uses: actions-ecosystem/action-add-assignees@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          assignees: michalowskil

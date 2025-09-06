@@ -39,7 +39,20 @@ class FlexCellsCard extends LitElement {
     .celltext { display: inline-block; white-space: nowrap; }
     .datatable td, .datatable th { line-height: 1.15; }
   
-    .icon-mask { display:inline-block; vertical-align:middle; }`;
+    .icon-mask { display:inline-block; vertical-align:middle; }
+    /* === Simple HA input controls === */
+    .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; }
+    .ctrl-range { width: 140px; vertical-align: middle; }
+    .ctrl-select, .ctrl-input { padding: 4px 6px; border: 1px solid var(--divider-color,#ddd); border-radius: 6px; background: var(--card-background-color,#fff); }
+    .ctrl-button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--divider-color,#ddd); background: var(--primary-background-color, #f7f7f7); cursor: pointer; }
+    .ctrl-switch { vertical-align: middle; }
+    .ctrl-input[type="date"],
+    .ctrl-input[type="time"],
+    .ctrl-input[type="datetime-local"],
+    .ctrl-select {
+      width: auto !important;
+    }
+`;
 
   setConfig(config) {
     const colCount =
@@ -93,12 +106,110 @@ class FlexCellsCard extends LitElement {
     const b = Number(cell?.scale_in_max);
     const c = Number(cell?.scale_out_min);
     const d = Number(cell?.scale_out_max);
-    if (![a,b,c,d].every(Number.isFinite) || a === b) return n;
+    if (![a, b, c, d].every(Number.isFinite) || a === b) return n;
     let t = (n - a) / (b - a);
     // domyślnie: clamp do [0,1] — zachowuje się „intuicyjnie” dla zakresów typu 0–255 -> 0–100
     t = Math.max(0, Math.min(1, t));
     return c + t * (d - c);
   }
+  // === Simple input entity controls (input_boolean / input_number / input_select) ===
+  _renderEntityControl(cell, stateObj, entityId) {
+    const domain = (entityId || '').split('.')[0];
+    if (domain === 'input_boolean') {
+      const checked = stateObj?.state === 'on';
+      return html`<label class="ctrl-wrap"><input class="ctrl-switch" type="checkbox" .checked=${checked}
+        @change=${(e) => this._onToggleBoolean(entityId, !!e.target.checked)} /></label>`;
+    }
+    if (domain === 'input_number') {
+      const attrs = stateObj?.attributes || {};
+      const min = Number(attrs.min ?? 0);
+      const max = Number(attrs.max ?? 100);
+      const stepRaw = attrs.step;
+      const step = (stepRaw === 'any' || stepRaw == null) ? 1 : Number(stepRaw) || 1;
+      const val = Number(stateObj?.state) || 0;
+      return html`<span class="ctrl-wrap">
+        <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${step}" .value=${String(val)}
+          @change=${(e) => this._onSetNumber(entityId, Number(e.target.value))} />
+        <span class="ctrl-value">${this._formatEntityCell(cell, stateObj)}</span>
+      </span>`;
+    }
+    if (domain === 'input_select') {
+      const rawOpts = stateObj?.attributes?.options;
+      const opts = Array.isArray(rawOpts) ? rawOpts.map(o => String(o)) : [];
+      const cur = String(stateObj?.state ?? '');
+      return html`<select class="ctrl-select" .value=${cur}
+        @change=${(e) => this._onSelectOption(entityId, e.target.value)}>
+        ${opts.map(o => html`<option value="${o}" ?selected=${o === cur}>${o}</option>`)}
+      </select>`;
+    }
+    if (domain === 'input_text') {
+      const cur = String(stateObj?.state ?? '');
+      return html`<input class="ctrl-input" type="text" .value=${cur}
+    @change=${(e) => this._onSetText(entityId, e.target.value)} />`;
+    }
+    if (domain === 'input_datetime') {
+      const attrs = stateObj?.attributes || {};
+      const hasDate = !!attrs.has_date;
+      const hasTime = !!attrs.has_time;
+      // Build value for input controls from state string primarily
+      const st = String(stateObj?.state ?? '');
+      let valueStr = '';
+      if (hasDate && hasTime) {
+        // formats like "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS"
+        const iso = st.replace(' ', 'T');
+        const m = iso.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::\d{2})?$/);
+        valueStr = m ? `${m[1]}T${m[2]}` : '';
+      } else if (hasDate) {
+        const m = st.match(/^(\d{4}-\d{2}-\d{2})$/);
+        valueStr = m ? m[1] : '';
+      } else if (hasTime) {
+        const m = st.match(/^(\d{2}:\d{2})(?::\d{2})?$/);
+        valueStr = m ? m[1] : '';
+      }
+      if (hasDate && hasTime) {
+        return html`<input class="ctrl-input" type="datetime-local" .value=${valueStr}
+      @change=${(e) => this._onSetDatetime(entityId, e.target.value)} />`;
+      } else if (hasDate) {
+        return html`<input class="ctrl-input" type="date" .value=${valueStr}
+      @change=${(e) => this._onSetDatetime(entityId, e.target.value)} />`;
+      } else if (hasTime) {
+        return html`<input class="ctrl-input" type="time" .value=${valueStr}
+      @change=${(e) => this._onSetDatetime(entityId, e.target.value)} />`;
+      }
+      // Fallback: just show formatted cell value
+      return this._formatEntityCell(cell, stateObj);
+    }
+
+    if (domain === 'input_button') {
+      const friendly = stateObj?.attributes?.friendly_name ?? stateObj?.attributes?.name;
+      const label = (friendly && String(friendly)) || (t(this.hass, 'editor.press') || 'Press');
+      const hasActs = this._hasCellActions(cell);
+      if (hasActs) {
+        return html`<button class="ctrl-button"
+      @click=${(e) => { e.stopPropagation(); }}
+      @pointerdown=${(e) => this._onCellPointerDown(e, cell, entityId)}
+      @pointerup=${(e) => this._onCellPointerUp(e, cell, entityId)}
+      @pointercancel=${(e) => this._onCellPointerCancel(e)}
+      @mouseleave=${(e) => this._onCellPointerCancel(e)}
+      @keydown=${(e) => this._onCellKeydown(e, cell, entityId)}>${label}</button>`;
+      }
+      // no actions configured -> do nothing, and don't bubble to cell
+      return html`<button class="ctrl-button" @click=${(e) => { e.stopPropagation(); e.preventDefault(); }}>${label}</button>`;
+    }
+
+    return this._formatEntityCell(cell, stateObj);
+  }
+  _onToggleBoolean(entityId, isOn) {
+    const svc = isOn ? 'turn_on' : 'turn_off';
+    try { this.hass?.callService('input_boolean', svc, { entity_id: entityId }); } catch (e) { /* noop */ }
+  }
+  _onSetNumber(entityId, value) {
+    try { this.hass?.callService('input_number', 'set_value', { entity_id: entityId, value }); } catch (e) { /* noop */ }
+  }
+  _onSelectOption(entityId, option) {
+    try { this.hass?.callService('input_select', 'select_option', { entity_id: entityId, option }); } catch (e) { /* noop */ }
+  }
+
 
   _formatEntityCell(cell, stateObj) {
     // Show attribute value if requested; otherwise show the entity state
@@ -112,6 +223,12 @@ class FlexCellsCard extends LitElement {
         source = stateObj?.attributes?.[attr];
       }
     } else {
+      // Default to entity state; special-case for input_button -> show its 'name' attribute when present
+      const domain = String(cell?.value || '').split('.')[0];
+      if (domain === 'input_button') {
+        const nm = stateObj?.attributes?.friendly_name ?? stateObj?.attributes?.name;
+        if (nm !== undefined) return String(nm);
+      }
       source = stateObj?.state;
     }
     const raw = (source !== undefined && source !== null) ? source : 'n/a';
@@ -151,11 +268,11 @@ class FlexCellsCard extends LitElement {
     return Number.isFinite(n) ? n : NaN;
   }
 
-    _evaluateDynColor(cell, type, displayText) {
+  _evaluateDynColor(cell, type, displayText) {
     const rules = Array.isArray(cell?.dyn_color) ? cell.dyn_color : [];
     if (!rules.length) return null;
 
-    const res = { }; // { bg, fg, hide, mask }
+    const res = {}; // { bg, fg, hide, mask }
     const resolvePath = (obj, path) => {
       if (!obj || !path) return undefined;
       const norm = String(path).replace(/\[(\d+)\]/g, '.$1');
@@ -273,7 +390,7 @@ class FlexCellsCard extends LitElement {
       }
 
       if (match) {
-                if (r.bg) res.bg = r.bg;
+        if (r.bg) res.bg = r.bg;
         if (r.fg) res.fg = r.fg;
         // New overwrite API
         const ow = (r.overwrite || '').toLowerCase();
@@ -295,13 +412,13 @@ class FlexCellsCard extends LitElement {
           if (r.hide !== undefined) res.hide = !!r.hide;
           if (r.mask !== undefined) res.mask = r.mask;
         }
-    }
+      }
     }
     return res;
   }
 
 
-  _buildTextStyle(cell, type, align, dyn){
+  _buildTextStyle(cell, type, align, dyn) {
     const st = cell?.style || {};
     const pad = this.config?.cell_padding || { top: 4, right: 0, bottom: 4, left: 0 };
     const parts = [
@@ -331,7 +448,7 @@ class FlexCellsCard extends LitElement {
     return parts.join(';');
   }
 
-  _buildIconStyle(cell, dyn){
+  _buildIconStyle(cell, dyn) {
     const st = cell?.style || {};
     const parts = [];
     if (st.color) parts.push(`color:${st.color}`);
@@ -473,7 +590,7 @@ class FlexCellsCard extends LitElement {
   _onCellPointerDown(e, cell, entityId) {
     e.stopPropagation();
     /* NEW: zgaś domyślne (zaznaczanie/callout) – zwłaszcza iOS */
-    try { e.preventDefault(); } catch(_) {}
+    try { e.preventDefault(); } catch (_) { }
     const el = e.currentTarget;
     el.__lastTapTs = el.__lastTapTs || 0;
 
@@ -537,7 +654,7 @@ class FlexCellsCard extends LitElement {
   }
 
   // ---------- render ----------
-  
+
   _renderHeaderCell(cell) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
@@ -552,8 +669,8 @@ class FlexCellsCard extends LitElement {
       const content = (dyn && dyn.overwrite === 'icon')
         ? (dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '')
         : ((dyn && dyn.hide)
-            ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '')
-            : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : ''));
+          ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '')
+          : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : ''));
 
       if (hasActions) {
         const aria = display || 'icon';
@@ -563,11 +680,11 @@ class FlexCellsCard extends LitElement {
               role="button"
               tabindex="0"
               aria-label=${aria}
-              @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
-              @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
-              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
-              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+              @pointerdown=${(e) => this._onCellPointerDown(e, cell)}
+              @pointerup=${(e) => this._onCellPointerUp(e, cell)}
+              @pointercancel=${(e) => this._onCellPointerCancel(e)}
+              @mouseleave=${(e) => this._onCellPointerCancel(e)}
+              @keydown=${(e) => this._onCellKeydown(e, cell)}>
             ${content}
           </th>
         `;
@@ -577,6 +694,13 @@ class FlexCellsCard extends LitElement {
 
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
+      const domain = val?.split?.('.')?.[0];
+      if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
+        const _disp = this._formatEntityCell(cell, stateObj);
+        const _dyn = this._evaluateDynColor(cell, type, _disp);
+        const _thStyle = this._buildTextStyle(cell, type, align, _dyn);
+        return html`<th style=${_thStyle}>${this._renderEntityControl(cell, stateObj, val)}</th>`;
+      }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const dyn = this._evaluateDynColor(cell, type, display);
       const thStyle = this._buildTextStyle(cell, type, align, dyn);
@@ -593,11 +717,11 @@ class FlexCellsCard extends LitElement {
               role="button"
               tabindex="0"
               aria-label=${aria}
-              @pointerdown=${(e)=>this._onCellPointerDown(e, cell, val)}
-              @pointerup=${(e)=>this._onCellPointerUp(e, cell, val)}
-              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
-              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+              @pointerdown=${(e) => this._onCellPointerDown(e, cell, val)}
+              @pointerup=${(e) => this._onCellPointerUp(e, cell, val)}
+              @pointercancel=${(e) => this._onCellPointerCancel(e)}
+              @mouseleave=${(e) => this._onCellPointerCancel(e)}
+              @keydown=${(e) => this._onCellKeydown(e, cell)}>
             ${shown}
           </th>
         `;
@@ -633,11 +757,11 @@ class FlexCellsCard extends LitElement {
             role="button"
             tabindex="0"
             aria-label=${aria}
-            @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
-            @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
-            @pointercancel=${(e)=>this._onCellPointerCancel(e)}
-            @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-            @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+            @pointerdown=${(e) => this._onCellPointerDown(e, cell)}
+            @pointerup=${(e) => this._onCellPointerUp(e, cell)}
+            @pointercancel=${(e) => this._onCellPointerCancel(e)}
+            @mouseleave=${(e) => this._onCellPointerCancel(e)}
+            @keydown=${(e) => this._onCellKeydown(e, cell)}>
           ${shown}
         </th>
       `;
@@ -648,7 +772,7 @@ class FlexCellsCard extends LitElement {
 
 
 
-  
+
   _renderBodyCell(cell) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
@@ -663,8 +787,8 @@ class FlexCellsCard extends LitElement {
       const content = (dyn && dyn.overwrite === 'icon')
         ? (dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '')
         : ((dyn && dyn.hide)
-            ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '')
-            : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : ''));
+          ? (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '')
+          : (display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : ''));
 
       if (hasActions) {
         const aria = display || 'icon';
@@ -674,12 +798,12 @@ class FlexCellsCard extends LitElement {
               role="button"
               tabindex="0"
               aria-label=${aria}
-              @contextmenu=${(e)=>e.preventDefault()}
-              @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
-              @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
-              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
-              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+              @contextmenu=${(e) => e.preventDefault()}
+              @pointerdown=${(e) => this._onCellPointerDown(e, cell)}
+              @pointerup=${(e) => this._onCellPointerUp(e, cell)}
+              @pointercancel=${(e) => this._onCellPointerCancel(e)}
+              @mouseleave=${(e) => this._onCellPointerCancel(e)}
+              @keydown=${(e) => this._onCellKeydown(e, cell)}>
             ${content}
           </td>
         `;
@@ -689,6 +813,13 @@ class FlexCellsCard extends LitElement {
 
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
+      const domain = val?.split?.('.')?.[0];
+      if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
+        const _disp = this._formatEntityCell(cell, stateObj);
+        const _dyn = this._evaluateDynColor(cell, type, _disp);
+        const _tdStyle = this._buildTextStyle(cell, type, align, _dyn);
+        return html`<td style=${_tdStyle}>${this._renderEntityControl(cell, stateObj, val)}</td>`;
+      }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const dyn = this._evaluateDynColor(cell, type, display);
       const tdStyle = this._buildTextStyle(cell, type, align, dyn);
@@ -705,12 +836,12 @@ class FlexCellsCard extends LitElement {
               role="button"
               tabindex="0"
               aria-label=${aria}
-              @contextmenu=${(e)=>e.preventDefault()}
-              @pointerdown=${(e)=>this._onCellPointerDown(e, cell, val)}
-              @pointerup=${(e)=>this._onCellPointerUp(e, cell, val)}
-              @pointercancel=${(e)=>this._onCellPointerCancel(e)}
-              @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-              @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+              @contextmenu=${(e) => e.preventDefault()}
+              @pointerdown=${(e) => this._onCellPointerDown(e, cell, val)}
+              @pointerup=${(e) => this._onCellPointerUp(e, cell, val)}
+              @pointercancel=${(e) => this._onCellPointerCancel(e)}
+              @mouseleave=${(e) => this._onCellPointerCancel(e)}
+              @keydown=${(e) => this._onCellKeydown(e, cell)}>
             ${shown}
           </td>
         `;
@@ -746,12 +877,12 @@ class FlexCellsCard extends LitElement {
             role="button"
             tabindex="0"
             aria-label=${aria}
-            @contextmenu=${(e)=>e.preventDefault()}
-            @pointerdown=${(e)=>this._onCellPointerDown(e, cell)}
-            @pointerup=${(e)=>this._onCellPointerUp(e, cell)}
-            @pointercancel=${(e)=>this._onCellPointerCancel(e)}
-            @mouseleave=${(e)=>this._onCellPointerCancel(e)}
-            @keydown=${(e)=>this._onCellKeydown(e, cell)}>
+            @contextmenu=${(e) => e.preventDefault()}
+            @pointerdown=${(e) => this._onCellPointerDown(e, cell)}
+            @pointerup=${(e) => this._onCellPointerUp(e, cell)}
+            @pointercancel=${(e) => this._onCellPointerCancel(e)}
+            @mouseleave=${(e) => this._onCellPointerCancel(e)}
+            @keydown=${(e) => this._onCellKeydown(e, cell)}>
           ${shown}
         </td>
       `;
@@ -816,25 +947,25 @@ class FlexCellsCard extends LitElement {
           <thead>
             <tr>
               ${Array.from({ length: colCount }, (_, i) => {
-                const cells = Array.isArray(headerRow?.cells) ? headerRow.cells : [];
-                const cell = cells[i] ?? { type: 'string', value: '', align: 'left', style: { bold: true } };
-                const withBold = cell.style?.bold === undefined
-                  ? { ...cell, style: { ...(cell.style || {}), bold: true } }
-                  : cell;
-                return this._renderHeaderCell(withBold);
-              })}
+      const cells = Array.isArray(headerRow?.cells) ? headerRow.cells : [];
+      const cell = cells[i] ?? { type: 'string', value: '', align: 'left', style: { bold: true } };
+      const withBold = cell.style?.bold === undefined
+        ? { ...cell, style: { ...(cell.style || {}), bold: true } }
+        : cell;
+      return this._renderHeaderCell(withBold);
+    })}
             </tr>
           </thead>
         ` : ''}
 
         <tbody>
           ${bodyRows.map((row) => {
-            const cells = Array.isArray(row?.cells) ? row.cells : [];
-            const filled = Array.from({ length: colCount }, (_, i) =>
-              cells[i] ?? { type: 'string', value: '', align: 'right' }
-            );
-            return html`<tr>${filled.map((cell) => this._renderBodyCell(cell))}</tr>`;
-          })}
+      const cells = Array.isArray(row?.cells) ? row.cells : [];
+      const filled = Array.from({ length: colCount }, (_, i) =>
+        cells[i] ?? { type: 'string', value: '', align: 'right' }
+      );
+      return html`<tr>${filled.map((cell) => this._renderBodyCell(cell))}</tr>`;
+    })}
         </tbody>
       </table>
     `;
@@ -842,8 +973,8 @@ class FlexCellsCard extends LitElement {
     return html`
       <div class="card" style="padding:${padVal}px;">
         ${cfg.overflow_x
-          ? html`<div class="wrap"><div class="scroller" style="overflow-x:auto; overflow-y:hidden">${table}</div></div>`
-          : html`<div class="wrap">${table}</div>`}
+        ? html`<div class="wrap"><div class="scroller" style="overflow-x:auto; overflow-y:hidden">${table}</div></div>`
+        : html`<div class="wrap">${table}</div>`}
       </div>
     `;
   }
@@ -851,9 +982,42 @@ class FlexCellsCard extends LitElement {
   // NEW: fallback import — gdyby przeglądarka wczytała wersję bez edytora lub cache „zgubił” definicję
   static async getConfigElement() {
     if (!customElements.get('flex-cells-card-editor')) {
-      try { await import('./flex-cells-card-editor.js'); } catch (_e) {}
+      try { await import('./flex-cells-card-editor.js'); } catch (_e) { }
     }
     return document.createElement('flex-cells-card-editor');
+  }
+  _onSetText(entityId, value) {
+    try {
+      this.hass?.callService('input_text', 'set_value', { entity_id: entityId, value: value ?? '' });
+    } catch (e) { /* noop */ }
+  }
+  _onSetDatetime(entityId, raw) {
+    try {
+      const st = this.hass?.states?.[entityId];
+      const attrs = st?.attributes || {};
+      const hasDate = !!attrs.has_date;
+      const hasTime = !!attrs.has_time;
+      const data = { entity_id: entityId };
+      if (hasDate && hasTime) {
+        const s = String(raw || '').replace(' ', 'T');
+        const m = s.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2})(?::[0-9]{2})?$/);
+        if (m) { data.date = m[1]; data.time = m[2] + ':00'; }
+      } else if (hasDate) {
+        const m = String(raw || '').match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})$/);
+        if (m) data.date = m[1];
+      } else if (hasTime) {
+        let time = String(raw || '');
+        if (/^[0-9]{2}:[0-9]{2}$/.test(time)) time += ':00';
+        if (/^[0-9]{2}:[0-9]{2}:[0-9]{2}$/.test(time)) data.time = time;
+      }
+      this.hass?.callService('input_datetime', 'set_datetime', data);
+    } catch (e) { /* noop */ }
+  }
+  _onPressButton(entityId) {
+    try {
+      // Legacy helper; not used if cell actions are configured.
+      this.hass?.callService('input_button', 'press', { entity_id: entityId });
+    } catch (e) { /* noop */ }
   }
 }
 
@@ -865,5 +1029,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'flex-cells-card',
   name: 'Flex Cells Card',
-  description: 'A Lovelace card for Home Assistant that lets you add icons, text, entities, or attributes in flexible cell layouts — fully configurable from a visual editor with no documentation required.',
+  description: 'A Lovelace card for Home Assistant that lets you add icons, text, entities, attributes, or input controls in flexible cell layouts - fully configurable from a visual editor, so no documentation is required to get started.',
 });

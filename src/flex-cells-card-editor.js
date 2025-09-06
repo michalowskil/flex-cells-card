@@ -10,7 +10,7 @@ class FlexCellsCardEditor extends LitElement {
     input[list], select, .text-input {
       width: 100%; padding: 10px 12px; font-size: 14px;
       border: 1px solid var(--divider-color,#ccc); border-radius: 8px; box-sizing: border-box;
-      margin-bottom: 8px; background: var(--card-background-color, white);
+      background: var(--card-background-color, white);
       transition: border 0.2s, box-shadow 0.2s;
     }
     input[list]:focus, select:focus, .text-input:focus {
@@ -186,6 +186,34 @@ class FlexCellsCardEditor extends LitElement {
 
     .option.group .mask-input { margin-top: 8px; }
 `;
+
+  _isSimpleControlEntity(cell) {
+    const id = cell?.value || '';
+    // Require entity id present and no attribute override
+    if (!id || cell?.attribute) return false;
+    const domain = (id.split ? id.split('.')[0] : '');
+    const allowed = [
+      'input_boolean',
+      'input_number',
+      'input_select',
+      'input_button',
+      'input_datetime',
+      'input_text'
+    ];
+    return allowed.includes(domain);
+  }
+  _cellShowControlChanged(r, c, e) {
+    const val = !!(e?.target?.checked);
+    const rows = [ ...(this.config.rows || []) ];
+    const row = { ...(rows[r] || {}) };
+    const cells = [ ...(row.cells || []) ];
+    const cell = { ...(cells[c] || {}) };
+    if (val) cell.show_control = true; else delete cell.show_control;
+    cells[c] = cell; rows[r] = { ...row, cells };
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged?.();
+  }
+
 
   constructor() {
     super();
@@ -1185,6 +1213,19 @@ class FlexCellsCardEditor extends LitElement {
                           </datalist>
 
                         </div>
+                          
+                        <!-- KONTROLKA ZAMIAST WARTOŚCI -->
+                        ${ this._isSimpleControlEntity(cell) ? html`
+                          <div class="cell-grid cell-wide">
+                            <label class="option full" @click=${(ev)=>{ if(ev.target.tagName!=='INPUT') ev.preventDefault(); }}>
+                              <input type="checkbox"
+                                     .checked=${!!cell.show_control}
+                                     @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
+                              ${t(this.hass,"editor.show_control")}
+                            </label>
+                          </div>
+                        ` : html`` }
+
                           <!-- PRZESKALOWANIE -->
                           <div class="option group scale full">
                             <span class="label" style="font-weight:600;">${t(this.hass,"editor.scale_title")}</span>
@@ -1243,8 +1284,13 @@ class FlexCellsCardEditor extends LitElement {
                         </div>
                       `}
 
+                      <!-- APPEARANCE SECTION -->
+<details style="margin-top:12px;">
+  <summary style="cursor:pointer;font-weight:600;">
+    ${t(this.hass, 'editor.appearance')}
+  </summary>
                       <!-- WYRÓWNANIE -->
-                      <div class="cell-grid cell-wide">
+                      <div class="cell-grid cell-wide" style="margin-top: 10px;">
                         <ha-select
                           .label=${t(this.hass, "editor.align")}
                           .value=${cell.align || 'right'}
@@ -1292,7 +1338,7 @@ class FlexCellsCardEditor extends LitElement {
                         </div>
 
                         ${isNumeric ? html`
-                          <div class="cell-grid cell-wide">
+                          <div class="cell-grid cell-wide" style="margin-bottom: 8px;">
                             <ha-select
                               .label=${t(this.hass,"editor.precision")}
                               .value=${(cell.precision ?? '').toString()}
@@ -1393,6 +1439,8 @@ class FlexCellsCardEditor extends LitElement {
                           </ha-textfield>
                         </div>
                       ` : ''}
+
+                                            </details>
 
                       <!-- Tap & Hold Actions -->
                       <details style="margin-top:12px;">
