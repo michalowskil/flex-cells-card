@@ -1,9 +1,10 @@
+[![Forum](https://img.shields.io/badge/Forum-41BDF5?style=flat&logo=homeassistant&logoColor=white)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780) [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
+
 # Flex Cells Card
 
 A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, **attributes**, or **input controls** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
 
-If you like this card, please consider giving it a ⭐ on GitHub:  
-[![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
+If you like this card, please consider giving it a ⭐ on GitHub: [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
 
 ## Features
 - Mix cells with **Icon / Text / Entity / Attribute / Input Control**
@@ -50,11 +51,9 @@ Add the card in the UI and configure everything from the visual editor.
   - Fixed **header/last row background** overflow when card padding is set to `0`.
 - v0.3.0 — Added **inline color picker** with live preview.
 - v0.2.0 — Added per-cell actions: **tap / hold / double-tap**.
-- v0.1.x — First basic release of the card.  
-&nbsp;  
-   [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
+- v0.1.x — First basic release of the card.
 
-### Screenshots
+## Screenshots
 
 | ![Flex Cells Card config](images/flex-cells-card-10.png) |
 |---|
@@ -83,7 +82,7 @@ Add the card in the UI and configure everything from the visual editor.
 | ![Flex Cells Card config](images/flex-cells-card-configuration3.png) |
 |---|
 
-Example YAML:
+## Example YAML
 ```yaml
 type: 'custom:flex-cells-card'
 ```
