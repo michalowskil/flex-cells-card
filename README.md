@@ -49,9 +49,12 @@ Add the card in the UI and configure everything from the visual editor.
   - Added **entity attributes** with per-attribute **rescaling** (Input/Output min/max).
   - Fixed **tap & hold** so secondary actions (e.g., setting brightness) work alongside the primary action.
   - Fixed **header/last row background** overflow when card padding is set to `0`.
-- v0.3.0 — Added **inline color picker** with live preview.
-- v0.2.0 — Added per-cell actions: **tap / hold / double-tap**.
-- v0.1.x — First basic release of the card.
+- v0.3.0 — 
+  - Added **inline color picker** with live preview.
+- v0.2.0 —
+  - Added per-cell actions: **tap / hold / double-tap**.
+- v0.1.x —
+  - First basic release of the card.
 
 ## Screenshots
 
