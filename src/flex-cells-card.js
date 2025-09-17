@@ -245,6 +245,84 @@ class FlexCellsCard extends LitElement {
       text = (typeof raw === 'object' && raw !== null) ? JSON.stringify(raw) : raw;
     }
 
+    // input_datetime: apply custom JS-like tokens if a pattern is set (only for main state, not attributes)
+    if (!isAttr && cell?.datetime_format && typeof stateObj?.state === 'string') {
+      const entId = String(cell?.value || '');
+      if (entId.startsWith('input_datetime.')) {
+        const attrs = stateObj?.attributes || {};
+        const hasDate = !!attrs.has_date;
+        const hasTime = !!attrs.has_time;
+        const st = String(stateObj.state || '');
+        let Y, M, D, h = 0, m = 0, s = 0;
+        if (hasDate) {
+          const md = st.match(/(\d{4})-(\d{2})-(\d{2})/);
+          if (md) { Y = Number(md[1]); M = Number(md[2]); D = Number(md[3]); }
+        }
+        if (hasTime) {
+          const mt = st.match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
+          if (mt) { h = Number(mt[1]); m = Number(mt[2]); s = Number(mt[3] || '0'); }
+        }
+        let d = null;
+        if (hasDate) {
+          d = new Date(Y || 1970, (M || 1) - 1, D || 1, hasTime ? h : 0, hasTime ? m : 0, hasTime ? s : 0);
+        } else if (hasTime) {
+          const now = new Date();
+          d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+        }
+        if (d && !isNaN(d.getTime())) {
+          const H = d.getHours();
+          const locale = (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator!=='undefined' ? navigator.language : 'en') || 'en');
+          const map = {
+            'YYYY': String(d.getFullYear()),
+            'YY': String(d.getFullYear()).slice(-2).padStart(2, '0'),
+            'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(d),
+            'MM': String(d.getMonth() + 1).padStart(2, '0'),
+            'M': String(d.getMonth() + 1),
+            'DD': String(d.getDate()).padStart(2, '0'),
+            'D': String(d.getDate()),
+            'HH': String(H).padStart(2, '0'),
+            'H': String(H),
+            'hh': String(((H % 12) || 12)).padStart(2, '0'),
+            'h': String(((H % 12) || 12)),
+            'mm': String(d.getMinutes()).padStart(2, '0'),
+            'm': String(d.getMinutes()),
+            'ss': String(d.getSeconds()).padStart(2, '0'),
+            's': String(d.getSeconds()),
+          };
+          try {
+            const pattern = String(cell.datetime_format || '');
+            const tokens = ['YYYY','MMMM','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s'];
+            const apply = (pat) => {
+              let out = '';
+              for (let i=0; i<pat.length;) {
+                const ch = pat[i];
+                if (ch === '[') {
+                  const j = pat.indexOf(']', i+1);
+                  if (j === -1) { out += '['; i += 1; continue; }
+                  out += pat.slice(i+1, j);
+                  i = j + 1;
+                  continue;
+                }
+                let matched = false;
+                for (const tk of tokens) {
+                  if (pat.startsWith(tk, i)) {
+                    out += (map[tk] ?? tk);
+                    i += tk.length;
+                    matched = true;
+                    break;
+                  }
+                }
+                if (!matched) { out += ch; i += 1; }
+              }
+              return out;
+            };
+            text = apply(pattern);
+          } catch (_e) { /* ignore */ }
+        }
+      }
+    }
+
+
     // Unit logic:
     // - for attribute: prefer explicit 'unit' on cell; otherwise no automatic unit
     // - for state: allow using the entity's native unit unless disabled

@@ -61,12 +61,15 @@ const DICTS = {
     scale_hint: "Map a numeric value from one range to another (e.g., 0-255 → 0-100).",
     dynamic_title: "Dynamic Rules: Color & Content Overrides",
     dynamic_hint: "Evaluate rules from top to bottom, the last match wins.",
+    datetime_format: "Date/Time format",
+    available_tokens: "Available tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [literals in brackets]",
     value: "Value"
   },
   placeholder: {
     entity: "Select entity",
     string: "Text to display",
     icon: "mdi:icon-name",
+    datetime_format: "e.g. H:mm:ss or YYYY-MM-DD H:mm; use [ ] for literal text",
     attribute_path: "Attribute path (e.g. a.b[0].c)"
   },
   dynamic: {
@@ -168,12 +171,15 @@ const DICTS = {
     scale_hint: "Mapuj wartość z jednego zakresu na inny (np. 0-255 → 0-100).",
     dynamic_title: "Reguły dynamiczne: kolor i nadpisywanie treści",
     dynamic_hint: "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa.",
+    datetime_format: "Format daty/czasu",
+    available_tokens: "Dostępne tokeny: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [literały w nawiasach]",
     value: "Wartość"
   },
   placeholder: {
     entity: "Wybierz encję",
     string: "Tekst do wyświetlenia",
     icon: "mdi:nazwa-ikony",
+    datetime_format: "np. H:mm:ss lub YYYY-MM-DD H:mm; użyj [ ] dla tekstu literalnego",
     attribute_path: "Ścieżka atrybutu (np. a.b[0].c)"
   },
   dynamic: {

@@ -37,6 +37,8 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 Add the card in the UI and configure everything from the visual editor.
 
 ## Changelog
+- v0.8.0 —
+  - Added **formatting for input_datetime**.
 - v0.7.0 —
   - Added **controls for input types**: boolean, number, select, button, datetime, text.
   - Added **"Appearance & Style" section** in the card editor for easier navigation.

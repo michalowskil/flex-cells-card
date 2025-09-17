@@ -1197,7 +1197,19 @@ class FlexCellsCardEditor extends LitElement {
                           `}
                         </div>
                         <div class="cell-grid cell-wide">
-                          
+
+                          ${ (String(cell.value||'').startsWith('input_datetime.')) ? html`
+                            <div class="cell-wide">
+                              <ha-textfield
+                                .label=${t(this.hass,"editor.datetime_format")}
+                                .value=${cell.datetime_format || ''}
+                                .placeholder=${t(this.hass,"placeholder.datetime_format")}
+                                @input=${(e)=> this._patchCell(rIdx,cIdx,{ datetime_format: (e.target.value||'') || undefined })}
+                              ></ha-textfield>
+                              <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
+                            </div>
+                          ` : '' }
+
                           <input
                             class="text-input mini-wide"
                             list=${`attr-list-${rIdx}-${cIdx}`}

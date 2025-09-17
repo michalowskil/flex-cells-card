@@ -1,6 +1,6 @@
 {
   "name": "flex-cells-card",
-  "version": "0.0.0",
+  "version": "0.8.0",
   "description": "A Lovelace card for Home Assistant that lets you add icons, text, entities, attributes, or input controls in flexible cell layouts - fully configurable from a visual editor, so no documentation is required to get started.",
   "type": "module",
   "scripts": {
