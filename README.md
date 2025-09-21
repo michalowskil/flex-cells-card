@@ -36,6 +36,10 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 ## Usage
 Add the card in the UI and configure everything from the visual editor.
 
+## Video
+
+Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkram) recorded a video explaining this card. If you know German, I encourage you to watch it https://www.youtube.com/watch?v=oh36grjbPDQ
+
 ## Changelog
 - v0.8.0 —
   - Added **formatting for input_datetime**.
