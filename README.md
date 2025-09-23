@@ -41,6 +41,10 @@ Add the card in the UI and configure everything from the visual editor.
 Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkram) recorded a video explaining this card. If you know German, I encourage you to watch it https://www.youtube.com/watch?v=oh36grjbPDQ
 
 ## Changelog
+- v0.9.0 —
+  - Added **German translation**, thanks to [Olli](https://community.home-assistant.io/u/olli.dev/summary) and [Thomas](https://github.com/tmycgn)
+  - Added **displaying an icon on the input_button** if configured
+  - Added ability to **select a background color** without the need for dynamic rules
 - v0.8.0 —
   - Added **formatting for input_datetime**.
 - v0.7.0 —

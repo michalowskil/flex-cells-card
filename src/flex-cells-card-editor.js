@@ -624,7 +624,15 @@ class FlexCellsCardEditor extends LitElement {
   }
   _cellValueChanged(r,c,e){ this._patchCell(r,c,{ value:e.target.value }); }
   _cellAlignChanged(r,c,e){ this._patchCell(r,c,{ align:e.target.value }); }
-  _cellUseEntityUnitChanged(r,c,e){ this._patchCell(r,c,{ use_entity_unit: !!e.target.checked }); }
+  _cellUseEntityUnitChanged(r,c,e){
+    const checked = !!e.target.checked;
+    const patch = { use_entity_unit: checked };
+    if (checked) {
+      const cell = this.config?.rows?.[r]?.cells?.[c];
+      if (cell?.attribute) patch.unit = undefined;
+    }
+    this._patchCell(r,c,patch);
+  }
   _cellUnitChanged(r,c,e){ this._patchCell(r,c,{ unit:e.target.value }); }
   _cellAttributeChanged(r,c,e){
     const raw = (e && e.target && typeof e.target.value === 'string') ? e.target.value : '';
@@ -817,8 +825,9 @@ class FlexCellsCardEditor extends LitElement {
     }
   };
 
-  _onPaletteClick(ev, rIdx, cIdx) {
-    const current = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.style?.color || "#ffffff";
+  _onPaletteClick(ev, rIdx, cIdx, prop = "color") {
+    const style = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.style || {};
+    const current = style?.[prop] || "#ffffff";
 
     const toHex = (v) => {
       const s = String(v || "").trim();
@@ -874,18 +883,18 @@ class FlexCellsCardEditor extends LitElement {
     // (opcjonalnie) live preview
     const scope = dialog || document;
     const previewCard = scope.querySelector?.("flex-cells-card") || null;
-    const varName = `--fcc-cell-r${rIdx}-c${cIdx}-color`;
+    const varName = `--fcc-cell-r${rIdx}-c${cIdx}-${prop}`;
 
     let raf = 0, lastHex = null;
     const pushThrottled = (hex) => {
       lastHex = hex;
       if (!raf) {
-        raf = requestAnimationFrame(() => { raf = 0; this._patchCellStyle(rIdx, cIdx, { color: lastHex }); });
+        raf = requestAnimationFrame(() => { raf = 0; this._patchCellStyle(rIdx, cIdx, { [prop]: lastHex }); });
       }
     };
     const setLive = (hex) => { if (previewCard) previewCard.style.setProperty(varName, hex); else pushThrottled(hex); };
 
-    // --- Sprzątanie: bez 'blur' / bez 'window.focus' ---
+    // --- Sprzątanie: bez "blur" / bez "window.focus" ---
     let cleaned = false, armed = false;
     const cleanup = () => {
       if (cleaned) return; cleaned = true;
@@ -898,7 +907,7 @@ class FlexCellsCardEditor extends LitElement {
     };
 
     const onInput = (e) => setLive(e.target.value);                // podgląd
-    const onChange = (e) => { this._patchCellStyle(rIdx, cIdx, { color: e.target.value }); cleanup(); };
+    const onChange = (e) => { this._patchCellStyle(rIdx, cIdx, { [prop]: e.target.value }); cleanup(); };
     const onKeyDown = (e) => { if (e.key === "Escape") cleanup(); };
     const onOutsidePointer = (e) => { if (!armed) return; if (e.target !== input) cleanup(); };
 
@@ -1366,21 +1375,36 @@ class FlexCellsCardEditor extends LitElement {
                       ` : ''}
 
                       ${(cell.type === 'string' || cell.type === 'entity') ? html`
+                        <!-- TLO -->
+                        <div class="cell-grid cell-wide">
+                          <div class="inline">
+                            <ha-textfield
+                            .label=${t(this.hass,"editor.background_color")}
+                            .placeholder=${"#ff5722 | red | var(--color)"}
+                            .value=${st.background || ''}
+                            @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
+                            </ha-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'background')}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+                          </div>
+                        </div>
+
                         <!-- KOLOR -->
                         <div class="cell-grid cell-wide">
                           <div class="inline">
                             <ha-textfield
-                            .label=${t(this.hass,"editor.text_color")}
+                            .label=${t(this.hass,"editor.content_color")}
                             .placeholder=${"#ff5722 | red | var(--color)"}
                             .value=${st.color || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
                             </ha-textfield>
-                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx)}>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'color')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
 
                           </div>
-
+                        </div>
                         <!-- ROZMIAR -->
                         <div class="cell-grid cell-wide">
                           <ha-textfield
@@ -1432,16 +1456,31 @@ class FlexCellsCardEditor extends LitElement {
                         <div class="cell-grid cell-wide">
                           <div class="inline">
                             <ha-textfield
+                            .label=${t(this.hass,"editor.background_color")}
+                            .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                            .value=${st.background || ''}
+                            @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
+                            </ha-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'background')}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="cell-grid cell-wide">
+                          <div class="inline">
+                            <ha-textfield
                             .label=${t(this.hass,"editor.icon_color")}
                             .placeholder=${"#ff5722 | red | var(--primary-color)"},
                             .value=${st.color || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
                             </ha-textfield>
-                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx)}>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'color')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
-
                           </div>
+                        </div>
+
                         <div class="cell-grid cell-wide">
                           <ha-textfield
                             .label=${t(this.hass,"editor.icon_size")}

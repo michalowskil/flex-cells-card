@@ -44,7 +44,19 @@ class FlexCellsCard extends LitElement {
     .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; }
     .ctrl-range { width: 140px; vertical-align: middle; }
     .ctrl-select, .ctrl-input { padding: 4px 6px; border: 1px solid var(--divider-color,#ddd); border-radius: 6px; background: var(--card-background-color,#fff); }
-    .ctrl-button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--divider-color,#ddd); background: var(--primary-background-color, #f7f7f7); cursor: pointer; }
+    .ctrl-button {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--divider-color,#ddd);
+      background: var(--primary-background-color, #f7f7f7);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ctrl-button ha-icon {
+      --mdc-icon-size: 18px;
+    }
     .ctrl-switch { vertical-align: middle; }
     .ctrl-input[type="date"],
     .ctrl-input[type="time"],
@@ -181,8 +193,13 @@ class FlexCellsCard extends LitElement {
     }
 
     if (domain === 'input_button') {
-      const friendly = stateObj?.attributes?.friendly_name ?? stateObj?.attributes?.name;
+      const attrs = stateObj?.attributes || {};
+      const friendly = attrs.friendly_name ?? attrs.name;
       const label = (friendly && String(friendly)) || (t(this.hass, 'editor.press') || 'Press');
+      const icon = attrs.icon ? String(attrs.icon) : '';
+      const buttonContent = icon
+        ? html`<ha-icon icon="${icon}"></ha-icon><span>${label}</span>`
+        : label;
       const hasActs = this._hasCellActions(cell);
       if (hasActs) {
         return html`<button class="ctrl-button"
@@ -191,12 +208,11 @@ class FlexCellsCard extends LitElement {
       @pointerup=${(e) => this._onCellPointerUp(e, cell, entityId)}
       @pointercancel=${(e) => this._onCellPointerCancel(e)}
       @mouseleave=${(e) => this._onCellPointerCancel(e)}
-      @keydown=${(e) => this._onCellKeydown(e, cell, entityId)}>${label}</button>`;
+      @keydown=${(e) => this._onCellKeydown(e, cell, entityId)}>${buttonContent}</button>`;
       }
       // no actions configured -> do nothing, and don't bubble to cell
-      return html`<button class="ctrl-button" @click=${(e) => { e.stopPropagation(); e.preventDefault(); }}>${label}</button>`;
+      return html`<button class="ctrl-button" @click=${(e) => { e.stopPropagation(); e.preventDefault(); }}>${buttonContent}</button>`;
     }
-
     return this._formatEntityCell(cell, stateObj);
   }
   _onToggleBoolean(entityId, isOn) {
@@ -513,6 +529,7 @@ class FlexCellsCard extends LitElement {
 
     if (st.bold) parts.push('font-weight:700');
     if (st.italic) parts.push('font-style:italic');
+    if (st.background) parts.push(`background:${st.background}`);
     if (st.color) parts.push(`color:${st.color}`);
 
     const globalSize = this.config?.text_size;
