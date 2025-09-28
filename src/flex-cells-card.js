@@ -2,6 +2,8 @@ import { LitElement, html, css } from 'lit';
 import { t } from './localize/localize.js';
 import './flex-cells-card-editor.js';
 
+const SORT_LOCALE_OPTS = { numeric: true, sensitivity: 'base' };
+
 class FlexCellsCard extends LitElement {
   static properties = { config: {}, hass: {} };
 
@@ -124,6 +126,94 @@ class FlexCellsCard extends LitElement {
     t = Math.max(0, Math.min(1, t));
     return c + t * (d - c);
   }
+
+  _sanitizeSortString(value) {
+    if (value === undefined || value === null) return '';
+    return String(value).trim();
+  }
+
+  _resolveDisplayWithDynamics(baseValue, dyn) {
+    if (!dyn) return baseValue ?? '';
+    if (dyn.overwrite === 'icon') return dyn.icon != null ? String(dyn.icon) : '';
+    if (dyn.overwrite === 'text') {
+      if (dyn.text != null) return String(dyn.text);
+      if (dyn.mask != null) return String(dyn.mask);
+      return '';
+    }
+    if (dyn.hide) {
+      if (dyn.mask != null) return String(dyn.mask);
+      return '';
+    }
+    return baseValue ?? '';
+  }
+
+  _buildSortKey(displayValue, tertiaryValue) {
+    const display = this._sanitizeSortString(displayValue);
+    const tertiaryBase = this._sanitizeSortString(tertiaryValue !== undefined ? tertiaryValue : display);
+    return {
+      primary: display.toLowerCase(),
+      secondary: display,
+      tertiary: tertiaryBase.toLowerCase(),
+    };
+  }
+
+  _getCellSortKey(row, colIndex) {
+    const cells = Array.isArray(row?.cells) ? row.cells : [];
+    const cell = cells[colIndex] ?? { type: 'string', value: '', align: 'right' };
+    const type = cell?.type || 'string';
+
+    if (type === 'icon') {
+      const base = cell?.value != null ? String(cell.value) : '';
+      const dyn = this._evaluateDynColor(cell, type, base);
+      const shown = this._resolveDisplayWithDynamics(base, dyn);
+      return this._buildSortKey(shown);
+    }
+
+    if (type === 'entity') {
+      const entityId = cell?.value != null ? String(cell.value) : '';
+      const stateObj = entityId ? this.hass?.states?.[entityId] : undefined;
+      const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj) : '';
+      const display = displayRaw != null ? String(displayRaw) : '';
+      const dyn = this._evaluateDynColor(cell, type, display);
+      const shown = this._resolveDisplayWithDynamics(display, dyn);
+      return this._buildSortKey(shown);
+    }
+
+    const base = cell?.value != null ? String(cell.value) : '';
+    const dyn = this._evaluateDynColor(cell, type, base);
+    const shown = this._resolveDisplayWithDynamics(base, dyn);
+    return this._buildSortKey(shown);
+  }
+  _compareSortKeys(left, right, sortDesc) {
+    if (!left || !right) return 0;
+    const direction = sortDesc ? -1 : 1;
+    let diff = left.primary.localeCompare(right.primary, undefined, SORT_LOCALE_OPTS);
+    if (diff !== 0) return diff * direction;
+    diff = left.secondary.localeCompare(right.secondary, undefined, SORT_LOCALE_OPTS);
+    if (diff !== 0) return diff * direction;
+    diff = left.tertiary.localeCompare(right.tertiary, undefined, SORT_LOCALE_OPTS);
+    if (diff !== 0) return diff * direction;
+    return 0;
+  }
+
+  _sortBodyRows(rows, sortColumns, sortDesc) {
+    if (!Array.isArray(rows) || !rows.length) return rows;
+    if (!Array.isArray(sortColumns) || !sortColumns.length) return rows;
+    const prepared = rows.map((row, index) => ({
+      row,
+      index,
+      keys: sortColumns.map((colIdx) => this._getCellSortKey(row, colIdx)),
+    }));
+    prepared.sort((a, b) => {
+      for (let i = 0; i < sortColumns.length; i += 1) {
+        const diff = this._compareSortKeys(a.keys[i], b.keys[i], sortDesc);
+        if (diff !== 0) return diff;
+      }
+      return a.index - b.index;
+    });
+    return prepared.map((entry) => entry.row);
+  }
+
   // === Simple input entity controls (input_boolean / input_number / input_select) ===
   _renderEntityControl(cell, stateObj, entityId) {
     const domain = (entityId || '').split('.')[0];
@@ -1029,6 +1119,16 @@ class FlexCellsCard extends LitElement {
 
     const tableStyle = useFixed ? 'table-layout: fixed;' : '';
 
+    const rawSortColumns = Array.isArray(cfg.sort_columns) ? cfg.sort_columns.filter((n) => Number.isInteger(n) && n > 0) : [];
+    const zeroBasedSortColumns = rawSortColumns
+      .map((n) => n - 1)
+      .filter((idx) => idx >= 0 && idx < colCount);
+    const sortColumns = zeroBasedSortColumns.filter((idx, pos, arr) => arr.indexOf(idx) === pos);
+    const sortDesc = !!cfg.sort_desc;
+    const rowsForBody = sortColumns.length
+      ? this._sortBodyRows(bodyRows, sortColumns, sortDesc)
+      : bodyRows;
+
     const table = html`
       <style>${hideCSS}</style>
       <table class=${classes.join(' ')} style=${tableStyle} cellpadding="0" cellspacing="0" border="0">
@@ -1054,7 +1154,7 @@ class FlexCellsCard extends LitElement {
         ` : ''}
 
         <tbody>
-          ${bodyRows.map((row) => {
+          ${rowsForBody.map((row) => {
       const cells = Array.isArray(row?.cells) ? row.cells : [];
       const filled = Array.from({ length: colCount }, (_, i) =>
         cells[i] ?? { type: 'string', value: '', align: 'right' }

@@ -70,7 +70,7 @@ class FlexCellsCardEditor extends LitElement {
       box-shadow: 0 0 0 2px rgba(3,169,244,0.15);
     }
 
-    .rowbox { touch-action: pan-y; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 10px; background: var(--card-background-color, #fff); overflow: hidden; }
+    .rowbox { touch-action: pan-y; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 10px; background: var(--card-background-color, #fff); overflow: unset; }
     .rowhdr { display: grid; grid-template-columns: auto auto auto 1fr auto; gap: 8px; align-items: center; padding: 10px 8px; border-bottom: 1px solid var(--divider-color, #e0e0e0);
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
@@ -1012,6 +1012,7 @@ class FlexCellsCardEditor extends LitElement {
     const colCount=this.config.column_count||1;
     const widthsStr=Array.isArray(this.config.column_widths)?this.config.column_widths.join(', '):'';
     const hideStr=Array.isArray(this.config.hide_on_narrow)?this.config.hide_on_narrow.join(','):'';
+    const sortStr=Array.isArray(this.config.sort_columns)?this.config.sort_columns.join(','):'';
     const cp=this.config.cell_padding||{top:4,right:0,bottom:4,left:0};
 
     const dclone = (o)=> (o ? JSON.parse(JSON.stringify(o)) : undefined);
@@ -1062,6 +1063,20 @@ class FlexCellsCardEditor extends LitElement {
             .value=${this.config.narrow_breakpoint ?? ''} placeholder="600"
             @input=${(e)=> this._updateBreakpoint(e)}>
           </ha-textfield>
+        </div>
+
+
+        <div class="cols21">
+          <ha-textfield
+            label=${t(this.hass,"editor.sort_cols_label")}
+            .value=${sortStr}
+            @input=${(e)=> this._upd('sort_columns', this._parseCsvIntList(e.target.value)) }>
+          </ha-textfield>
+
+          <label class="option full">
+            <input type="checkbox" .checked=${!!this.config.sort_desc} @change=${(e)=>this._toggle('sort_desc',e)} />
+            ${t(this.hass,"editor.sort_desc_label")}
+          </label>
         </div>
 
         <div class="options">

@@ -40,11 +40,35 @@ Add the card in the UI and configure everything from the visual editor.
 
 Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkram) recorded a video explaining this card. If you know German, I encourage you to watch it https://www.youtube.com/watch?v=oh36grjbPDQ
 
+## Tips & Tricks
+
+<details><summary>How sorting works</summary>
+
+- Sorting works "after applying" dynamic rules, meaning what's visible is sorted.
+- Sorting works even if the column being sorted is hidden (breakpoint).
+</details>
+
+<details><summary>Dynamic rules</summary>
+
+- For example, if you want to change what an entity displays to a defined text, while keeping "more-info" on click, you can add a rule without an entity, with the operator set to "not equal" and an empty "value". This condition will always be met.
+- If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
+</details>
+
+<details><summary>Available colors</summary>
+
+- You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
+</details>
+
+
 ## Changelog
+- v0.10.0 —
+  - Added **dynamic sorting by single or multiple columns**.
+  - Added a "tips & tricks" section to the readme.md.
+  - Fixed the dropdown list display in dynamic rules.
 - v0.9.0 —
-  - Added **German translation**, thanks to [Olli](https://community.home-assistant.io/u/olli.dev/summary) and [Thomas](https://github.com/tmycgn)
-  - Added **displaying an icon on the input_button** if configured
-  - Added ability to **select a background color** without the need for dynamic rules
+  - Added **German translation**, thanks to [Olli](https://community.home-assistant.io/u/olli.dev/summary) and [Thomas](https://github.com/tmycgn).
+  - Added **displaying an icon on the input_button** if configured.
+  - Added ability to **select a background color** without the need for dynamic rules.
 - v0.8.0 —
   - Added **formatting for input_datetime**.
 - v0.7.0 —
