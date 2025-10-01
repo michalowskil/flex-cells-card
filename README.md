@@ -68,6 +68,10 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 </details>
 
 ## Changelog
+- v0.11.0 —
+  - Added use of **system-assigned icons and colors** for entities.
+  - Changed the decimal separator to use the system settings.
+  - Disabled the default underline for entities.
 - v0.10.0 —
   - Added **dynamic sorting by single or multiple columns**.
   - Added a "tips & tricks" section to the readme.md.
