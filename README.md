@@ -9,6 +9,8 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 ## Features
 - Mix cells with **Icon / Text / Entity / Attribute / Input Control**
 - **Dynamic Rules**: Color & Content Overrides
+- **Sorting** by single or multiple columns
+- Using **icons and colors assigned to entities by the system**.
 - **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
@@ -59,6 +61,11 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
 </details>
 
+<details><summary>Copy & Paste / Search & Replace</summary>
+
+- You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
+- If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
+</details>
 
 ## Changelog
 - v0.10.0 —

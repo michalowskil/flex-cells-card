@@ -4,6 +4,39 @@ import './flex-cells-card-editor.js';
 
 const SORT_LOCALE_OPTS = { numeric: true, sensitivity: 'base' };
 
+
+const UNAVAILABLE = 'unavailable';
+const UNKNOWN = 'unknown';
+const OFF = 'off';
+
+const STATE_COLORED_DOMAIN = new Set(['alarm_control_panel','alert','automation','binary_sensor','calendar','camera','climate','cover','device_tracker','fan','group','humidifier','input_boolean','lawn_mower','light','lock','media_player','person','plant','remote','schedule','script','siren','sun','switch','timer','update','vacuum','valve','water_heater']);
+
+const CLIMATE_HVAC_ACTION_TO_MODE = { cooling: 'cool', defrosting: 'heat', drying: 'dry', fan: 'fan_only', heating: 'heat', idle: 'off', off: 'off', preheating: 'heat' };
+
+const batteryStateColorProperty = (state) => { const value = Number(state); if (Number.isNaN(value)) return undefined; if (value >= 70) return '--state-sensor-battery-high-color'; if (value >= 30) return '--state-sensor-battery-medium-color'; return '--state-sensor-battery-low-color'; };
+
+const computeCssVariable = (props) => { if (Array.isArray(props)) { return props.slice().reverse().reduce((str, variable) => 'var(' + variable + (str ? ', ' + str : '') + ')', undefined); } return 'var(' + props + ')'; };
+
+const slugify = (value, delimiter = '_') => { if (value === undefined || value === null) return 'unknown'; const slug = String(value).toLowerCase().replace(/\\s+/g, delimiter).replace(/[^a-z0-9_]+/g, delimiter).replace(new RegExp(delimiter + '+', 'g'), delimiter).replace(new RegExp('^' + delimiter + '|' + delimiter + '$', 'g'), ''); return slug || 'unknown'; };
+
+const computeDomain = (entityId) => entityId.split('.')[0];
+
+const computeGroupDomain = (stateObj) => { const entityIds = (stateObj?.attributes?.entity_id) || []; const uniqueDomains = [...new Set(entityIds.map((id) => computeDomain(id)))]; return uniqueDomains.length === 1 ? uniqueDomains[0] : undefined; };
+
+const isUnavailableState = (state) => state === UNAVAILABLE || state === UNKNOWN;
+
+const stateActive = (stateObj, state) => { const domain = computeDomain(stateObj.entity_id); const compareState = state !== undefined ? state : stateObj?.state; if (['button','event','input_button','scene'].includes(domain)) return compareState !== UNAVAILABLE; if (isUnavailableState(compareState)) return false; if (compareState === OFF && domain !== 'alert') return false; switch (domain) { case 'alarm_control_panel': return compareState !== 'disarmed'; case 'alert': return compareState !== 'idle'; case 'cover': return compareState !== 'closed'; case 'device_tracker': case 'person': return compareState !== 'not_home'; case 'lawn_mower': return ['mowing','error'].includes(compareState); case 'lock': return compareState !== 'locked'; case 'media_player': return compareState !== 'standby'; case 'vacuum': return !['idle','docked','paused'].includes(compareState); case 'valve': return compareState !== 'closed'; case 'plant': return compareState === 'problem'; case 'group': return ['on','home','open','locked','problem'].includes(compareState); case 'timer': return compareState === 'active'; case 'camera': return compareState === 'streaming'; default: return true; } };
+
+const domainColorProperties = (domain, deviceClass, state, active) => { const properties = []; const stateKey = slugify(state, '_'); const activeKey = active ? 'active' : 'inactive'; if (deviceClass) properties.push('--state-' + domain + '-' + deviceClass + '-' + stateKey + '-color'); properties.push('--state-' + domain + '-' + stateKey + '-color'); properties.push('--state-' + domain + '-' + activeKey + '-color'); properties.push('--state-' + activeKey + '-color'); return properties; };
+
+const domainStateColorProperties = (domain, stateObj, state) => domainColorProperties(domain, stateObj.attributes?.device_class, state !== undefined ? state : stateObj.state, stateActive(stateObj, state));
+
+const stateColorProperties = (stateObj, state) => { const compareState = state !== undefined ? state : stateObj?.state; const domain = computeDomain(stateObj.entity_id); const deviceClass = stateObj.attributes?.device_class; if (domain === 'sensor' && deviceClass === 'battery') { const property = batteryStateColorProperty(compareState); if (property) return [property]; } if (domain === 'group') { const groupDomain = computeGroupDomain(stateObj); if (groupDomain && STATE_COLORED_DOMAIN.has(groupDomain)) { return domainStateColorProperties(groupDomain, stateObj, state); } } if (STATE_COLORED_DOMAIN.has(domain)) { return domainStateColorProperties(domain, stateObj, state); } return undefined; };
+
+const stateColorCss = (stateObj, state) => { const compareState = state !== undefined ? state : stateObj?.state; if (compareState === UNAVAILABLE) return 'var(--state-unavailable-color)'; const properties = stateColorProperties(stateObj, state); return properties ? computeCssVariable(properties) : undefined; };
+
+const stateColorBrightness = (stateObj) => { const brightness = stateObj?.attributes?.brightness; if (typeof brightness === 'number' && computeDomain(stateObj.entity_id) !== 'plant') { return 'brightness(' + ((brightness + 245) / 5) + '%)'; } return ''; };
+
 class FlexCellsCard extends LitElement {
   static properties = { config: {}, hass: {} };
 
@@ -42,6 +75,11 @@ class FlexCellsCard extends LitElement {
     .datatable td, .datatable th { line-height: 1.15; }
   
     .icon-mask { display:inline-block; vertical-align:middle; }
+    .fc-entity-icon-text {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
     /* === Simple HA input controls === */
     .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; }
     .ctrl-range { width: 140px; vertical-align: middle; }
@@ -125,6 +163,88 @@ class FlexCellsCard extends LitElement {
     // domyślnie: clamp do [0,1] — zachowuje się „intuicyjnie” dla zakresów typu 0–255 -> 0–100
     t = Math.max(0, Math.min(1, t));
     return c + t * (d - c);
+  }
+
+  _normalizePrecision(precision) {
+    if (precision === null || precision === undefined || precision === '') return null;
+    const parsed = Number(precision);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  _inferFractionDigits(value) {
+    if (!Number.isFinite(value)) return 0;
+    const absVal = Math.abs(value);
+    let str = absVal.toString();
+    if (str.includes('e') || str.includes('E')) str = absVal.toPrecision(6);
+    if (!str.includes('.')) return 0;
+    const fractional = str.split('.')[1];
+    const trimmed = fractional.replace(/0+$/, '');
+    return Math.max(0, Math.min(trimmed.length, 6));
+  }
+
+  _normalizeLocaleCode(code) {
+    if (typeof code !== 'string' || !code.length) return undefined;
+    let normalized = code.trim();
+    const atIndex = normalized.indexOf('@');
+    if (atIndex !== -1) normalized = normalized.slice(0, atIndex);
+    const dotIndex = normalized.indexOf('.');
+    if (dotIndex !== -1) normalized = normalized.slice(0, dotIndex);
+    normalized = normalized.replace(/_/g, '-');
+    return normalized || undefined;
+  }
+
+  _resolveNumberLocale(locale, prefInput) {
+    const navLang = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : undefined;
+    const hassLang = this._normalizeLocaleCode(this?.hass?.language);
+    const normalizedPref = (prefInput || 'language').toLowerCase();
+    const pref = normalizedPref.replace(/-/g, '_');
+
+    switch (pref) {
+      case 'comma_decimal':
+        return ['en-US', 'en'];
+      case 'decimal_comma':
+        return ['de', 'es', 'it'];
+      case 'space_comma':
+        return ['fr', 'sv', 'cs'];
+      case 'system':
+        return undefined;
+      case 'language':
+      case 'auto':
+      default: {
+        const langCode = this._normalizeLocaleCode(locale?.language) || hassLang || navLang;
+        return langCode || undefined;
+      }
+    }
+  }
+
+  _formatNumberByLocale(value, precision) {
+    if (!Number.isFinite(value)) return String(value);
+    const locale = this.hass?.locale;
+    const prefRaw = typeof locale?.number_format === 'string' ? locale.number_format : 'language';
+    const pref = prefRaw.toLowerCase().replace(/-/g, '_');
+    const normalizedPrecision = this._normalizePrecision(precision);
+
+    if (pref === 'none') {
+      return normalizedPrecision !== null ? value.toFixed(normalizedPrecision) : String(value);
+    }
+
+    const inferredFractionDigits = normalizedPrecision !== null ? normalizedPrecision : this._inferFractionDigits(value);
+    const maxFractionDigits = Math.min(Math.max(inferredFractionDigits, normalizedPrecision !== null ? normalizedPrecision : 0), 20);
+
+    const options = {
+      useGrouping: true,
+      minimumFractionDigits: normalizedPrecision !== null ? normalizedPrecision : 0,
+      maximumFractionDigits: maxFractionDigits,
+    };
+
+    const localeCode = this._resolveNumberLocale(locale, pref);
+
+    try {
+      const nfLocale = localeCode || undefined;
+      return new Intl.NumberFormat(nfLocale, options).format(value);
+    } catch (_e) {
+      return normalizedPrecision !== null ? value.toFixed(normalizedPrecision) : String(value);
+    }
   }
 
   _sanitizeSortString(value) {
@@ -342,11 +462,7 @@ class FlexCellsCard extends LitElement {
     if (this._isNumericState(raw)) {
       let num = Number(raw);
       num = this._rescaleIfConfigured(cell, num);
-      if (cell?.precision === 0 || cell?.precision === 1 || cell?.precision === 2) {
-        text = num.toFixed(cell.precision);
-      } else {
-        text = String(num);
-      }
+      text = this._formatNumberByLocale(num, cell?.precision);
     } else {
       text = (typeof raw === 'object' && raw !== null) ? JSON.stringify(raw) : raw;
     }
@@ -602,7 +718,7 @@ class FlexCellsCard extends LitElement {
   }
 
 
-  _buildTextStyle(cell, type, align, dyn) {
+  _buildTextStyle(cell, type, align, dyn, options = {}) {
     const st = cell?.style || {};
     const pad = this.config?.cell_padding || { top: 4, right: 0, bottom: 4, left: 0 };
     const parts = [
@@ -610,12 +726,13 @@ class FlexCellsCard extends LitElement {
       `text-align:${align}`,
     ];
 
-    const underline = st.underline === undefined ? (type === 'entity') : !!st.underline;
+    const underline = st.underline === undefined ? false : !!st.underline;
     const strike = !!st.strike;
     const decos = [];
     if (underline) decos.push('underline');
     if (strike) decos.push('line-through');
-    parts.push(`text-decoration:${decos.length ? decos.join(' ') : 'none'}`);
+    const textDecoration = decos.length ? decos.join(' ') : 'none';
+    if (!options?.skipTextDecoration) parts.push(`text-decoration:${textDecoration}`);
 
     if (st.bold) parts.push('font-weight:700');
     if (st.italic) parts.push('font-style:italic');
@@ -630,20 +747,159 @@ class FlexCellsCard extends LitElement {
     if (st.letter_spacing) parts.push(`letter-spacing:${st.letter_spacing}`);
     if (dyn && dyn.bg) parts.push(`background:${dyn.bg}`);
     if (dyn && dyn.fg) parts.push(`color:${dyn.fg}`);
-    return parts.join(';');
+    return {
+      style: parts.join(';'),
+      textDecoration,
+    };
   }
 
-  _buildIconStyle(cell, dyn) {
+  _buildIconStyle(cell, dyn, stateObj = undefined) {
     const st = cell?.style || {};
     const parts = [];
-    if (st.color) parts.push(`color:${st.color}`);
-    if (dyn && dyn.fg) parts.push(`color:${dyn.fg}`);
+    const visuals = stateObj ? this._computeStateIconVisuals(stateObj) : null;
+    const applyColor = (value) => {
+      if (!value) return;
+      parts.push('color:' + value);
+      parts.push('--state-icon-color:' + value);
+      parts.push('--icon-color:' + value);
+    };
+    const dynColor = dyn?.fg;
+    const styleColor = st.color;
+    if (dynColor) {
+      applyColor(dynColor);
+    } else if (styleColor) {
+      applyColor(styleColor);
+    } else if (visuals?.color) {
+      applyColor(visuals.color);
+    }
+    if (visuals?.filter) {
+      parts.push('filter:' + visuals.filter);
+    }
     const globalSize = this.config?.text_size;
     const iconSize = st.icon_size || globalSize || '';
-    if (iconSize) parts.push(`--mdc-icon-size:${iconSize}`);
+    if (iconSize) parts.push('--mdc-icon-size:' + iconSize);
     return parts.join(';');
   }
 
+  _computeStateIconVisuals(stateObj) {
+    if (!stateObj) return {};
+    const attrs = stateObj.attributes || {};
+    let color = stateColorCss(stateObj);
+    if (Array.isArray(attrs.rgb_color) && attrs.rgb_color.length === 3) {
+      color = this._rgbToCss(attrs.rgb_color);
+    } else if (Array.isArray(attrs.hs_color) && attrs.hs_color.length >= 2) {
+      const rgbFromHs = this._hsbToRgb(attrs.hs_color[0], attrs.hs_color[1], 1);
+      color = this._rgbToCss(rgbFromHs);
+    }
+    const hvacAction = attrs.hvac_action;
+    if (hvacAction && CLIMATE_HVAC_ACTION_TO_MODE[hvacAction]) {
+      const hvacColor = stateColorCss(stateObj, CLIMATE_HVAC_ACTION_TO_MODE[hvacAction]);
+      if (hvacColor) color = hvacColor;
+    }
+    if (!color && stateActive(stateObj)) {
+      color = 'var(--state-icon-active-color, var(--primary-color))';
+    }
+    const filter = stateColorBrightness(stateObj) || '';
+    return { color, filter };
+  }
+  _hsbToRgb(h, s, b) {
+    const hueRaw = Number.isFinite(Number(h)) ? Number(h) : 0;
+    const hue = ((hueRaw % 360) + 360) % 360;
+    const sat = Math.max(0, Math.min(1, Number(s) / 100));
+    const bri = Math.max(0, Math.min(1, Number.isFinite(Number(b)) ? Number(b) : 1));
+    const c = bri * sat;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = bri - c;
+    let r1 = 0, g1 = 0, b1 = 0;
+    const segment = Math.floor(hue / 60);
+    switch (segment) {
+      case 0: r1 = c; g1 = x; b1 = 0; break;
+      case 1: r1 = x; g1 = c; b1 = 0; break;
+      case 2: r1 = 0; g1 = c; b1 = x; break;
+      case 3: r1 = 0; g1 = x; b1 = c; break;
+      case 4: r1 = x; g1 = 0; b1 = c; break;
+      default: r1 = c; g1 = 0; b1 = x; break;
+    }
+    return [Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255)];
+  }
+
+  _rgbToCss(rgb, brightness) {
+    if (!Array.isArray(rgb) || rgb.length !== 3) return '';
+    const clamp = (val) => Math.max(0, Math.min(255, Math.round(Number(val) || 0)));
+    const [r, g, b] = [clamp(rgb[0]), clamp(rgb[1]), clamp(rgb[2])];
+    if (brightness === undefined) {
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    const alpha = Math.max(0.2, Math.min(1, brightness));
+    if (alpha >= 0.999) return `rgb(${r}, ${g}, ${b})`;
+    return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+  }
+  _getEntityDisplayMode(cell) {
+    const mode = cell?.entity_display;
+    return mode === "icon" || mode === "icon_value" ? mode : "value";
+  }
+
+  _renderEntityIconTemplate(cell, stateObj, dyn) {
+    const iconStyle = this._buildIconStyle(cell, dyn, stateObj);
+    if (dyn?.overwrite === "icon") {
+      const iconName = dyn.icon != null ? String(dyn.icon) : "";
+      if (!iconName) return "";
+      return html`<ha-icon style=${iconStyle} icon="${iconName}"></ha-icon>`;
+    }
+    if (!stateObj) return "";
+    if (customElements.get("ha-state-icon")) {
+      return html`<ha-state-icon style=${iconStyle} .hass=${this.hass} .stateObj=${stateObj}></ha-state-icon>`;
+    }
+    const attrIcon = stateObj?.attributes?.icon;
+    return attrIcon ? html`<ha-icon style=${iconStyle} icon="${attrIcon}"></ha-icon>` : "";
+  }
+
+  _buildEntityDisplayContent(cell, stateObj, display, dyn, textDecoration, presetMode) {
+    const mode = presetMode || this._getEntityDisplayMode(cell);
+    const textDisplay = display != null ? String(display) : "";
+    const overwrite = (dyn?.overwrite || "").toLowerCase();
+
+    if (overwrite === "icon") {
+      const iconTemplate = this._renderEntityIconTemplate(cell, stateObj, dyn);
+      return iconTemplate || "";
+    }
+    if (overwrite === "text") {
+      return dyn?.text ?? dyn?.mask ?? "";
+    }
+    if (overwrite === "hide") {
+      return dyn?.mask || "";
+    }
+    if (dyn?.hide) {
+      return dyn.mask || "";
+    }
+
+    const wantsIcon = mode === "icon" || mode === "icon_value";
+    const iconTemplate = wantsIcon ? this._renderEntityIconTemplate(cell, stateObj, dyn) : null;
+    if (mode === "icon") {
+      return iconTemplate || textDisplay;
+    }
+    if (mode === "icon_value") {
+      let deco = textDecoration;
+      if (deco === undefined) {
+        const st = cell?.style || {};
+        const underline = st.underline === undefined ? false : !!st.underline;
+        const strike = !!st.strike;
+        const decos = [];
+        if (underline) decos.push("underline");
+        if (strike) decos.push("line-through");
+        deco = decos.length ? decos.join(" ") : "none";
+      }
+      const decoStyle = deco && deco !== "none" ? `text-decoration:${deco}` : "";
+      const textSpan = decoStyle
+        ? html`<span class="celltext" style=${decoStyle}>${textDisplay}</span>`
+        : html`<span class="celltext">${textDisplay}</span>`;
+      if (iconTemplate) {
+        return html`<span class="fc-entity-icon-text">${iconTemplate}${textSpan}</span>`;
+      }
+      return textSpan;
+    }
+    return textDisplay;
+  }
   // ---------- Actions ----------
   _hasAction(cfg) { return !!(cfg && cfg.action && cfg.action !== 'none'); }
 
@@ -848,7 +1104,7 @@ class FlexCellsCard extends LitElement {
     if (type === 'icon') {
       const display = val;
       const dyn = this._evaluateDynColor(cell, type, display);
-      const thStyle = this._buildTextStyle(cell, type, align, dyn);
+      const { style: thStyle } = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
       const content = (dyn && dyn.overwrite === 'icon')
@@ -883,20 +1139,21 @@ class FlexCellsCard extends LitElement {
       if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
         const _disp = this._formatEntityCell(cell, stateObj);
         const _dyn = this._evaluateDynColor(cell, type, _disp);
-        const _thStyle = this._buildTextStyle(cell, type, align, _dyn);
+        const { style: _thStyle } = this._buildTextStyle(cell, type, align, _dyn);
         return html`<th style=${_thStyle}>${this._renderEntityControl(cell, stateObj, val)}</th>`;
       }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const dyn = this._evaluateDynColor(cell, type, display);
-      const thStyle = this._buildTextStyle(cell, type, align, dyn);
+      const mode = this._getEntityDisplayMode(cell);
+      const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
-      const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
-      const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : display);
+      const shown = this._buildEntityDisplayContent(cell, stateObj, display, dyn, textDecoration, mode);
       const aria = stateObj ? `${val}: ${display}` : val;
+      const cls = mode === 'icon' ? 'icon clickable' : 'clickable';
 
       if (hasActions) {
         return html`
-          <th class="clickable"
+          <th class=${cls}
               style=${thStyle}
               title=${val}
               role="button"
@@ -914,7 +1171,7 @@ class FlexCellsCard extends LitElement {
 
       // Default 'more-info' for header entity if no actions
       return html`
-        <th class="clickable"
+        <th class=${cls}
             style=${thStyle}
             title=${val}
             role="button"
@@ -929,7 +1186,7 @@ class FlexCellsCard extends LitElement {
 
     const display = val ?? '';
     const dyn = this._evaluateDynColor(cell, type, display);
-    const thStyle = this._buildTextStyle(cell, type, align, dyn);
+    const { style: thStyle } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
     const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : (val ?? ''));
@@ -966,7 +1223,7 @@ class FlexCellsCard extends LitElement {
     if (type === 'icon') {
       const display = val;
       const dyn = this._evaluateDynColor(cell, type, display);
-      const tdStyle = this._buildTextStyle(cell, type, align, dyn);
+      const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
       const content = (dyn && dyn.overwrite === 'icon')
@@ -1002,20 +1259,21 @@ class FlexCellsCard extends LitElement {
       if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
         const _disp = this._formatEntityCell(cell, stateObj);
         const _dyn = this._evaluateDynColor(cell, type, _disp);
-        const _tdStyle = this._buildTextStyle(cell, type, align, _dyn);
+        const { style: _tdStyle } = this._buildTextStyle(cell, type, align, _dyn);
         return html`<td style=${_tdStyle}>${this._renderEntityControl(cell, stateObj, val)}</td>`;
       }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const dyn = this._evaluateDynColor(cell, type, display);
-      const tdStyle = this._buildTextStyle(cell, type, align, dyn);
+      const mode = this._getEntityDisplayMode(cell);
+      const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
-      const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
-      const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : display);
+      const shown = this._buildEntityDisplayContent(cell, stateObj, display, dyn, textDecoration, mode);
       const aria = stateObj ? `${val}: ${display}` : val;
+      const cls = mode === 'icon' ? 'icon clickable' : 'clickable';
 
       if (hasActions) {
         return html`
-          <td class="clickable"
+          <td class=${cls}
               style=${tdStyle}
               title=${val}
               role="button"
@@ -1033,7 +1291,7 @@ class FlexCellsCard extends LitElement {
       }
 
       return html`
-        <td class="clickable"
+        <td class=${cls}
             style=${tdStyle}
             title=${val}
             role="button"
@@ -1049,7 +1307,7 @@ class FlexCellsCard extends LitElement {
     // string
     const display = val ?? '';
     const dyn = this._evaluateDynColor(cell, type, display);
-    const tdStyle = this._buildTextStyle(cell, type, align, dyn);
+    const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
     const shown = content !== null ? content : ((dyn && dyn.hide) ? (dyn.mask || '') : (val ?? ''));

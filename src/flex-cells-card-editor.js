@@ -618,10 +618,14 @@ class FlexCellsCardEditor extends LitElement {
   _cellTypeChanged(r,c,e){
     const type=e.target.value; const patch={ type };
     if (type==='icon' && !this.config.rows?.[r]?.cells?.[c]?.value) patch.value='mdi:information-outline';
-    if (type!=='entity'){ patch.use_entity_unit=undefined; patch.unit=undefined; patch.precision=undefined; }
-    else if (this.config.rows?.[r]?.cells?.[c]?.use_entity_unit===undefined) patch.use_entity_unit=true;
+    if (type!=='entity') {
+      patch.use_entity_unit=undefined; patch.unit=undefined; patch.precision=undefined; patch.entity_display=undefined;
+    } else {
+      if (this.config.rows?.[r]?.cells?.[c]?.use_entity_unit===undefined) patch.use_entity_unit=true;
+    }
     this._patchCell(r,c,patch);
   }
+
   _cellValueChanged(r,c,e){ this._patchCell(r,c,{ value:e.target.value }); }
   _cellAlignChanged(r,c,e){ this._patchCell(r,c,{ align:e.target.value }); }
   _cellUseEntityUnitChanged(r,c,e){
@@ -638,6 +642,12 @@ class FlexCellsCardEditor extends LitElement {
     const raw = (e && e.target && typeof e.target.value === 'string') ? e.target.value : '';
     const v = raw.trim();
     this._patchCell(r,c,{ attribute: v ? v : undefined });
+  }
+  _cellEntityDisplayChanged(r,c,e){
+    const raw = e?.target?.value;
+    const value = (typeof raw === 'string' && raw.trim()) ? raw.trim() : 'value';
+    const entityDisplay = value === 'value' ? undefined : value;
+    this._patchCell(r,c,{ entity_display: entityDisplay });
   }
   _cellPrecisionChanged(r,c,e){ const v=e.target.value; const precision=v===''?undefined:parseInt(v); this._patchCell(r,c,{ precision }); }
   _cellScaleChanged(r,c,key,e){
@@ -1249,6 +1259,20 @@ class FlexCellsCardEditor extends LitElement {
                           </datalist>
 
                         </div>
+
+                        <div class="cell-grid cell-wide">
+                          <ha-select
+                            .label=${t(this.hass,"editor.entity_display_label")}
+                            .value=${cell.entity_display || "value"}
+                            naturalMenuWidth
+                            fixedMenuPosition
+                            @selected=${(e)=>this._cellEntityDisplayChanged(rIdx,cIdx,e)}
+                            @closed=${(e)=>e.stopPropagation()}>
+                            <mwc-list-item value="value">${t(this.hass,"editor.entity_display_option_value")}</mwc-list-item>
+                            <mwc-list-item value="icon">${t(this.hass,"editor.entity_display_option_icon")}</mwc-list-item>
+                            <mwc-list-item value="icon_value">${t(this.hass,"editor.entity_display_option_icon_value")}</mwc-list-item>
+                          </ha-select>
+                        </div>
                           
                         <!-- KONTROLKA ZAMIAST WARTOŚCI -->
                         ${ this._isSimpleControlEntity(cell) ? html`
@@ -1455,7 +1479,7 @@ class FlexCellsCardEditor extends LitElement {
                         </div>
                         <div class="cell-grid cell-wide">
                           <label class="option full">
-                            <input type="checkbox" .checked=${st.underline ?? (cell.type==='entity' ? true : false)} @change=${(e)=>this._styleToggle(rIdx,cIdx,'underline',e)} />
+                            <input type="checkbox" .checked=${st.underline ?? false} @change=${(e)=>this._styleToggle(rIdx,cIdx,'underline',e)} />
                             ${t(this.hass,"style.underline")}
                           </label>
                         </div>
