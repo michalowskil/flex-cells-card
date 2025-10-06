@@ -1,4 +1,5 @@
-[![Forum](https://img.shields.io/badge/Forum-41BDF5?style=flat&logo=homeassistant&logoColor=white)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780) [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
+[![GitHub Discussions](https://img.shields.io/github/discussions/michalowskil/flex-cells-card)](https://github.com/michalowskil/flex-cells-card/discussions)
+ [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest) [![Forum](https://img.shields.io/badge/Forum-41BDF5?style=flat&logo=homeassistant&logoColor=white)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780)
 
 # Flex Cells Card
 
