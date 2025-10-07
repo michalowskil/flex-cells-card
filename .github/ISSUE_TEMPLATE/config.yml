@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+   - name: Support
+     url: https://github.com/michalowskil/flex-cells-card/discussions
+     about: If you don't want to report a bug but just want to ask a question, click here.
