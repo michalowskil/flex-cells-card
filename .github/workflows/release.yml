@@ -65,6 +65,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
           body: ${{ steps.tagbody.outputs.body }}
           generate_release_notes: true
           files: dist/flex-cells-card.js
@@ -75,5 +76,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
           generate_release_notes: true
           files: dist/flex-cells-card.js

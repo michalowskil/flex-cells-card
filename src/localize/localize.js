@@ -69,7 +69,7 @@ const DICTS = {
       scale_hint: "Map a numeric value from one range to another (e.g., 0-255 → 0-100).",
       dynamic_title: "Dynamic Rules: Color & Content Overrides",
       dynamic_hint: "Evaluate rules from top to bottom, the last match wins.",
-      datetime_format: "Date/Time format",
+      datetime_format: "Date/Time format & Text override",
       available_tokens: "Available tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [literals in brackets]",
       value: "Value"
     },
@@ -77,8 +77,8 @@ const DICTS = {
       entity: "Select entity",
       string: "Text to display",
       icon: "mdi:icon-name",
-      datetime_format: "e.g. H:mm:ss or YYYY-MM-DD H:mm; use [ ] for literal text",
-      attribute_path: "Attribute path (e.g. a.b[0].c)"
+      datetime_format: "e.g. H:mm:ss, YYYY-MM-DD H:mm or [Custom text]",
+      attribute_path: "Metadata path (e.g. a.b[0].c)"
     },
     dynamic: {
       operator: "Operator",
@@ -187,7 +187,7 @@ const DICTS = {
       scale_hint: "Mapuj wartość z jednego zakresu na inny (np. 0-255 → 0-100).",
       dynamic_title: "Reguły dynamiczne: kolor i nadpisywanie treści",
       dynamic_hint: "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa.",
-      datetime_format: "Format daty/czasu",
+      datetime_format: "Format daty/czasu i nadpisanie tekstu",
       available_tokens: "Dostępne tokeny: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [literały w nawiasach]",
       value: "Wartość"
     },
@@ -195,8 +195,8 @@ const DICTS = {
       entity: "Wybierz encję",
       string: "Tekst do wyświetlenia",
       icon: "mdi:nazwa-ikony",
-      datetime_format: "np. H:mm:ss lub YYYY-MM-DD H:mm; użyj [ ] dla tekstu literalnego",
-      attribute_path: "Ścieżka atrybutu (np. a.b[0].c)"
+      datetime_format: "np. H:mm:ss, YYYY-MM-DD H:mm lub [dowolny tekst]",
+      attribute_path: "Ścieżka metadanych (np. a.b[0].c)"
     },
     dynamic: {
       operator: "Operator",
@@ -305,7 +305,7 @@ const DICTS = {
       scale_hint: "Numerischen Wert von einem Bereich in einen anderen abbilden (z. B. 0-255 → 0-100).",
       dynamic_title: "Dynamische Regeln: Farb- & Inhalts-Übersteuerung",
       dynamic_hint: "Regeln von oben nach unten prüfen, die letzte Übereinstimmung gewinnt.",
-      datetime_format: "Datums-/Zeitformat",
+      datetime_format: "Datums-/Zeitformat & Textüberschreibung",
       available_tokens: "Verfügbare Tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [Literale in Klammern]",
       value: "Wert"
     },
@@ -313,8 +313,8 @@ const DICTS = {
       entity: "Entität auswählen",
       string: "Anzuzeigender Text",
       icon: "mdi:icon-name",
-      datetime_format: "z. B. H:mm:ss oder YYYY-MM-DD H:mm; [ ] für wörtlichen Text",
-      attribute_path: "Attributpfad (z. B. a.b[0].c)"
+      datetime_format: "z. B. H:mm:ss, YYYY-MM-DD H:mm oder [eigener Text]",
+      attribute_path: "Metadatenpfad (z. B. a.b[0].c)"
     },
     dynamic: {
       operator: "Operator",

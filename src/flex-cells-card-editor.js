@@ -74,6 +74,7 @@ class FlexCellsCardEditor extends LitElement {
     .rowhdr { display: grid; grid-template-columns: auto auto auto 1fr auto; gap: 8px; align-items: center; padding: 10px 8px; border-bottom: 1px solid var(--divider-color, #e0e0e0);
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
+    .rowhdr.collapsed { border-bottom: none; }
 
     .handle {
       cursor: grab; padding: 6px 8px; border-radius: 8px;
@@ -257,12 +258,40 @@ class FlexCellsCardEditor extends LitElement {
     this._boundColPointerCancel = (e)=>this._onColPointerCancel?.(e);
   }
   /* === Attribute suggestions helpers === */
+  _getStateObject(entityId) {
+    if (!entityId) return undefined;
+    return this.hass?.states?.[entityId];
+  }
+
+  _buildEntityValueTree(stateObj) {
+    if (!stateObj) return {};
+    const attrs = stateObj.attributes || {};
+    const tree = {
+      ...attrs,
+      attributes: attrs,
+      entity_id: stateObj.entity_id,
+      state: stateObj.state,
+      last_changed: stateObj.last_changed,
+      last_updated: stateObj.last_updated,
+    };
+    if (stateObj.context !== undefined) tree.context = stateObj.context;
+    return tree;
+  }
+
+  _resolveEntityValue(stateObj, path) {
+    if (!stateObj || !path) return undefined;
+    const tree = this._buildEntityValueTree(stateObj);
+    return this._resolvePath(tree, path);
+  }
+
   _getEntityAttributesObject(rIdx, cIdx) {
     try {
       const id = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.value;
-      return this.hass?.states?.[id]?.attributes || {};
+      const st = this._getStateObject(id);
+      return this._buildEntityValueTree(st);
     } catch (_) { return {}; }
   }
+
 
   _resolvePath(obj, path) {
     if (!obj) return undefined;
@@ -284,44 +313,17 @@ class FlexCellsCardEditor extends LitElement {
   }
 
   _buildAttrSuggestions(rIdx, cIdx, inputValue) {
-    const attrs = this._getEntityAttributesObject(rIdx, cIdx);
+    const tree = this._getEntityAttributesObject(rIdx, cIdx) || {};
     const val = String(inputValue || '');
-    // If nothing typed -> top-level keys
-    if (val === '') return Object.keys(attrs).sort();
-
-    // Split into path and last segment
-    const norm = val.replace(/\[(\d+)\]/g, '.$1');
-    const parts = norm.split('.');
-    const endsWithDot = norm.endsWith('.');
-    const head = endsWithDot ? parts.slice(0, -1) : parts.slice(0, -1);
-    const last = endsWithDot ? '' : parts[parts.length - 1];
-    const basePath = parts.length > 1 ? parts.slice(0, -1).join('.') : '';
-
-    let node = attrs;
-    if (parts.length > 1) {
-      node = this._resolvePath(attrs, parts.slice(0, -1).join('.'));
-      if (node === undefined) return []; // unknown base
-    }
-
-    // When endsWithDot -> show *all* children of base
-    // Else -> filter children by prefix 'last'
-    const children = this._listKeys(node).sort();
-    const filtered = last ? children.filter(k => k.startsWith(last)) : children;
-
-    return filtered.map(k => (basePath ? basePath + '.' : '') + k);
-  }
-  _buildAttrSuggestionsForEntity(entityId, inputValue) {
-    const attrs = (this.hass?.states?.[entityId]?.attributes) || {};
-    const val = String(inputValue || '');
-    if (val === '') return Object.keys(attrs).sort();
+    if (val === '') return Object.keys(tree).sort();
     const norm = val.replace(/\[(\d+)\]/g, '.$1');
     const parts = norm.split('.');
     const endsWithDot = norm.endsWith('.');
     const last = endsWithDot ? '' : parts[parts.length - 1];
     const basePath = parts.length > 1 ? parts.slice(0, -1).join('.') : '';
-    let node = attrs;
+    let node = tree;
     if (parts.length > 1) {
-      node = this._resolvePath(attrs, parts.slice(0, -1).join('.'));
+      node = this._resolvePath(tree, parts.slice(0, -1).join('.'));
       if (node === undefined) return [];
     }
     const children = this._listKeys(node).sort();
@@ -329,7 +331,25 @@ class FlexCellsCardEditor extends LitElement {
     return filtered.map(k => (basePath ? basePath + '.' : '') + k);
   }
 
-  
+
+  _buildAttrSuggestionsForEntity(entityId, inputValue) {
+    const tree = this._buildEntityValueTree(this._getStateObject(entityId));
+    const val = String(inputValue || '');
+    if (val === '') return Object.keys(tree || {}).sort();
+    const norm = val.replace(/\[(\d+)\]/g, '.$1');
+    const parts = norm.split('.');
+    const endsWithDot = norm.endsWith('.');
+    const last = endsWithDot ? '' : parts[parts.length - 1];
+    const basePath = parts.length > 1 ? parts.slice(0, -1).join('.') : '';
+    let node = tree;
+    if (parts.length > 1) {
+      node = this._resolvePath(tree, parts.slice(0, -1).join('.'));
+      if (node === undefined) return [];
+    }
+    const children = this._listKeys(node).sort();
+    const filtered = last ? children.filter(k => k.startsWith(last)) : children;
+    return filtered.map(k => (basePath ? basePath + '.' : '') + k);
+  }
 
   async _ensureEntityPickerLoaded() {
     try {
@@ -659,23 +679,9 @@ class FlexCellsCardEditor extends LitElement {
   }
   _isEntityNumeric(cell){
     const id = cell?.value;
-    if (!id || !this.hass?.states?.[id]) return false;
-    const st = this.hass.states[id];
-    // if attribute path provided, resolve it on attributes supporting dot/bracket notation
-    let raw;
-    if (cell?.attribute) {
-      const path = String(cell.attribute);
-      const norm = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
-      let cur = st.attributes;
-      for (const kRaw of norm) {
-        if (cur == null) break;
-        const k = Array.isArray(cur) && /^\d+$/.test(kRaw) ? Number(kRaw) : kRaw;
-        cur = cur?.[k];
-      }
-      raw = cur;
-    } else {
-      raw = st.state;
-    }
+    const st = this._getStateObject(id);
+    if (!st) return false;
+    const raw = cell?.attribute ? this._resolveEntityValue(st, cell.attribute) : st.state;
     const num = Number(raw);
     return Number.isFinite(num);
   }
@@ -1142,7 +1148,7 @@ class FlexCellsCardEditor extends LitElement {
                  @dragleave=${(e)=>this._onDragLeave(rIdx,e)}
                  @drop=${(e)=>this._onDrop(rIdx,e)}
                  @contextmenu=${(e)=>e.preventDefault()}>
-              <div class="rowhdr">
+              <div class="rowhdr ${collapsed ? 'collapsed' : ''}">
                 <button class="handle"
                         title=${t(this.hass,"editor.drag_to_reorder")}
                         draggable=${!this._isTouchDevice}
@@ -1191,6 +1197,8 @@ class FlexCellsCardEditor extends LitElement {
                     const isEntity = cell.type === 'entity';
                     const isIcon = cell.type === 'icon';
                     const isNumeric = isEntity && this._isEntityNumeric(cell);
+                    const entityDisplay = cell.entity_display || "value";
+                    const showEntityIconSize = isEntity && (entityDisplay === "icon" || entityDisplay === "icon_value");
                     const st = cell.style || {};
 
                     // selektory akcji (dla icon/string z ograniczoną listą)
@@ -1231,19 +1239,6 @@ class FlexCellsCardEditor extends LitElement {
                           `}
                         </div>
                         <div class="cell-grid cell-wide">
-
-                          ${ (String(cell.value||'').startsWith('input_datetime.')) ? html`
-                            <div class="cell-wide">
-                              <ha-textfield
-                                .label=${t(this.hass,"editor.datetime_format")}
-                                .value=${cell.datetime_format || ''}
-                                .placeholder=${t(this.hass,"placeholder.datetime_format")}
-                                @input=${(e)=> this._patchCell(rIdx,cIdx,{ datetime_format: (e.target.value||'') || undefined })}
-                              ></ha-textfield>
-                              <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
-                            </div>
-                          ` : '' }
-
                           <input
                             class="text-input mini-wide"
                             list=${`attr-list-${rIdx}-${cIdx}`}
@@ -1257,6 +1252,16 @@ class FlexCellsCardEditor extends LitElement {
                                 .map(opt => html`<option value="${opt}"></option>`)
                             }
                           </datalist>
+
+                          <div class="cell-wide">
+                            <ha-textfield
+                              .label=${t(this.hass,"editor.datetime_format")}
+                              .value=${cell.datetime_format || ''}
+                              .placeholder=${t(this.hass,"placeholder.datetime_format")}
+                              @input=${(e)=> this._patchCell(rIdx,cIdx,{ datetime_format: (e.target.value||'') || undefined })}
+                            ></ha-textfield>
+                            <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
+                          </div>
 
                         </div>
 
@@ -1444,6 +1449,16 @@ class FlexCellsCardEditor extends LitElement {
 
                           </div>
                         </div>
+                        ${ showEntityIconSize ? html`
+                          <div class="cell-grid cell-wide">
+                            <ha-textfield
+                              .label=${t(this.hass,"editor.icon_size")}
+                              .placeholder=${"24px | 1.4rem"}
+                              .value=${st.icon_size || ''}
+                              @input=${(e)=>this._styleValue(rIdx,cIdx,'icon_size',e)}>
+                            </ha-textfield>
+                          </div>
+                        ` : ''}
                         <!-- ROZMIAR -->
                         <div class="cell-grid cell-wide">
                           <ha-textfield

@@ -8,7 +8,7 @@ A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **ent
 If you like this card, please consider giving it a ⭐ on GitHub: [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
 
 ## Features
-- Mix cells with **Icon / Text / Entity / Attribute / Input Control**
+- Mix cells with **Icon / Text / Entity / Metadata / Input Control**
 - **Dynamic Rules**: Color & Content Overrides
 - **Sorting** by single or multiple columns
 - Using **icons and colors assigned to entities by the system**.
@@ -69,6 +69,12 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 </details>
 
 ## Changelog
+- v0.12.0-beta (Pre-release) —
+  - Added **metadata** (instead of attributes), now we have access to all data.
+  - Improved "Text size (default)" in the main settings, it no longer affects icon size.
+  - Added size setting for icons from entities.
+  - Changed "Date/Time format" to "Date/Time format & Text override". Now we can override the entity value even if it doesn't contain a date/time.
+  - Minor visual improvements.
 - v0.11.0 —
   - Added use of **system-assigned icons and colors** for entities.
   - Changed the decimal separator to use the system settings.

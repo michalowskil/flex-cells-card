@@ -153,6 +153,212 @@ class FlexCellsCard extends LitElement {
     return cur;
   }
 
+  _buildEntityValueTree(stateObj) {
+    if (!stateObj) return null;
+    const attrs = stateObj.attributes || {};
+    const tree = {
+      ...attrs,
+      attributes: attrs,
+      entity_id: stateObj.entity_id,
+      state: stateObj.state,
+      last_changed: stateObj.last_changed,
+      last_updated: stateObj.last_updated,
+    };
+    if (stateObj.context !== undefined) tree.context = stateObj.context;
+    return tree;
+  }
+
+  _resolveEntityValuePath(stateObj, path, cachedTree) {
+    if (!stateObj || path === undefined || path === null) return undefined;
+    const tree = cachedTree || this._buildEntityValueTree(stateObj);
+    if (!tree) return undefined;
+    return this._getByPath(tree, String(path));
+  }
+
+  _buildDateForInputDatetime(stateObj) {
+    if (!stateObj) return null;
+    const attrs = stateObj.attributes || {};
+    const hasDate = !!attrs.has_date;
+    const hasTime = !!attrs.has_time;
+    const stateStr = typeof stateObj.state === 'string' ? stateObj.state : '';
+    let dateFromState = null;
+
+    if (hasDate || hasTime) {
+      let year;
+      let month;
+      let day;
+      if (hasDate) {
+        const matchDate = stateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (matchDate) {
+          year = Number(matchDate[1]);
+          month = Number(matchDate[2]);
+          day = Number(matchDate[3]);
+        }
+      }
+      let hours = 0;
+      let minutes = 0;
+      let seconds = 0;
+      if (hasTime) {
+        const matchTime = stateStr.match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (matchTime) {
+          hours = Number(matchTime[1]);
+          minutes = Number(matchTime[2]);
+          seconds = Number(matchTime[3] || '0');
+        }
+      }
+      if (hasDate) {
+        const result = new Date(
+          year || 1970,
+          (month || 1) - 1,
+          day || 1,
+          hasTime ? hours : 0,
+          hasTime ? minutes : 0,
+          hasTime ? seconds : 0,
+        );
+        if (!Number.isNaN(result.getTime())) dateFromState = result;
+      } else if (hasTime) {
+        const now = new Date();
+        const result = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          hours,
+          minutes,
+          seconds,
+        );
+        if (!Number.isNaN(result.getTime())) dateFromState = result;
+      }
+    }
+
+    if (dateFromState) return dateFromState;
+    return this._parseDateLikeValue(stateStr);
+  }
+
+  _parseDateLikeValue(raw) {
+    if (raw === undefined || raw === null) return null;
+    if (raw instanceof Date) {
+      return Number.isNaN(raw.getTime()) ? null : new Date(raw.getTime());
+    }
+    if (typeof raw === 'number') {
+      if (!Number.isFinite(raw)) return null;
+      const abs = Math.abs(raw);
+      const millis = abs >= 1e12 ? raw : raw * 1000;
+      const date = new Date(millis);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+      const parsed = Date.parse(normalized);
+      if (!Number.isNaN(parsed)) return new Date(parsed);
+      const asNumber = Number(trimmed);
+      if (Number.isFinite(asNumber)) return this._parseDateLikeValue(asNumber);
+    }
+    return null;
+  }
+
+  _formatDateWithPattern(date, pattern) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+    const locale = (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator !== 'undefined' ? navigator.language : 'en') || 'en');
+    const tokens = ['YYYY','MMMM','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s'];
+    const hours24 = date.getHours();
+    const mapping = {
+      'YYYY': String(date.getFullYear()),
+      'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(date),
+      'YY': String(date.getFullYear()).slice(-2).padStart(2, '0'),
+      'MM': String(date.getMonth() + 1).padStart(2, '0'),
+      'M': String(date.getMonth() + 1),
+      'DD': String(date.getDate()).padStart(2, '0'),
+      'D': String(date.getDate()),
+      'HH': String(hours24).padStart(2, '0'),
+      'H': String(hours24),
+      'hh': String(((hours24 % 12) || 12)).padStart(2, '0'),
+      'h': String(((hours24 % 12) || 12)),
+      'mm': String(date.getMinutes()).padStart(2, '0'),
+      'm': String(date.getMinutes()),
+      'ss': String(date.getSeconds()).padStart(2, '0'),
+      's': String(date.getSeconds()),
+    };
+    try {
+      const pat = String(pattern || '');
+      let out = '';
+      for (let i = 0; i < pat.length;) {
+        const ch = pat[i];
+        if (ch === '[') {
+          const end = pat.indexOf(']', i + 1);
+          if (end === -1) {
+            out += '[';
+            i += 1;
+            continue;
+          }
+          out += pat.slice(i + 1, end);
+          i = end + 1;
+          continue;
+        }
+        let matched = false;
+        for (const token of tokens) {
+          if (pat.startsWith(token, i)) {
+            out += mapping[token] ?? token;
+            i += token.length;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          out += ch;
+          i += 1;
+        }
+      }
+      return out;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  _literalizePattern(pattern) {
+    if (!pattern) return '';
+    const pat = String(pattern);
+    let out = '';
+    for (let i = 0; i < pat.length;) {
+      const ch = pat[i];
+      if (ch === '[') {
+        const end = pat.indexOf(']', i + 1);
+        if (end === -1) {
+          out += ch;
+          i += 1;
+          continue;
+        }
+        out += pat.slice(i + 1, end);
+        i = end + 1;
+        continue;
+      }
+      out += ch;
+      i += 1;
+    }
+    return out;
+  }
+
+  _formatCellDateValue(cell, stateObj, raw, isAttr) {
+    const pattern = cell?.datetime_format;
+    if (!pattern) return null;
+    let date = null;
+    if (!isAttr) {
+      const entityId = String(cell?.value || '');
+      if (entityId.startsWith('input_datetime.')) {
+        date = this._buildDateForInputDatetime(stateObj);
+      }
+    }
+    if (!date) {
+      date = this._parseDateLikeValue(raw);
+    }
+    if (date) {
+      const formatted = this._formatDateWithPattern(date, pattern);
+      if (formatted !== null && formatted !== undefined) return formatted;
+    }
+    return this._literalizePattern(pattern);
+  }
+
   _rescaleIfConfigured(cell, n) {
     const a = Number(cell?.scale_in_min);
     const b = Number(cell?.scale_in_max);
@@ -438,18 +644,14 @@ class FlexCellsCard extends LitElement {
 
 
   _formatEntityCell(cell, stateObj) {
-    // Show attribute value if requested; otherwise show the entity state
     const isAttr = !!cell?.attribute;
     let source;
+
     if (isAttr) {
-      const attr = cell?.attribute;
-      if (typeof attr === 'string' && attr.includes('.')) {
-        source = this._getByPath(stateObj?.attributes, attr);
-      } else {
-        source = stateObj?.attributes?.[attr];
-      }
+      const path = cell?.attribute;
+      const tree = this._buildEntityValueTree(stateObj);
+      source = this._resolveEntityValuePath(stateObj, path, tree);
     } else {
-      // Default to entity state; special-case for input_button -> show its 'name' attribute when present
       const domain = String(cell?.value || '').split('.')[0];
       if (domain === 'input_button') {
         const nm = stateObj?.attributes?.friendly_name ?? stateObj?.attributes?.name;
@@ -457,97 +659,25 @@ class FlexCellsCard extends LitElement {
       }
       source = stateObj?.state;
     }
-    const raw = (source !== undefined && source !== null) ? source : 'n/a';
-    let text;
-    if (this._isNumericState(raw)) {
-      let num = Number(raw);
-      num = this._rescaleIfConfigured(cell, num);
-      text = this._formatNumberByLocale(num, cell?.precision);
-    } else {
-      text = (typeof raw === 'object' && raw !== null) ? JSON.stringify(raw) : raw;
-    }
 
-    // input_datetime: apply custom JS-like tokens if a pattern is set (only for main state, not attributes)
-    if (!isAttr && cell?.datetime_format && typeof stateObj?.state === 'string') {
-      const entId = String(cell?.value || '');
-      if (entId.startsWith('input_datetime.')) {
-        const attrs = stateObj?.attributes || {};
-        const hasDate = !!attrs.has_date;
-        const hasTime = !!attrs.has_time;
-        const st = String(stateObj.state || '');
-        let Y, M, D, h = 0, m = 0, s = 0;
-        if (hasDate) {
-          const md = st.match(/(\d{4})-(\d{2})-(\d{2})/);
-          if (md) { Y = Number(md[1]); M = Number(md[2]); D = Number(md[3]); }
-        }
-        if (hasTime) {
-          const mt = st.match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
-          if (mt) { h = Number(mt[1]); m = Number(mt[2]); s = Number(mt[3] || '0'); }
-        }
-        let d = null;
-        if (hasDate) {
-          d = new Date(Y || 1970, (M || 1) - 1, D || 1, hasTime ? h : 0, hasTime ? m : 0, hasTime ? s : 0);
-        } else if (hasTime) {
-          const now = new Date();
-          d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
-        }
-        if (d && !isNaN(d.getTime())) {
-          const H = d.getHours();
-          const locale = (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator!=='undefined' ? navigator.language : 'en') || 'en');
-          const map = {
-            'YYYY': String(d.getFullYear()),
-            'YY': String(d.getFullYear()).slice(-2).padStart(2, '0'),
-            'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(d),
-            'MM': String(d.getMonth() + 1).padStart(2, '0'),
-            'M': String(d.getMonth() + 1),
-            'DD': String(d.getDate()).padStart(2, '0'),
-            'D': String(d.getDate()),
-            'HH': String(H).padStart(2, '0'),
-            'H': String(H),
-            'hh': String(((H % 12) || 12)).padStart(2, '0'),
-            'h': String(((H % 12) || 12)),
-            'mm': String(d.getMinutes()).padStart(2, '0'),
-            'm': String(d.getMinutes()),
-            'ss': String(d.getSeconds()).padStart(2, '0'),
-            's': String(d.getSeconds()),
-          };
-          try {
-            const pattern = String(cell.datetime_format || '');
-            const tokens = ['YYYY','MMMM','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s'];
-            const apply = (pat) => {
-              let out = '';
-              for (let i=0; i<pat.length;) {
-                const ch = pat[i];
-                if (ch === '[') {
-                  const j = pat.indexOf(']', i+1);
-                  if (j === -1) { out += '['; i += 1; continue; }
-                  out += pat.slice(i+1, j);
-                  i = j + 1;
-                  continue;
-                }
-                let matched = false;
-                for (const tk of tokens) {
-                  if (pat.startsWith(tk, i)) {
-                    out += (map[tk] ?? tk);
-                    i += tk.length;
-                    matched = true;
-                    break;
-                  }
-                }
-                if (!matched) { out += ch; i += 1; }
-              }
-              return out;
-            };
-            text = apply(pattern);
-          } catch (_e) { /* ignore */ }
-        }
+    const hasValue = source !== undefined && source !== null;
+    let textValue;
+
+    if (!hasValue) {
+      textValue = 'n/a';
+    } else {
+      const maybeDate = this._formatCellDateValue(cell, stateObj, source, isAttr);
+      if (maybeDate !== null) {
+        textValue = maybeDate;
+      } else if (this._isNumericState(source)) {
+        let num = Number(source);
+        num = this._rescaleIfConfigured(cell, num);
+        textValue = this._formatNumberByLocale(num, cell?.precision);
+      } else {
+        textValue = (typeof source === 'object') ? JSON.stringify(source) : String(source);
       }
     }
 
-
-    // Unit logic:
-    // - for attribute: prefer explicit 'unit' on cell; otherwise no automatic unit
-    // - for state: allow using the entity's native unit unless disabled
     let unit = '';
     if (isAttr) {
       unit = cell?.unit ?? '';
@@ -556,8 +686,9 @@ class FlexCellsCard extends LitElement {
       unit = useEntityUnit ? (stateObj?.attributes?.unit_of_measurement ?? '') : (cell?.unit ?? '');
     }
 
-    return `${text}${unit ? ` ${unit}` : ''}`;
+    return `${textValue}${unit ? ` ${unit}` : ''}`;
   }
+
   // === Dynamic coloring helpers (simple rules) ===
   _coerceNumber(v) {
     if (v === null || v === undefined) return NaN;
@@ -573,23 +704,17 @@ class FlexCellsCard extends LitElement {
     if (!rules.length) return null;
 
     const res = {}; // { bg, fg, hide, mask }
-    const resolvePath = (obj, path) => {
-      if (!obj || !path) return undefined;
-      const norm = String(path).replace(/\[(\d+)\]/g, '.$1');
-      const parts = norm.split('.').filter(Boolean);
-      let cur = obj;
-      for (const p of parts) {
-        if (cur && typeof cur === 'object' && p in cur) cur = cur[p];
-        else return undefined;
+    const treeCache = new Map();
+    const readAttr = (stObj, attrPath) => {
+      if (!stObj || attrPath === undefined || attrPath === null) return undefined;
+      const entityId = stObj.entity_id;
+      let tree = entityId ? treeCache.get(entityId) : undefined;
+      if (!tree) {
+        tree = this._buildEntityValueTree(stObj);
+        if (entityId && tree) treeCache.set(entityId, tree);
       }
-      return cur;
-    };
-    const getAttr = (stObj, attr) => {
-      if (!stObj || !attr) return undefined;
-      if (typeof attr === 'string' && attr.includes('.')) {
-        return resolvePath(stObj.attributes, attr);
-      }
-      return stObj.attributes?.[attr];
+      if (!tree) return undefined;
+      return this._resolveEntityValuePath(stObj, attrPath, tree);
     };
 
     for (const r of rules) {
@@ -601,7 +726,7 @@ class FlexCellsCard extends LitElement {
       if (r.entity) {
         // NEW: always read from selected entity/attribute
         const stObj = this.hass?.states?.[r.entity];
-        sourceVal = r.attr ? getAttr(stObj, r.attr) : stObj?.state;
+        sourceVal = r.attr ? readAttr(stObj, r.attr) : stObj?.state;
         isThisEntity = (type === 'entity' && r.entity === cell?.value);
       } else if (r.src) {
         // LEGACY support
@@ -618,14 +743,14 @@ class FlexCellsCard extends LitElement {
         } else if (src === 'this_attr') {
           if (type === 'entity') {
             const stObj = this.hass?.states?.[cell?.value];
-            sourceVal = getAttr(stObj, r.attr);
+            sourceVal = readAttr(stObj, r.attr);
           }
         } else if (src === 'other_state') {
           const stObj = this.hass?.states?.[r.entity];
           sourceVal = stObj?.state;
         } else if (src === 'other_attr') {
           const stObj = this.hass?.states?.[r.entity];
-          sourceVal = getAttr(stObj, r.attr);
+          sourceVal = readAttr(stObj, r.attr);
         } else {
           sourceVal = displayText ?? (cell?.value ?? '');
         }
@@ -718,6 +843,7 @@ class FlexCellsCard extends LitElement {
   }
 
 
+
   _buildTextStyle(cell, type, align, dyn, options = {}) {
     const st = cell?.style || {};
     const pad = this.config?.cell_padding || { top: 4, right: 0, bottom: 4, left: 0 };
@@ -775,8 +901,7 @@ class FlexCellsCard extends LitElement {
     if (visuals?.filter) {
       parts.push('filter:' + visuals.filter);
     }
-    const globalSize = this.config?.text_size;
-    const iconSize = st.icon_size || globalSize || '';
+    const iconSize = st.icon_size || '';
     if (iconSize) parts.push('--mdc-icon-size:' + iconSize);
     return parts.join(';');
   }
