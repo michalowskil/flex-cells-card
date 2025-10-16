@@ -110,35 +110,26 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
 ## Screenshots
 
-| ![Flex Cells Card config](images/flex-cells-card-10.png) |
-|---|
-
-| ![Flex Cells Card](images/flex-cells-card-9.png) | ![Flex Cells Card](images/flex-cells-card-8.png) |
-|---|---|
-
-| ![Flex Cells Card](images/flex-cells-card-4.png) | ![Flex Cells Card](images/flex-cells-card-5.png) |
-|---|---|
-
-| ![Flex Cells Card](images/flex-cells-card-1.png) | ![Flex Cells Card](images/flex-cells-card-2.png) |
-|---|---|
-
-| ![Flex Cells Card config](images/flex-cells-card-6.png) |
-|---|
+![Flex Cells Card](images/flex-cells-card-10.png)
+![Flex Cells Card](images/flex-cells-card-9.png)
+![Flex Cells Card](images/flex-cells-card-8.png)
+![Flex Cells Card](images/flex-cells-card-4.png)
+![Flex Cells Card](images/flex-cells-card-5.png)
+![Flex Cells Card](images/flex-cells-card-1.png)
+![Flex Cells Card](images/flex-cells-card-2.png)
+![Flex Cells Card](images/flex-cells-card-6.png)
 
 **Main configuration view**
 
-| ![Flex Cells Card config](images/flex-cells-card-configuration1.png) |
-|---|
+![Flex Cells Card config](images/flex-cells-card-configuration1.png)
 
 **Row and cell configuration**
 
-| ![Flex Cells Card config](images/flex-cells-card-configuration2.png) |
-|---|
+![Flex Cells Card config](images/flex-cells-card-configuration2.png)
 
 **Tap & Hold Actions**
 
-| ![Flex Cells Card config](images/flex-cells-card-configuration3.png) |
-|---|
+![Flex Cells Card config](images/flex-cells-card-configuration3.png)
 
 ## Example YAML
 ```yaml

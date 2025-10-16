@@ -1,5 +1,0 @@
-theme: jekyll-theme-cayman
-markdown: CommonMarkGhPages
-title: Flex Cells Card
-plugins:
-  - jekyll-commonmark-ghpages
