@@ -126,14 +126,17 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 |---|
 
 **Main configuration view**
+
 | ![Flex Cells Card config](images/flex-cells-card-configuration1.png) |
 |---|
 
 **Row and cell configuration**
+
 | ![Flex Cells Card config](images/flex-cells-card-configuration2.png) |
 |---|
 
 **Tap & Hold Actions**
+
 | ![Flex Cells Card config](images/flex-cells-card-configuration3.png) |
 |---|
 
