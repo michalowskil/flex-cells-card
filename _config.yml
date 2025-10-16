@@ -1,4 +1,5 @@
 theme: jekyll-theme-cayman
-markdown: kramdown
-kramdown:
-  input: GFM
+markdown: CommonMarkGhPages
+title: Flex Cells Card
+plugins:
+  - jekyll-commonmark-ghpages
