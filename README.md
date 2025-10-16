@@ -69,11 +69,11 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 </details>
 
 ## Changelog
-- v0.12.0-beta (Pre-release) —
+- v0.12.0 —
   - Added **metadata** (instead of attributes), now we have access to all data.
-  - Improved "Text size (default)" in the main settings, it no longer affects icon size.
-  - Added size setting for icons from entities.
-  - Changed "Date/Time format" to "Date/Time format & Text override". Now we can override the entity value even if it doesn't contain a date/time.
+  - Improved "_Text size (default)_" in the main settings, it no longer affects icon size.
+  - Added icon size settings (entity-derived icon).
+  - Changed "_Date/Time format_" to "_Date/Time format & Text override_". Now we can override the entity value even if it doesn't contain a date/time.
   - Minor visual improvements.
 - v0.11.0 —
   - Added use of **system-assigned icons and colors** for entities.
