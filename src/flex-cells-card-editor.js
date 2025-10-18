@@ -120,7 +120,70 @@ class FlexCellsCardEditor extends LitElement {
     }
     .dot { width: 2px; height: 2px; border-radius: 50%; background: currentColor; }
 
-    .addrow { margin: 6px 0 16px; }
+    .addrow {
+      margin: 6px 0 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .addrow button .btn-icon {
+      margin-right: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .addrow button.secondary .btn-icon {
+      color: var(--secondary-text-color, #888);
+    }
+
+    .rowhdr.separator {
+      grid-template-columns: auto auto 1fr auto;
+    }
+    .rowhdr.separator .preview {
+      display: none;
+    }
+    .option-group {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid var(--divider-color, #ddd);
+      border-radius: 10px;
+      background: var(--card-background-color, #fff);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .option-group label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0;
+      cursor: pointer;
+    }
+    .option-group label.disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .option-group input {
+      margin: 0;
+    }
+    .simple-check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    .simple-check input {
+      margin: 0;
+    }
+    .simple-check span {
+      font-size: 14px;
+    }
 
     /* Sekcja przeskalowania: 4 rzędy, 2 kolumny */
     .option.group.scale {
@@ -365,11 +428,56 @@ class FlexCellsCardEditor extends LitElement {
 
   _clone(x){ return JSON.parse(JSON.stringify(x)); }
 
+  _defaultSeparator() {
+    return {
+      color: '#d0d7de',
+      background: '',
+      style: 'solid',
+      thickness: 1,
+      length: '100%',
+      align: 'stretch',
+      opacity: 1,
+      margin_top: 0,
+      margin_bottom: 0,
+    };
+  }
+
+  _firstNonSeparatorRowIndex() {
+    const rows = this.config?.rows || [];
+    for (let i = 0; i < rows.length; i += 1) {
+      if ((rows[i]?.type || '') !== 'separator') return i;
+    }
+    return -1;
+  }
+
+  _isHeaderRowIndex(idx) {
+    if (!this.config?.header_from_first_row) return false;
+    const first = this._firstNonSeparatorRowIndex();
+    return first !== -1 && idx === first;
+  }
+
+  _displayRowNumber(idx) {
+    const rows = this.config?.rows || [];
+    let count = 0;
+    for (let i = 0; i <= idx; i += 1) {
+      if ((rows[i]?.type || '') !== 'separator') count += 1;
+    }
+    return count;
+  }
+
   setConfig(config) {
+    const fallbackCount = (() => {
+      if (!Array.isArray(config.rows)) return 1;
+      for (const row of config.rows) {
+        if (Array.isArray(row?.cells) && row.cells.length) return row.cells.length;
+      }
+      return 1;
+    })();
+
     const columnCount =
       Number.isInteger(config.column_count) && config.column_count > 0
         ? config.column_count
-        : (config.rows?.[0]?.cells?.length || 1);
+        : fallbackCount;
 
     const defaultPad = { top: 4, right: 0, bottom: 4, left: 0 };
     const cell_padding = { ...defaultPad, ...(config.cell_padding || {}) };
@@ -412,6 +520,10 @@ class FlexCellsCardEditor extends LitElement {
   _fireConfigChanged() { this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this.config }, bubbles: true, composed: true })); }
 
   _ensureCells(row, count) {
+    if ((row?.type || '') === 'separator') {
+      const defaults = this._defaultSeparator();
+      return { ...row, type: 'separator', separator: { ...defaults, ...(row?.separator || {}) }, cells: [] };
+    }
     const cells = Array.isArray(row?.cells) ? [...row.cells] : [];
     for (let i = cells.length; i < count; i++) cells.push({ type: 'string', value: '', align: 'right' });
     if (cells.length > count) cells.length = count;
@@ -748,6 +860,7 @@ class FlexCellsCardEditor extends LitElement {
 
   /* podgląd wiersza – wersja "po kolei" */
   _rowPreview(row) {
+    if ((row?.type || '') === 'separator') return html``;
     const cells = Array.isArray(row?.cells) ? row.cells : [];
     const out = [];
     let textCount = 0; // liczymy tylko elementy tekstowe (string/entity), żeby wstawić " • " pomiędzy nimi
@@ -784,6 +897,264 @@ class FlexCellsCardEditor extends LitElement {
     }
 
     return out.length ? html`${out}` : html`—`;
+  }
+
+  _separatorColorValue(color) {
+    const value = (color || '').trim();
+    return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value) ? value : '#d0d7de';
+  }
+
+  _renderSeparatorEditor(row, rIdx) {
+    const defaults = this._defaultSeparator();
+    const sep = { ...defaults, ...(row?.separator || {}) };
+
+    return html`
+      <div class="rowbody">
+        <div class="cell-grid cell-wide">
+          <div class="inline">
+            <ha-textfield
+              .label=${t(this.hass, "editor.separator_color")}
+              .value=${sep.color ?? ''}
+              .placeholder=${"#d0d7de | var(--divider-color)"}
+              @input=${(e)=>this._updateSeparator(rIdx,{ color: (e.target.value || '').trim() || defaults.color })}>
+            </ha-textfield>
+            <button type="button" class="toggle" title=${t(this.hass,"editor.separator_color_picker")} @click=${(ev)=>this._onSeparatorPaletteClick(ev, rIdx, 'color')}>
+              <ha-icon icon="mdi:palette"></ha-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="cell-grid cell-wide">
+          <div class="inline">
+            <ha-textfield
+              .label=${t(this.hass, "editor.separator_background")}
+              .value=${sep.background ?? ''}
+              .placeholder=${"transparent | #f0f0f0 | var(--color)"}
+              @input=${(e)=>this._updateSeparator(rIdx,{ background: (e.target.value || '').trim() || undefined })}>
+            </ha-textfield>
+            <button type="button" class="toggle" title=${t(this.hass,"editor.separator_color_picker")} @click=${(ev)=>this._onSeparatorPaletteClick(ev, rIdx, 'background')}>
+              <ha-icon icon="mdi:palette"></ha-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="cols2">
+          <div>
+            <ha-select
+              style="width:100%;"
+              .label=${t(this.hass, "editor.separator_style")}
+              .value=${sep.style || defaults.style}
+              naturalMenuWidth
+              fixedMenuPosition
+              @selected=${(e)=>this._updateSeparator(rIdx,{ style: e.target.value || defaults.style })}
+              @closed=${(e)=>e.stopPropagation()}>
+              <mwc-list-item value="solid">${t(this.hass,"editor.separator_style_solid")}</mwc-list-item>
+              <mwc-list-item value="dashed">${t(this.hass,"editor.separator_style_dashed")}</mwc-list-item>
+              <mwc-list-item value="dotted">${t(this.hass,"editor.separator_style_dotted")}</mwc-list-item>
+            </ha-select>
+          </div>
+          <div>
+            <ha-textfield
+              style="width:100%;"
+              .label=${t(this.hass, "editor.separator_thickness")}
+              type="number"
+              min="0"
+              step="0.1"
+              .value=${String(sep.thickness ?? '')}
+              @input=${(e)=>this._separatorNumberChanged(rIdx,'thickness',e,{ float:true, min:0 })}>
+            </ha-textfield>
+          </div>
+        </div>
+
+        <div class="cols2">
+          <div>
+            <ha-textfield
+              style="width:100%;"
+              .label=${t(this.hass, "editor.separator_length")}
+              .value=${sep.length ?? ''}
+              .placeholder=${"100% | 80% | 240px"}
+              @input=${(e)=>this._updateSeparator(rIdx,{ length: (e.target.value || '').trim() || defaults.length })}>
+            </ha-textfield>
+          </div>
+          <div>
+            <ha-select
+              style="width:100%;"
+              .label=${t(this.hass, "editor.separator_align")}
+              .value=${sep.align || defaults.align}
+              naturalMenuWidth
+              fixedMenuPosition
+              @selected=${(e)=>this._updateSeparator(rIdx,{ align: e.target.value || defaults.align })}
+              @closed=${(e)=>e.stopPropagation()}>
+              <mwc-list-item value="stretch">${t(this.hass,"editor.separator_align_full")}</mwc-list-item>
+              <mwc-list-item value="center">${t(this.hass,"editor.separator_align_center")}</mwc-list-item>
+              <mwc-list-item value="left">${t(this.hass,"editor.separator_align_left")}</mwc-list-item>
+              <mwc-list-item value="right">${t(this.hass,"editor.separator_align_right")}</mwc-list-item>
+            </ha-select>
+          </div>
+        </div>
+
+        <div class="cols2">
+          <div>
+            <ha-textfield
+              style="width:100%;"
+              .label=${t(this.hass, "editor.separator_margin_top")}
+              type="number"
+              step="1"
+              .value=${String(sep.margin_top ?? '')}
+              @input=${(e)=>this._separatorNumberChanged(rIdx,'margin_top',e,{ float:true })}>
+            </ha-textfield>
+          </div>
+          <div>
+            <ha-textfield
+              style="width:100%;"
+              .label=${t(this.hass, "editor.separator_margin_bottom")}
+              type="number"
+              step="1"
+              .value=${String(sep.margin_bottom ?? '')}
+              @input=${(e)=>this._separatorNumberChanged(rIdx,'margin_bottom',e,{ float:true })}>
+            </ha-textfield>
+          </div>
+        </div>
+
+        <div class="cell-grid cell-wide">
+          <ha-textfield
+            .label=${t(this.hass, "editor.separator_opacity")}
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+            .value=${String(sep.opacity ?? '')}
+            @input=${(e)=>this._separatorNumberChanged(rIdx,'opacity',e,{ float:true, min:0, max:1 })}>
+          </ha-textfield>
+        </div>
+        <div class="muted" style="margin-top:10px;">${t(this.hass, "editor.separator_zero_hint")}</div>
+      </div>
+    `;
+  }
+
+  _onSeparatorPaletteClick(ev, idx, key = 'color') {
+    ev?.preventDefault();
+    ev?.stopPropagation();
+    const defaults = this._defaultSeparator();
+    const currentRow = this.config?.rows?.[idx];
+    const fallback = (key === 'background'
+      ? (defaults.background || defaults.color)
+      : (defaults[key] ?? defaults.color)) || defaults.color;
+    const currentValue = currentRow?.separator?.[key];
+    const current = this._separatorColorValue(currentValue || fallback);
+
+    const btn = ev.currentTarget || ev.target;
+    const rect = btn?.getBoundingClientRect?.();
+    let x = rect ? rect.right - 8 : 24;
+    let y = rect ? rect.bottom + 8 : 24;
+
+    let container = document.body;
+    let position = 'fixed';
+    const dialog = this.closest?.('ha-dialog');
+    if (dialog?.shadowRoot) {
+      const surface = dialog.shadowRoot.querySelector('.mdc-dialog__surface') || dialog;
+      if (surface) {
+        const srect = surface.getBoundingClientRect();
+        x -= srect.left; y -= srect.top;
+        container = surface; position = 'absolute';
+      }
+    }
+
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = current;
+    Object.assign(input.style, {
+      position,
+      left: `${Math.round(x)}px`,
+      top: `${Math.round(y)}px`,
+      transform: 'translate(-10px,-10px)',
+      width: '18px',
+      height: '18px',
+      opacity: '0.001',
+      pointerEvents: 'auto',
+      border: '0', padding: '0', margin: '0',
+      zIndex: '2147483647',
+    });
+
+    const textfield = btn?.parentElement?.querySelector('ha-textfield') || null;
+
+    let pending = null;
+    let tid = 0;
+    const flush = () => {
+      if (pending != null) {
+        const value = (pending === defaults.color && key === 'background' && !currentValue)
+          ? undefined
+          : pending;
+        this._updateSeparator(idx, { [key]: value });
+        pending = null;
+      }
+      if (tid) { clearTimeout(tid); tid = 0; }
+    };
+
+    const cleanup = () => {
+      flush();
+      document.removeEventListener('pointerdown', onOutside, true);
+      input.remove();
+    };
+
+    const onInput = (e) => {
+      pending = this._separatorColorValue(e.target.value || defaults.color);
+      if (textfield) { textfield.value = pending; textfield.requestUpdate?.(); }
+      if (!tid) tid = window.setTimeout(() => { tid = 0; flush(); }, 60);
+    };
+
+    const onChange = (e) => {
+      pending = this._separatorColorValue(e.target.value || defaults.color);
+      flush();
+      cleanup();
+    };
+
+    const onBlur = () => cleanup();
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); cleanup(); } };
+    const onOutside = (e) => { if (e.target !== input) cleanup(); };
+
+    input.addEventListener('input', onInput);
+    input.addEventListener('change', onChange, { once: true });
+    input.addEventListener('blur', onBlur, { once: true });
+    input.addEventListener('keydown', onKey);
+
+    container.appendChild(input);
+    document.addEventListener('pointerdown', onOutside, true);
+    requestAnimationFrame(() => input.click());
+  }
+
+  _updateSeparator(idx, patch) {
+    const rows = [...(this.config.rows || [])];
+    if (!rows[idx]) return;
+    const defaults = this._defaultSeparator();
+    const current = { ...defaults, ...(rows[idx].separator || {}) };
+    const next = { ...current, ...(patch || {}) };
+    Object.keys(next).forEach((k) => { if (next[k] === undefined) delete next[k]; });
+    rows[idx] = { ...rows[idx], type: 'separator', separator: next, cells: [] };
+    this.config = { ...this.config, rows };
+    if (Array.isArray(this._fullCells) && this._fullCells.length) {
+      const copy = [...this._fullCells];
+      copy[idx] = [];
+      this._fullCells = copy;
+    }
+    this._fireConfigChanged();
+  }
+
+  _separatorNumberChanged(idx, key, e, opts = {}) {
+    const raw = (e?.target?.value ?? '').trim();
+    const defaults = this._defaultSeparator();
+    if (raw === '') {
+      const fallback = defaults[key];
+      this._updateSeparator(idx, { [key]: fallback });
+      return;
+    }
+    const useFloat = !!opts.float;
+    const num = useFloat ? parseFloat(raw) : parseInt(raw, 10);
+    if (!Number.isFinite(num)) return;
+    let value = num;
+    if (opts.min !== undefined && value < opts.min) value = opts.min;
+    if (opts.max !== undefined && value > opts.max) value = opts.max;
+    this._updateSeparator(idx, { [key]: value });
   }
 
   firstUpdated() { this._ensureEntityPickerLoaded(); }
@@ -1082,23 +1453,45 @@ class FlexCellsCardEditor extends LitElement {
         </div>
 
 
-        <div class="cols21">
+        <div class="option-group">
           <ha-textfield
+            style="width:100%;"
             label=${t(this.hass,"editor.sort_cols_label")}
             .value=${sortStr}
             @input=${(e)=> this._upd('sort_columns', this._parseCsvIntList(e.target.value)) }>
           </ha-textfield>
-
-          <label class="option full">
+          <label class="simple-check">
             <input type="checkbox" .checked=${!!this.config.sort_desc} @change=${(e)=>this._toggle('sort_desc',e)} />
-            ${t(this.hass,"editor.sort_desc_label")}
+            <span>${t(this.hass,"editor.sort_desc_label")}</span>
           </label>
+          <label class="simple-check">
+            <input type="checkbox"
+              .checked=${!!this.config.hide_separators_on_sort}
+              @change=${(e)=>this._toggle('hide_separators_on_sort', e)} />
+            <span>${t(this.hass,"editor.sort_hide_separators_label")}</span>
+          </label>
+          <div class="muted" style="margin-top:4px;">
+            ${t(this.hass,"editor.sort_hint_grouped")}
+          </div>
         </div>
 
         <div class="options">
           <label class="option"><input type="checkbox" .checked=${!!this.config.overflow_x} @change=${(e)=>this._toggle('overflow_x',e)} /> ${t(this.hass,"editor.overflow_x")}</label>
           <label class="option"><input type="checkbox" .checked=${!!this.config.header_from_first_row} @change=${(e)=>this._toggle('header_from_first_row',e)} /> ${t(this.hass,"editor.header_from_first")}</label>
-          <label class="option"><input type="checkbox" .checked=${!!this.config.zebra} @change=${(e)=>this._toggle('zebra',e)} /> ${t(this.hass,"editor.zebra")}</label>
+          <div class="option-group zebra-option">
+            <label>
+              <input type="checkbox" .checked=${!!this.config.zebra} @change=${(e)=>this._toggle('zebra',e)} />
+              ${t(this.hass,"editor.zebra")}
+            </label>
+            ${this.config.zebra ? html`
+              <label>
+                <input type="checkbox"
+                  .checked=${!!this.config.zebra_ignore_separators}
+                  @change=${(e)=>this._toggle('zebra_ignore_separators', e)} />
+                ${t(this.hass,"editor.zebra_skip_separators")}
+              </label>
+            ` : ''}
+          </div>
         </div>
 
         ${colCount>=2 ? html`
@@ -1133,13 +1526,17 @@ class FlexCellsCardEditor extends LitElement {
         `: ''}
       </div>
 
-      ${this.config.rows.map((row, rIdx) => {
-        const colCountNow=this.config.column_count||1;
+      ${(this.config.rows || []).map((row, rIdx) => {
+        const colCountNow = this.config.column_count || 1;
         const active = Math.min(this._activeTabs[rIdx] || 0, colCountNow - 1);
-        const isHeaderRow = !!this.config.header_from_first_row && rIdx === 0;
-        const rowTitle = `${t(this.hass, "editor.row")} ${rIdx + 1}${isHeaderRow ? t(this.hass,"editor.header_suffix") : ""}`;
+        const isSeparator = (row?.type || '') === 'separator';
+        const isHeaderRow = !isSeparator && this._isHeaderRowIndex(rIdx);
+        const rowTitle = isSeparator
+          ? t(this.hass, "editor.separator_title")
+          : `${t(this.hass, "editor.row")} ${this._displayRowNumber(rIdx)}${isHeaderRow ? t(this.hass,"editor.header_suffix") : ""}`;
         const collapsed = !!this._collapsed?.[rIdx];
         const rowClass = this._dragOverIndex === rIdx ? 'dragover' : '';
+        const rowHdrClass = `${collapsed ? 'collapsed' : ''} ${isSeparator ? 'separator' : ''}`.trim();
 
         return html`
           <div class="row">
@@ -1148,7 +1545,7 @@ class FlexCellsCardEditor extends LitElement {
                  @dragleave=${(e)=>this._onDragLeave(rIdx,e)}
                  @drop=${(e)=>this._onDrop(rIdx,e)}
                  @contextmenu=${(e)=>e.preventDefault()}>
-              <div class="rowhdr ${collapsed ? 'collapsed' : ''}">
+              <div class="rowhdr ${rowHdrClass}">
                 <button class="handle"
                         title=${t(this.hass,"editor.drag_to_reorder")}
                         draggable=${!this._isTouchDevice}
@@ -1166,7 +1563,7 @@ class FlexCellsCardEditor extends LitElement {
                 </button>
 
                 <div class="title">${rowTitle}</div>
-                <div class="preview">${this._rowPreview(row)}</div>
+                <div class="preview">${isSeparator ? '' : this._rowPreview(row)}</div>
 
                 <div class="rowtools">
                   <button title=${t(this.hass,"editor.up")} ?disabled=${rIdx===0} @click=${()=>this._moveRow(rIdx,-1)}>▲</button>
@@ -1175,7 +1572,9 @@ class FlexCellsCardEditor extends LitElement {
                 </div>
               </div>
 
-              ${collapsed ? '' : html`
+              ${collapsed ? '' : (isSeparator
+                ? this._renderSeparatorEditor(row, rIdx)
+                : html`
                 <div class="rowbody">
                   <div class="tabs">
                     ${Array.from({ length: colCountNow }, (_, i) => html`
@@ -1742,14 +2141,21 @@ class FlexCellsCardEditor extends LitElement {
                     `;
                   })()}
                 </div>
-              `}
+              `)}
             </div>
           </div>
         `;
       })}
 
       <div class="addrow">
-        <button @click=${() => this._addRow?.()}>➕ ${t(this.hass,"editor.add_row")}</button>
+        <button type="button" @click=${() => this._addRow?.()}>
+          <span class="btn-icon">&#x2795;</span>
+          ${t(this.hass,"editor.add_row")}
+        </button>
+        <button type="button" class="secondary" @click=${() => this._addSeparator?.()}>
+          <span class="btn-icon">&#x2795;</span>
+          ${t(this.hass,"editor.add_separator")}
+        </button>
       </div>
 
       <datalist id="entities-list">
@@ -1765,6 +2171,15 @@ class FlexCellsCardEditor extends LitElement {
     const rows = [...(this.config.rows || []), { cells: newCells }];
     this.config = { ...this.config, rows };
     this._fullCells = [...(this._fullCells || []), newCells.map(c => this._clone(c))];
+    this._collapsed = [...(this._collapsed || []), true];
+    this._activeTabs = { ...(this._activeTabs || {}), [rows.length - 1]: 0 };
+    this._fireConfigChanged();
+  }
+  _addSeparator() {
+    const separator = this._defaultSeparator();
+    const rows = [...(this.config.rows || []), { type: 'separator', separator, cells: [] }];
+    this.config = { ...this.config, rows };
+    this._fullCells = [...(this._fullCells || []), []];
     this._collapsed = [...(this._collapsed || []), true];
     this._activeTabs = { ...(this._activeTabs || {}), [rows.length - 1]: 0 };
     this._fireConfigChanged();

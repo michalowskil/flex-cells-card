@@ -37,6 +37,18 @@ const stateColorCss = (stateObj, state) => { const compareState = state !== unde
 
 const stateColorBrightness = (stateObj) => { const brightness = stateObj?.attributes?.brightness; if (typeof brightness === 'number' && computeDomain(stateObj.entity_id) !== 'plant') { return 'brightness(' + ((brightness + 245) / 5) + '%)'; } return ''; };
 
+const DEFAULT_SEPARATOR = {
+  color: '#d0d7de',
+  background: '',
+  style: 'solid',
+  thickness: 1,
+  length: '100%',
+  align: 'stretch',
+  opacity: 1,
+  margin_top: 0,
+  margin_bottom: 0,
+};
+
 class FlexCellsCard extends LitElement {
   static properties = { config: {}, hass: {} };
 
@@ -57,7 +69,7 @@ class FlexCellsCard extends LitElement {
       background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
       border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12));
     }
-    .datatable.zebra tbody tr:nth-child(even) td {
+    .datatable.zebra tbody tr.fc-zebra-alt td {
       background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
     }
 
@@ -73,6 +85,15 @@ class FlexCellsCard extends LitElement {
     .icon ha-icon { color: var(--state-icon-color, var(--primary-text-color)); }
     .celltext { display: inline-block; white-space: nowrap; }
     .datatable td, .datatable th { line-height: 1.15; }
+    .fc-separator-row td {
+      padding: 0 !important;
+      background: transparent;
+    }
+    .fc-separator-line {
+      display: block;
+      height: 0;
+      border: none;
+    }
   
     .icon-mask { display:inline-block; vertical-align:middle; }
     .fc-entity-icon-text {
@@ -107,10 +128,18 @@ class FlexCellsCard extends LitElement {
 `;
 
   setConfig(config) {
+    const fallbackColCount = (() => {
+      if (!Array.isArray(config.rows)) return 1;
+      for (const row of config.rows) {
+        if (Array.isArray(row?.cells) && row.cells.length) return row.cells.length;
+      }
+      return 1;
+    })();
+
     const colCount =
       Number.isInteger(config.column_count) && config.column_count > 0
         ? config.column_count
-        : (config.rows?.[0]?.cells?.length || 1);
+        : fallbackColCount;
 
     const defaultCellPadding = { top: 4, right: 0, bottom: 4, left: 0 };
     const cell_padding = { ...defaultCellPadding, ...(config.cell_padding || {}) };
@@ -525,19 +554,39 @@ class FlexCellsCard extends LitElement {
   _sortBodyRows(rows, sortColumns, sortDesc) {
     if (!Array.isArray(rows) || !rows.length) return rows;
     if (!Array.isArray(sortColumns) || !sortColumns.length) return rows;
-    const prepared = rows.map((row, index) => ({
-      row,
-      index,
-      keys: sortColumns.map((colIdx) => this._getCellSortKey(row, colIdx)),
-    }));
-    prepared.sort((a, b) => {
-      for (let i = 0; i < sortColumns.length; i += 1) {
-        const diff = this._compareSortKeys(a.keys[i], b.keys[i], sortDesc);
-        if (diff !== 0) return diff;
+
+    const sortSegment = (segment) => {
+      if (!segment.length) return [];
+      const prepared = segment.map((row, index) => ({
+        row,
+        index,
+        keys: sortColumns.map((colIdx) => this._getCellSortKey(row, colIdx)),
+      }));
+      prepared.sort((a, b) => {
+        for (let i = 0; i < sortColumns.length; i += 1) {
+          const diff = this._compareSortKeys(a.keys[i], b.keys[i], sortDesc);
+          if (diff !== 0) return diff;
+        }
+        return a.index - b.index;
+      });
+      return prepared.map((entry) => entry.row);
+    };
+
+    const result = [];
+    let segment = [];
+    rows.forEach((row) => {
+      if ((row?.type || '') === 'separator') {
+        if (segment.length) {
+          result.push(...sortSegment(segment));
+          segment = [];
+        }
+        result.push(row);
+      } else {
+        segment.push(row);
       }
-      return a.index - b.index;
     });
-    return prepared.map((entry) => entry.row);
+    if (segment.length) result.push(...sortSegment(segment));
+    return result;
   }
 
   // === Simple input entity controls (input_boolean / input_number / input_select) ===
@@ -1459,6 +1508,90 @@ class FlexCellsCard extends LitElement {
     return html`<td style=${tdStyle}>${shown}</td>`;
   }
 
+  _normalizeSeparator(row) {
+    const raw = row?.separator || {};
+    const normalized = { ...DEFAULT_SEPARATOR };
+
+    if (raw.color != null && String(raw.color).trim()) normalized.color = String(raw.color).trim();
+    if (raw.background != null && String(raw.background).trim()) normalized.background = String(raw.background).trim();
+
+    const style = String(raw.style || '').toLowerCase();
+    if (['solid', 'dashed', 'dotted'].includes(style)) normalized.style = style;
+
+    const thickness = Number(raw.thickness);
+    if (Number.isFinite(thickness) && thickness >= 0) normalized.thickness = thickness;
+
+    if (raw.length != null && String(raw.length).trim()) normalized.length = String(raw.length).trim();
+
+    const align = String(raw.align || '').toLowerCase();
+    if (['stretch', 'center', 'left', 'right'].includes(align)) normalized.align = align;
+
+    const opacity = Number(raw.opacity);
+    if (Number.isFinite(opacity)) normalized.opacity = Math.min(Math.max(opacity, 0), 1);
+
+    const marginTop = Number(raw.margin_top);
+    if (Number.isFinite(marginTop)) normalized.margin_top = marginTop;
+
+    const marginBottom = Number(raw.margin_bottom);
+    if (Number.isFinite(marginBottom)) normalized.margin_bottom = marginBottom;
+
+    return normalized;
+  }
+
+  _renderSeparatorRow(row, colCount) {
+    const sep = this._normalizeSeparator(row);
+    const thickness = Math.max(0, Number(sep.thickness));
+    const opacity = Number.isFinite(sep.opacity) ? sep.opacity : DEFAULT_SEPARATOR.opacity;
+    const marginTop = Number.isFinite(sep.margin_top) ? sep.margin_top : DEFAULT_SEPARATOR.margin_top;
+    const marginBottom = Number.isFinite(sep.margin_bottom) ? sep.margin_bottom : DEFAULT_SEPARATOR.margin_bottom;
+    const span = Math.max(1, colCount || 1);
+    const background = (sep.background || '').trim();
+
+    let width = sep.length || '100%';
+    let marginLeft = 'auto';
+    let marginRight = 'auto';
+
+    switch (sep.align) {
+      case 'stretch':
+        width = '100%';
+        marginLeft = '0';
+        marginRight = '0';
+        break;
+      case 'left':
+        marginLeft = '0';
+        marginRight = 'auto';
+        break;
+      case 'right':
+        marginLeft = 'auto';
+        marginRight = '0';
+        break;
+      default:
+        marginLeft = 'auto';
+        marginRight = 'auto';
+        break;
+    }
+
+    const styleParts = [
+      thickness > 0 ? `border-top:${thickness}px ${sep.style} ${sep.color}` : 'border-top:none',
+      `width:${width}`,
+      `margin-top:${marginTop}px`,
+      `margin-bottom:${marginBottom}px`,
+      `margin-left:${marginLeft}`,
+      `margin-right:${marginRight}`,
+      `opacity:${opacity}`,
+      'height:0',
+      'box-sizing:border-box',
+    ];
+
+    return html`
+      <tr class="fc-separator-row">
+        <td colspan=${span} style=${background ? `background:${background};` : ''}>
+          <div class="fc-separator-line" style=${styleParts.join(';')}></div>
+        </td>
+      </tr>
+    `;
+  }
+
 
   _resolveCardPadding() {
     const v = this.config?.card_padding;
@@ -1469,16 +1602,22 @@ class FlexCellsCard extends LitElement {
 
   render() {
     const cfg = this.config || {};
+    const rows = Array.isArray(cfg.rows) ? cfg.rows : [];
     const colCount = cfg.column_count ?? 1;
     const padVal = this._resolveCardPadding();
 
-    if (!cfg.rows || !Array.isArray(cfg.rows) || cfg.rows.length === 0) {
+    if (!rows.length) {
       return html`<div class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</div>`;
     }
 
-    const hasHeader = !!cfg.header_from_first_row && cfg.rows.length > 0;
-    const headerRow = hasHeader ? cfg.rows[0] : null;
-    const bodyRows = hasHeader ? cfg.rows.slice(1) : cfg.rows;
+    const headerIndex = cfg.header_from_first_row
+      ? rows.findIndex((row) => (row?.type || '') !== 'separator')
+      : -1;
+    const headerRow = headerIndex >= 0 ? rows[headerIndex] : null;
+    const hasHeader = !!headerRow;
+    const bodyRows = hasHeader
+      ? rows.filter((_, idx) => idx !== headerIndex)
+      : rows;
 
     const widths = Array.isArray(cfg.column_widths) ? cfg.column_widths : null;
     const useFixed = !!widths && widths.length > 0;
@@ -1508,9 +1647,14 @@ class FlexCellsCard extends LitElement {
       .filter((idx) => idx >= 0 && idx < colCount);
     const sortColumns = zeroBasedSortColumns.filter((idx, pos, arr) => arr.indexOf(idx) === pos);
     const sortDesc = !!cfg.sort_desc;
-    const rowsForBody = sortColumns.length
+    const sortActive = sortColumns.length > 0;
+    const rowsForBody = sortActive
       ? this._sortBodyRows(bodyRows, sortColumns, sortDesc)
       : bodyRows;
+
+    let zebraCounter = 0;
+    const zebraIgnoreSeparators = !!cfg.zebra_ignore_separators;
+    const hideSortSeparators = sortActive && !!cfg.hide_separators_on_sort;
 
     const table = html`
       <style>${hideCSS}</style>
@@ -1538,11 +1682,25 @@ class FlexCellsCard extends LitElement {
 
         <tbody>
           ${rowsForBody.map((row) => {
+      const isSeparator = (row?.type || '') === 'separator';
+      if (isSeparator) {
+        if (cfg.zebra && !zebraIgnoreSeparators) {
+          zebraCounter += 1;
+        }
+        const separatorRow = hideSortSeparators
+          ? { ...row, separator: { ...(row?.separator || {}), thickness: 0 } }
+          : row;
+        return this._renderSeparatorRow(separatorRow, colCount);
+      }
+      if (cfg.zebra) {
+        zebraCounter += 1;
+      }
+      const zebraClass = (cfg.zebra && zebraCounter % 2 === 0) ? 'fc-zebra-alt' : '';
       const cells = Array.isArray(row?.cells) ? row.cells : [];
       const filled = Array.from({ length: colCount }, (_, i) =>
         cells[i] ?? { type: 'string', value: '', align: 'right' }
       );
-      return html`<tr>${filled.map((cell) => this._renderBodyCell(cell))}</tr>`;
+      return html`<tr class=${zebraClass}>${filled.map((cell) => this._renderBodyCell(cell))}</tr>`;
     })}
         </tbody>
       </table>

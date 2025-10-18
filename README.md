@@ -10,8 +10,8 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 ## Features
 - Mix cells with **Icon / Text / Entity / Metadata / Input Control**
 - **Dynamic Rules**: Color & Content Overrides
-- **Sorting** by single or multiple columns
-- Using **icons and colors assigned to entities by the system**.
+- **Sorting** by one or more columns in one or more **groups**
+- Using **icons and colors assigned to entities by the system**
 - **Per-cell actions:** tap, hold, double-tap (mobile-friendly)
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
@@ -69,6 +69,8 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 </details>
 
 ## Changelog
+- v0.13.0-beta (Pre-release) —
+  - Added **separators** and **sorting by groups**.
 - v0.12.0 —
   - Added **metadata** (instead of attributes), now we have access to all data.
   - Improved "_Text size (default)_" in the main settings, it no longer affects icon size.
