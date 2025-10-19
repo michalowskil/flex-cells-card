@@ -866,6 +866,10 @@ class FlexCellsCard extends LitElement {
       if (match) {
         if (r.bg) res.bg = r.bg;
         if (r.fg) res.fg = r.fg;
+        if (r.visibility) {
+          const visRaw = String(r.visibility).toLowerCase();
+          if (visRaw === 'visible' || visRaw === 'hidden') res.visibility = visRaw;
+        }
         // New overwrite API
         const ow = (r.overwrite || '').toLowerCase();
         if (ow === 'hide') {
@@ -889,6 +893,22 @@ class FlexCellsCard extends LitElement {
       }
     }
     return res;
+  }
+
+
+
+  _evaluateRowRules(row) {
+    const rules = Array.isArray(row?.dyn_row_rules) ? row.dyn_row_rules : [];
+    if (!rules.length) return null;
+    const stub = { dyn_color: rules };
+    const res = this._evaluateDynColor(stub, 'row', undefined);
+    if (!res) return null;
+    const out = {};
+    if (res.bg) out.bg = res.bg;
+    if (res.fg) out.fg = res.fg;
+    const vis = typeof res.visibility === 'string' ? res.visibility.toLowerCase() : null;
+    if (vis === 'hidden' || vis === 'visible') out.visibility = vis;
+    return Object.keys(out).length ? out : null;
   }
 
 
@@ -1389,14 +1409,22 @@ class FlexCellsCard extends LitElement {
 
 
 
-  _renderBodyCell(cell) {
+  _renderBodyCell(cell, rowDyn = null) {
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
     const align = cell?.align || 'right';
+    const rowDynBase = rowDyn
+      ? {
+          ...(rowDyn.bg ? { bg: rowDyn.bg } : {}),
+          ...(rowDyn.fg ? { fg: rowDyn.fg } : {}),
+        }
+      : null;
+    const mergeDyn = (cellDyn) => (cellDyn ? { ...(rowDynBase || {}), ...cellDyn } : rowDynBase);
 
     if (type === 'icon') {
       const display = val;
-      const dyn = this._evaluateDynColor(cell, type, display);
+      const cellDyn = this._evaluateDynColor(cell, type, display);
+      const dyn = mergeDyn(cellDyn);
       const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
@@ -1432,12 +1460,14 @@ class FlexCellsCard extends LitElement {
       const domain = val?.split?.('.')?.[0];
       if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
         const _disp = this._formatEntityCell(cell, stateObj);
-        const _dyn = this._evaluateDynColor(cell, type, _disp);
+        const _cellDyn = this._evaluateDynColor(cell, type, _disp);
+        const _dyn = mergeDyn(_cellDyn);
         const { style: _tdStyle } = this._buildTextStyle(cell, type, align, _dyn);
         return html`<td style=${_tdStyle}>${this._renderEntityControl(cell, stateObj, val)}</td>`;
       }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
-      const dyn = this._evaluateDynColor(cell, type, display);
+      const cellDyn = this._evaluateDynColor(cell, type, display);
+      const dyn = mergeDyn(cellDyn);
       const mode = this._getEntityDisplayMode(cell);
       const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
@@ -1480,7 +1510,8 @@ class FlexCellsCard extends LitElement {
 
     // string
     const display = val ?? '';
-    const dyn = this._evaluateDynColor(cell, type, display);
+    const cellDyn = this._evaluateDynColor(cell, type, display);
+    const dyn = mergeDyn(cellDyn);
     const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     const content = (dyn && dyn.overwrite === 'icon') ? html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>` : null;
@@ -1688,9 +1719,21 @@ class FlexCellsCard extends LitElement {
           zebraCounter += 1;
         }
         const separatorRow = hideSortSeparators
-          ? { ...row, separator: { ...(row?.separator || {}), thickness: 0 } }
+          ? {
+              ...row,
+              separator: {
+                ...(row?.separator || {}),
+                thickness: 0,
+                margin_top: 0,
+                margin_bottom: 0,
+              },
+            }
           : row;
         return this._renderSeparatorRow(separatorRow, colCount);
+      }
+      const rowDyn = this._evaluateRowRules(row);
+      if (rowDyn?.visibility === 'hidden') {
+        return html``;
       }
       if (cfg.zebra) {
         zebraCounter += 1;
@@ -1700,7 +1743,7 @@ class FlexCellsCard extends LitElement {
       const filled = Array.from({ length: colCount }, (_, i) =>
         cells[i] ?? { type: 'string', value: '', align: 'right' }
       );
-      return html`<tr class=${zebraClass}>${filled.map((cell) => this._renderBodyCell(cell))}</tr>`;
+      return html`<tr class=${zebraClass}>${filled.map((cell) => this._renderBodyCell(cell, rowDyn))}</tr>`;
     })}
         </tbody>
       </table>

@@ -45,24 +45,24 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
 ## Tips & Tricks
 
-<details><summary>How sorting works</summary>
+<details markdown="1"><summary>How sorting works</summary>
 
 - Sorting works "after applying" dynamic rules, meaning what's visible is sorted.
 - Sorting works even if the column being sorted is hidden (breakpoint).
 </details>
 
-<details><summary>Dynamic rules</summary>
+<details markdown="1"><summary>Dynamic rules</summary>
 
 - For example, if you want to change what an entity displays to a defined text, while keeping "more-info" on click, you can add a rule without an entity, with the operator set to "not equal" and an empty "value". This condition will always be met.
 - If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
 </details>
 
-<details><summary>Available colors</summary>
+<details markdown="1"><summary>Available colors</summary>
 
 - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
 </details>
 
-<details><summary>Copy & Paste / Search & Replace</summary>
+<details markdown="1"><summary>Copy & Paste / Search & Replace</summary>
 
 - You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
 - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
@@ -71,6 +71,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 ## Changelog
 - v0.13.0-beta (Pre-release) —
   - Added **separators** and **sorting by groups**.
+  - Added **dynamic rules for the entire row**.
 - v0.12.0 —
   - Added **metadata** (instead of attributes), now we have access to all data.
   - Improved "_Text size (default)_" in the main settings, it no longer affects icon size.
