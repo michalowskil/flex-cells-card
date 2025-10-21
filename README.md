@@ -45,31 +45,24 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
 ## Tips & Tricks
 
-<details markdown="1"><summary>How sorting works</summary>
+- How sorting works
+  - Sorting works "after applying" dynamic rules, meaning what's visible is sorted.
+  - Sorting works even if the column being sorted is hidden (breakpoint).
 
-- Sorting works "after applying" dynamic rules, meaning what's visible is sorted.
-- Sorting works even if the column being sorted is hidden (breakpoint).
-</details>
+- Dynamic rules
+  - For example, if you want to change what an entity displays to a defined text, while keeping "more-info" on click, you can add a rule without an entity, with the operator set to "not equal" and an empty "value". This condition will always be met.
+  - If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
 
-<details markdown="1"><summary>Dynamic rules</summary>
+- Available colors
+  - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
+  </details>
 
-- For example, if you want to change what an entity displays to a defined text, while keeping "more-info" on click, you can add a rule without an entity, with the operator set to "not equal" and an empty "value". This condition will always be met.
-- If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
-</details>
-
-<details markdown="1"><summary>Available colors</summary>
-
-- You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
-</details>
-
-<details markdown="1"><summary>Copy & Paste / Search & Replace</summary>
-
-- You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
-- If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
-</details>
+- Copy & Paste / Search & Replace
+  - You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
+  - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
 ## Changelog
-- v0.13.0-beta (Pre-release) —
+- v0.13.0 —
   - Added **separators** and **sorting by groups**.
   - Added **dynamic rules for the entire row**.
 - v0.12.0 —
@@ -88,13 +81,13 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Fixed the dropdown list display in dynamic rules.
 - v0.9.0 —
   - Added **German translation**, thanks to [Olli](https://community.home-assistant.io/u/olli.dev/summary) and [Thomas](https://github.com/tmycgn).
-  - Added **displaying an icon on the input_button** if configured.
-  - Added ability to **select a background color** without the need for dynamic rules.
+  - Added displaying an icon on the input_button if configured.
+  - Added ability to select a background color without the need for dynamic rules.
 - v0.8.0 —
   - Added **formatting for input_datetime**.
 - v0.7.0 —
   - Added **controls for input types**: boolean, number, select, button, datetime, text.
-  - Added **"Appearance & Style" section** in the card editor for easier navigation.
+  - Added "Appearance & Style" section in the card editor for easier navigation.
 - v0.6.0 —
   - Added **dynamic icons**.
 - v0.5.0 —
@@ -102,8 +95,8 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Minor visual improvements.
 - v0.4.0 —
   - Added **entity attributes** with per-attribute **rescaling** (Input/Output min/max).
-  - Fixed **tap & hold** so secondary actions (e.g., setting brightness) work alongside the primary action.
-  - Fixed **header/last row background** overflow when card padding is set to `0`.
+  - Fixed tap & hold so secondary actions (e.g., setting brightness) work alongside the primary action.
+  - Fixed header/last row background overflow when card padding is set to `0`.
 - v0.3.0 — 
   - Added **inline color picker** with live preview.
 - v0.2.0 —
