@@ -55,7 +55,6 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
 - Available colors
   - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
-  </details>
 
 - Copy & Paste / Search & Replace
   - You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
