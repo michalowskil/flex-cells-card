@@ -728,6 +728,19 @@ class FlexCellsCardEditor extends LitElement {
   }
 
   /* ====== patchowanie komórek + bufor ====== */
+  _patchRow(r, patch, cleanupKeys = []){
+    const rows = Array.isArray(this.config.rows) ? [...this.config.rows] : [];
+    if (r < 0 || r >= rows.length) return;
+    const current = { ...(rows[r] || {}) };
+    const next = { ...current, ...patch };
+    cleanupKeys.forEach((key) => {
+      if (next[key] === undefined) delete next[key];
+    });
+    rows[r] = next;
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged();
+  }
+
   _patchCell(r,c,patch){
     const rows=[...this.config.rows]; const row={...rows[r]}; const cells=[...row.cells];
     const current={...(cells[c]||{})}; const next={...current, ...patch};
@@ -822,7 +835,7 @@ class FlexCellsCardEditor extends LitElement {
   }
   _addRule(r,c){
     const rules = this._getCellRules(r,c);
-    rules.push({ entity:'', attr:'', op:'=', val:'', bg:'', fg:'', overwrite:'' });
+    rules.push({ entity:'', attr:'', op:'=', val:'', bg:'', fg:'', overwrite:'', overwrite_entity:'', overwrite_attr:'' });
     this._setCellRules(r,c,rules);
   }
   _removeRule(r,c,idx){
@@ -869,20 +882,33 @@ class FlexCellsCardEditor extends LitElement {
 
   _setActiveTab(rowIdx,tab){ this._activeTabs={...this._activeTabs,[rowIdx]:tab}; this.requestUpdate(); }
   _copyActiveCell(rowIdx){
-    const colCount=this.config.column_count||1; const active=Math.min(this._activeTabs[rowIdx]||0,colCount-1);
-    const cell=this.config.rows?.[rowIdx]?.cells?.[active]; if(!cell) return;
+    const row=this.config.rows?.[rowIdx]; if(!row) return;
+    const colCount=this.config.column_count||1;
+    const merge=!!row.merge_columns;
+    const active=merge?0:Math.min(this._activeTabs[rowIdx]||0,colCount-1);
+    const cell=row.cells?.[active]; if(!cell) return;
     this._clipboardCell=this._clone(cell); this.requestUpdate();
   }
   _pasteToActiveCell(rowIdx){
     if(!this._clipboardCell) return;
-    const colCount=this.config.column_count||1; const active=Math.min(this._activeTabs[rowIdx]||0,colCount-1);
+    const row=this.config.rows?.[rowIdx]; if(!row) return;
+    const colCount=this.config.column_count||1;
+    const merge=!!row.merge_columns;
+    const active=merge?0:Math.min(this._activeTabs[rowIdx]||0,colCount-1);
     const clone=this._clone(this._clipboardCell);
-    const rows=[...this.config.rows]; const row={...rows[rowIdx]}; const cells=[...row.cells]; cells[active]=clone; rows[rowIdx]={...row,cells};
+    const rows=[...this.config.rows];
+    const current={...row};
+    const cells=Array.isArray(current.cells)?[...current.cells]:[];
+    cells[active]=clone; current.cells=cells; rows[rowIdx]=current;
     this.config={...this.config, rows}; this._fireConfigChanged();
     if (Array.isArray(this._fullCells) && this._fullCells[rowIdx]) {
       const full=[...this._fullCells[rowIdx]]; if (active>=full.length) { for(let i=full.length;i<=active;i++) full[i]={type:'string',value:'',align:'right'}; }
       full[active]=this._clone(clone); this._fullCells[rowIdx]=full;
     }
+  }
+  _toggleMergeColumns(rowIdx,e){
+    const checked=!!e.target.checked;
+    this._patchRow(rowIdx, checked ? { merge_columns:true } : { merge_columns:undefined }, ['merge_columns']);
   }
 
   _toggleCollapse(i){ const a=Array.from(this._collapsed||[]); a[i]=!a[i]; this._collapsed=a; this.requestUpdate(); }
@@ -1564,7 +1590,9 @@ class FlexCellsCardEditor extends LitElement {
 
       ${(this.config.rows || []).map((row, rIdx) => {
         const colCountNow = this.config.column_count || 1;
-        const active = Math.min(this._activeTabs[rIdx] || 0, colCountNow - 1);
+        const mergeColumns = !!row?.merge_columns;
+        const effectiveColCount = mergeColumns ? 1 : colCountNow;
+        const active = mergeColumns ? 0 : Math.min(this._activeTabs[rIdx] || 0, colCountNow - 1);
         const isSeparator = (row?.type || '') === 'separator';
         const isHeaderRow = !isSeparator && this._isHeaderRowIndex(rIdx);
         const rowTitle = isSeparator
@@ -1613,13 +1641,18 @@ class FlexCellsCardEditor extends LitElement {
                 : html`
                 <div class="rowbody">
                   <div class="tabs">
-                    ${Array.from({ length: colCountNow }, (_, i) => html`
+                    ${Array.from({ length: effectiveColCount }, (_, i) => html`
                       <button class="tab ${i===active?'active':''}" @click=${() => this._setActiveTab(rIdx, i)}>
                         ${i===0 ? t(this.hass,"editor.tab_first") : String(i+1)}
                       </button>
                     `)}
                   </div>
-
+                  <label class="simple-check" style="margin:8px 0 10px;">
+                    <input type="checkbox"
+                      .checked=${mergeColumns}
+                      @change=${(e)=>this._toggleMergeColumns(rIdx,e)} />
+                    <span>${t(this.hass,"editor.merge_all_columns")}</span>
+                  </label>
                   <div class="flex" style="gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;">
                     <button @click=${() => this._copyActiveCell(rIdx)}>${t(this.hass,"editor.copy")}</button>
                     <button ?disabled=${!this._clipboardCell} @click=${() => this._pasteToActiveCell(rIdx)}>${t(this.hass,"editor.paste")}</button>
@@ -1627,7 +1660,7 @@ class FlexCellsCardEditor extends LitElement {
                   </div>
 
                   ${(() => {
-                    const cIdx = active;
+                    const cIdx = mergeColumns ? 0 : active;
                     const cell = row.cells?.[cIdx] ?? { type: 'string', value: '', align: 'right' };
                     const isEntity = cell.type === 'entity';
                     const isIcon = cell.type === 'icon';
@@ -2126,10 +2159,35 @@ class FlexCellsCardEditor extends LitElement {
                                 @closed=${(e)=>e.stopPropagation()}>
                                 <mwc-list-item value=""></mwc-list-item>
                                 <mwc-list-item value="hide">${t(this.hass, 'dynamic.overwrite_hide')}</mwc-list-item>
+                                <mwc-list-item value="entity">${t(this.hass, 'dynamic.overwrite_entity_metadata')}</mwc-list-item>
                                 <mwc-list-item value="text">${t(this.hass, 'dynamic.overwrite_text')}</mwc-list-item>
                                 <mwc-list-item value="icon">${t(this.hass, 'dynamic.overwrite_icon')}</mwc-list-item>
                               </ha-select>
                             </div>
+
+                            ${ (rule.overwrite || '') === 'entity' ? html`
+                              <div class="cols1">
+                                <ha-entity-picker
+                                  .hass=${this.hass}
+                                  .value=${rule.overwrite_entity || rule.entity || ''}
+                                  allow-custom-entity
+                                  @value-changed=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite_entity: e.detail?.value || e.target.value })}>
+                                </ha-entity-picker>
+                              </div>
+                              <div class="cols1">
+                                <input
+                                  class="text-input attr-input"
+                                  list=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}
+                                  .value=${rule.overwrite_attr || ''}
+                                  placeholder=${t(this.hass,"placeholder.attribute_path")}
+                                  @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ overwrite_attr: (e.target.value||'') }) }
+                                />
+                                <datalist id=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}>
+                                  ${ (this._buildAttrSuggestionsForEntity(rule.overwrite_entity || rule.entity, rule.overwrite_attr || '') || [])
+                                      .map(opt => html`<option value="${opt}"></option>`) }
+                                </datalist>
+                              </div>
+                            ` : html`` }
 
                             ${ (rule.overwrite || '') === 'text' ? html`
                               <div class="cols1">
