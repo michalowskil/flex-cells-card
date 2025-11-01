@@ -290,7 +290,9 @@ class FlexCellsCardEditor extends LitElement {
       zebra: false,
       narrow_breakpoint: '',
       text_size: '',
-      cell_padding: { top: 4, right: 0, bottom: 4, left: 0 }
+      cell_padding: { top: 4, right: 0, bottom: 4, left: 0 },
+      custom_template_enabled: false,
+      custom_template_html: ''
     };
     this._activeTabs = {};
     this._clipboardCell = null;
@@ -511,7 +513,18 @@ class FlexCellsCardEditor extends LitElement {
       collapsed = Array.from({ length: normalizedRows.length }, () => true);
     }
 
-    this.config = { ...this.config, ...config, column_count: columnCount, rows: normalizedRows, cell_padding };
+    const customTemplateEnabled = !!config.custom_template_enabled;
+    const customTemplateHtml = typeof config.custom_template_html === 'string' ? config.custom_template_html : '';
+
+    this.config = {
+      ...this.config,
+      ...config,
+      column_count: columnCount,
+      rows: normalizedRows,
+      cell_padding,
+      custom_template_enabled: customTemplateEnabled,
+      custom_template_html: customTemplateHtml,
+    };
     this._activeTabs = newTabs;
     this._collapsed = collapsed;
   }
@@ -550,6 +563,15 @@ class FlexCellsCardEditor extends LitElement {
 
   _updateTextSize(e){ const v=(e.target.value||'').trim(); this._upd('text_size', v||''); }
   _updateCardPadding(e){ this._inputNumberAllowEmpty('card_padding', e); }
+  _toggleCustomTemplate(e){
+    this.config = { ...this.config, custom_template_enabled: !!e.target.checked };
+    this._fireConfigChanged();
+  }
+  _updateCustomTemplateHtml(e){
+    const val = e.target?.value ?? '';
+    this.config = { ...this.config, custom_template_html: val };
+    this._fireConfigChanged();
+  }
 
   _updateColumnCount(e){
     let value=parseInt(e.target.value,10);
@@ -2377,6 +2399,28 @@ class FlexCellsCardEditor extends LitElement {
           <span class="btn-icon">&#x2795;</span>
           ${t(this.hass,"editor.add_separator")}
         </button>
+      </div>
+
+      <div class="option group">
+        <label class="simple-check">
+          <input
+            type="checkbox"
+            .checked=${!!this.config.custom_template_enabled}
+            @change=${(e)=>this._toggleCustomTemplate(e)} />
+          <span>${t(this.hass,"editor.custom_template")}</span>
+        </label>
+        ${this.config.custom_template_enabled ? html`
+          <textarea
+            class="text-input"
+            rows="8"
+            style="margin-top:12px; min-height:160px;"
+            .value=${this.config.custom_template_html || ''}
+            @input=${(e)=>this._updateCustomTemplateHtml(e)}>
+          </textarea>
+          <div class="muted">
+            ${t(this.hass,"editor.custom_template_hint")}
+          </div>
+        ` : ''}
       </div>
 
       <datalist id="entities-list">

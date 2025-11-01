@@ -61,6 +61,8 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
 ## Changelog
+- v0.15.0-beta (Pre-release) —
+  - Added **custom HTML templates**.
 - v0.14.0 —
   - Added **column merging**.
   - Added entity/metadata overrides.

@@ -1,6 +1,7 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { t } from './localize/localize.js';
 import './flex-cells-card-editor.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 const SORT_LOCALE_OPTS = { numeric: true, sensitivity: 'base' };
 
@@ -71,6 +72,19 @@ class FlexCellsCard extends LitElement {
     }
     .datatable.zebra tbody tr.fc-zebra-alt td {
       background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+    }
+    .fcc-preview-stack {
+      display: grid;
+      gap: 16px;
+    }
+    .fcc-template-card {
+      position: relative;
+    }
+    .fcc-template-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
     }
 
     /* === NEW: blokada zaznaczania/kontekstu tylko dla klikanych pól === */
@@ -143,6 +157,8 @@ class FlexCellsCard extends LitElement {
 
     const defaultCellPadding = { top: 4, right: 0, bottom: 4, left: 0 };
     const cell_padding = { ...defaultCellPadding, ...(config.cell_padding || {}) };
+    const customTemplateEnabled = !!config.custom_template_enabled;
+    const customTemplateHtml = typeof config.custom_template_html === 'string' ? config.custom_template_html : '';
 
     this.config = {
       overflow_x: true,
@@ -153,6 +169,8 @@ class FlexCellsCard extends LitElement {
       cell_padding,
       ...config,
       column_count: colCount,
+      custom_template_enabled: customTemplateEnabled,
+      custom_template_html: customTemplateHtml,
     };
   }
 
@@ -1475,10 +1493,7 @@ class FlexCellsCard extends LitElement {
     return html`<th colspan=${span} style=${thStyle}>${shown}</th>`;
   }
 
-
-
-
-  _renderBodyCell(cell, rowDyn = null, colSpan = 1) {
+  _describeBodyCell(cell, rowDyn = null, colSpan = 1) {
     const numericSpan = Number(colSpan);
     const span = Number.isFinite(numericSpan) && numericSpan > 1 ? numericSpan : 1;
     const type = cell?.type || 'string';
@@ -1486,11 +1501,31 @@ class FlexCellsCard extends LitElement {
     const align = cell?.align || 'right';
     const rowDynBase = rowDyn
       ? {
-          ...(rowDyn.bg ? { bg: rowDyn.bg } : {}),
-          ...(rowDyn.fg ? { fg: rowDyn.fg } : {}),
+          ...(rowDyn?.bg ? { bg: rowDyn.bg } : {}),
+          ...(rowDyn?.fg ? { fg: rowDyn.fg } : {}),
         }
       : null;
     const mergeDyn = (cellDyn) => (cellDyn ? { ...(rowDynBase || {}), ...cellDyn } : rowDynBase);
+
+    const descriptor = {
+      colSpan: span,
+      className: '',
+      style: '',
+      role: null,
+      tabIndex: null,
+      title: null,
+      ariaLabel: null,
+      onContextMenu: null,
+      onPointerDown: null,
+      onPointerUp: null,
+      onPointerCancel: null,
+      onMouseLeave: null,
+      onKeydown: null,
+      onClick: null,
+      content: '',
+      align,
+      type,
+    };
 
     if (type === 'icon') {
       const display = val;
@@ -1513,38 +1548,39 @@ class FlexCellsCard extends LitElement {
         content = display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : '';
       }
 
+      descriptor.className = hasActions ? 'icon clickable' : 'icon';
+      descriptor.style = tdStyle;
+      descriptor.content = content;
+
       if (hasActions) {
         const aria = display || 'icon';
-        return html`
-          <td class="icon clickable"
-              colspan=${span}
-              style=${tdStyle}
-              role="button"
-              tabindex="0"
-              aria-label=${aria}
-              @contextmenu=${(e) => e.preventDefault()}
-              @pointerdown=${(e) => this._onCellPointerDown(e, cell)}
-              @pointerup=${(e) => this._onCellPointerUp(e, cell)}
-              @pointercancel=${(e) => this._onCellPointerCancel(e)}
-              @mouseleave=${(e) => this._onCellPointerCancel(e)}
-              @keydown=${(e) => this._onCellKeydown(e, cell)}>
-            ${content}
-          </td>
-        `;
+        descriptor.role = 'button';
+        descriptor.tabIndex = 0;
+        descriptor.ariaLabel = aria;
+        descriptor.onContextMenu = (e) => e.preventDefault();
+        descriptor.onPointerDown = (e) => this._onCellPointerDown(e, cell);
+        descriptor.onPointerUp = (e) => this._onCellPointerUp(e, cell);
+        descriptor.onPointerCancel = (e) => this._onCellPointerCancel(e);
+        descriptor.onMouseLeave = (e) => this._onCellPointerCancel(e);
+        descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
       }
-      return html`<td class="icon" colspan=${span} style=${tdStyle}>${content}</td>`;
+
+      return descriptor;
     }
 
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const domain = val?.split?.('.')?.[0];
       if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
-        const _disp = this._formatEntityCell(cell, stateObj);
-        const _cellDyn = this._evaluateDynColor(cell, type, _disp);
-        const _dyn = mergeDyn(_cellDyn);
-        const { style: _tdStyle } = this._buildTextStyle(cell, type, align, _dyn);
-        return html`<td colspan=${span} style=${_tdStyle}>${this._renderEntityControl(cell, stateObj, val)}</td>`;
+        const display = this._formatEntityCell(cell, stateObj);
+        const cellDyn = this._evaluateDynColor(cell, type, display);
+        const dyn = mergeDyn(cellDyn);
+        const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
+        descriptor.style = tdStyle;
+        descriptor.content = this._renderEntityControl(cell, stateObj, val);
+        return descriptor;
       }
+
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const cellDyn = this._evaluateDynColor(cell, type, display);
       const dyn = mergeDyn(cellDyn);
@@ -1555,42 +1591,29 @@ class FlexCellsCard extends LitElement {
       const aria = stateObj ? `${val}: ${display}` : val;
       const cls = mode === 'icon' ? 'icon clickable' : 'clickable';
 
+      descriptor.className = cls;
+      descriptor.style = tdStyle;
+      descriptor.title = val;
+      descriptor.role = 'button';
+      descriptor.tabIndex = 0;
+      descriptor.ariaLabel = aria;
+      descriptor.content = shown;
+
       if (hasActions) {
-        return html`
-          <td class=${cls}
-              colspan=${span}
-              style=${tdStyle}
-              title=${val}
-              role="button"
-              tabindex="0"
-              aria-label=${aria}
-              @contextmenu=${(e) => e.preventDefault()}
-              @pointerdown=${(e) => this._onCellPointerDown(e, cell, val)}
-              @pointerup=${(e) => this._onCellPointerUp(e, cell, val)}
-              @pointercancel=${(e) => this._onCellPointerCancel(e)}
-              @mouseleave=${(e) => this._onCellPointerCancel(e)}
-              @keydown=${(e) => this._onCellKeydown(e, cell)}>
-            ${shown}
-          </td>
-        `;
+        descriptor.onContextMenu = (e) => e.preventDefault();
+        descriptor.onPointerDown = (e) => this._onCellPointerDown(e, cell, val);
+        descriptor.onPointerUp = (e) => this._onCellPointerUp(e, cell, val);
+        descriptor.onPointerCancel = (e) => this._onCellPointerCancel(e);
+        descriptor.onMouseLeave = (e) => this._onCellPointerCancel(e);
+        descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
+      } else {
+        descriptor.onClick = () => this._openMoreInfo(val);
+        descriptor.onKeydown = (e) => this._onEntityKeydown(e, val);
       }
 
-      return html`
-        <td class=${cls}
-            colspan=${span}
-            style=${tdStyle}
-            title=${val}
-            role="button"
-            tabindex="0"
-            aria-label=${aria}
-            @click=${() => this._openMoreInfo(val)}
-            @keydown=${(e) => this._onEntityKeydown(e, val)}>
-          ${shown}
-        </td>
-      `;
+      return descriptor;
     }
 
-    // string
     const display = val ?? '';
     const cellDyn = this._evaluateDynColor(cell, type, display);
     const dyn = mergeDyn(cellDyn);
@@ -1608,27 +1631,210 @@ class FlexCellsCard extends LitElement {
       shown = val ?? '';
     }
 
+    descriptor.className = hasActions ? 'clickable' : '';
+    descriptor.style = tdStyle;
+    descriptor.content = shown;
+
     if (hasActions) {
       const aria = String(val || 'text');
-      return html`
-        <td class="clickable"
-            colspan=${span}
-            style=${tdStyle}
-            role="button"
-            tabindex="0"
-            aria-label=${aria}
-            @contextmenu=${(e) => e.preventDefault()}
-            @pointerdown=${(e) => this._onCellPointerDown(e, cell)}
-            @pointerup=${(e) => this._onCellPointerUp(e, cell)}
-            @pointercancel=${(e) => this._onCellPointerCancel(e)}
-            @mouseleave=${(e) => this._onCellPointerCancel(e)}
-            @keydown=${(e) => this._onCellKeydown(e, cell)}>
-          ${shown}
-        </td>
-      `;
+      descriptor.role = 'button';
+      descriptor.tabIndex = 0;
+      descriptor.ariaLabel = aria;
+      descriptor.onContextMenu = (e) => e.preventDefault();
+      descriptor.onPointerDown = (e) => this._onCellPointerDown(e, cell);
+      descriptor.onPointerUp = (e) => this._onCellPointerUp(e, cell);
+      descriptor.onPointerCancel = (e) => this._onCellPointerCancel(e);
+      descriptor.onMouseLeave = (e) => this._onCellPointerCancel(e);
+      descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
     }
 
-    return html`<td colspan=${span} style=${tdStyle}>${shown}</td>`;
+    return descriptor;
+  }
+
+  _renderBodyCell(cell, rowDyn = null, colSpan = 1) {
+    const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
+    if (!descriptor) return html``;
+    const {
+      colSpan: span,
+      className,
+      style,
+      role,
+      tabIndex,
+      title,
+      ariaLabel,
+      onContextMenu,
+      onPointerDown,
+      onPointerUp,
+      onPointerCancel,
+      onMouseLeave,
+      onKeydown,
+      onClick,
+      content,
+    } = descriptor;
+
+    return html`
+      <td
+        class=${className ? className : nothing}
+        colspan=${span}
+        style=${style ? style : nothing}
+        role=${role || nothing}
+        title=${title || nothing}
+        aria-label=${ariaLabel || nothing}
+        tabindex=${tabIndex !== null && tabIndex !== undefined ? tabIndex : nothing}
+        @contextmenu=${onContextMenu || null}
+        @pointerdown=${onPointerDown || null}
+        @pointerup=${onPointerUp || null}
+        @pointercancel=${onPointerCancel || null}
+        @mouseleave=${onMouseLeave || null}
+        @keydown=${onKeydown || null}
+        @click=${onClick || null}>
+        ${content}
+      </td>
+    `;
+  }
+
+  _renderStandaloneCell(cell, rowDyn = null, colSpan = 1, extraStyle = '') {
+    const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
+    if (!descriptor) return html``;
+    const {
+      className,
+      style,
+      role,
+      tabIndex,
+      title,
+      ariaLabel,
+      onContextMenu,
+      onPointerDown,
+      onPointerUp,
+      onPointerCancel,
+      onMouseLeave,
+      onKeydown,
+      onClick,
+      content,
+      align,
+    } = descriptor;
+    const classes = ['fcc-template-cell'];
+    if (className) classes.push(className);
+    const alignment = typeof align === 'string' ? align : 'left';
+    const styleSegments = [];
+    if (style) {
+      const cleaned = style.replace(/text-align:[^;]+;?/gi, '');
+      if (cleaned.trim()) styleSegments.push(cleaned.trim().replace(/;$/, ''));
+    }
+    styleSegments.push('display:inline-flex');
+    styleSegments.push('align-items:center');
+    if (alignment === 'right') {
+      styleSegments.push('justify-content:flex-end');
+      styleSegments.push('text-align:right');
+    } else if (alignment === 'center') {
+      styleSegments.push('justify-content:center');
+      styleSegments.push('text-align:center');
+    } else {
+      styleSegments.push('justify-content:flex-start');
+      styleSegments.push('text-align:left');
+    }
+    styleSegments.push('white-space:nowrap');
+    if (extraStyle && typeof extraStyle === 'string') {
+      const appended = extraStyle.trim().replace(/;+$/, '');
+      if (appended) styleSegments.push(appended);
+    }
+    const finalStyle = styleSegments.join(';');
+    return html`
+      <span
+        class=${classes.join(' ') || nothing}
+        style=${finalStyle || nothing}
+        role=${role || nothing}
+        title=${title || nothing}
+        aria-label=${ariaLabel || nothing}
+        tabindex=${tabIndex !== null && tabIndex !== undefined ? tabIndex : nothing}
+        @contextmenu=${onContextMenu || null}
+        @pointerdown=${onPointerDown || null}
+        @pointerup=${onPointerUp || null}
+        @pointercancel=${onPointerCancel || null}
+        @mouseleave=${onMouseLeave || null}
+        @keydown=${onKeydown || null}
+        @click=${onClick || null}>
+        ${content}
+      </span>
+    `;
+  }
+
+  _renderTemplateCell(templateRows, rowNumber, colNumber, inlineStyle = '') {
+    if (!Number.isInteger(rowNumber) || rowNumber <= 0) return html``;
+    if (!Number.isInteger(colNumber) || colNumber <= 0) return html``;
+    const entry = templateRows[rowNumber - 1];
+    if (!entry) return html``;
+    if (entry.mergeColumns) {
+      if (colNumber !== 1) return html``;
+      const cell = entry.cells[0] ?? { type: 'string', value: '', align: 'right' };
+      return this._renderStandaloneCell(cell, entry.rowDyn, entry.colSpan, inlineStyle);
+    }
+    const idx = colNumber - 1;
+    if (idx < 0 || idx >= entry.cells.length) return html``;
+    const cell = entry.cells[idx] ?? { type: 'string', value: '', align: 'right' };
+    return this._renderStandaloneCell(cell, entry.rowDyn, 1, inlineStyle);
+  }
+
+  _renderCustomTemplate(templateHtml, templateRows) {
+    const raw = typeof templateHtml === 'string' ? templateHtml : '';
+    if (!raw) return html``;
+    const regex = /<fcc\b([^>]*)\/>/gi;
+    const strings = [];
+    const rawStrings = [];
+    const values = [];
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(raw)) !== null) {
+      const before = raw.slice(lastIndex, match.index);
+      strings.push(before);
+      rawStrings.push(before);
+
+      const attrs = match[1] || '';
+      const rowMatch = attrs.match(/row\s*=\s*"(\d+)"/i);
+      const colMatch = attrs.match(/col\s*=\s*"(\d+)"/i);
+      const styleMatch =
+        attrs.match(/style\s*=\s*"([^"]*)"/i) ||
+        attrs.match(/style\s*=\s*'([^']*)'/i);
+      const rowNumber = rowMatch ? parseInt(rowMatch[1], 10) : NaN;
+      const colNumber = colMatch ? parseInt(colMatch[1], 10) : NaN;
+      const styleValue = styleMatch ? styleMatch[1] : '';
+
+      if (Number.isInteger(rowNumber) && rowNumber > 0 && Number.isInteger(colNumber) && colNumber > 0) {
+        values.push(this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue));
+      } else {
+        const idx = strings.length - 1;
+        strings[idx] = strings[idx] + match[0];
+        rawStrings[idx] = rawStrings[idx] + match[0];
+        lastIndex = regex.lastIndex;
+        continue;
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    const tail = raw.slice(lastIndex);
+    strings.push(tail);
+    rawStrings.push(tail);
+
+    if (!values.length) {
+      return html`${unsafeHTML(raw)}`;
+    }
+
+    const stringsCopy = strings.slice(0);
+    const rawCopy = rawStrings.slice(0);
+    const templateStrings = stringsCopy;
+    templateStrings.raw = rawCopy;
+    Object.freeze(rawCopy);
+    Object.freeze(templateStrings);
+    return html(templateStrings, ...values);
+  }
+
+  _isInEditorPreview() {
+    try {
+      return !!this.closest?.('hui-card-preview');
+    } catch (_e) {
+      return false;
+    }
   }
 
   _normalizeSeparator(row) {
@@ -1728,9 +1934,23 @@ class FlexCellsCard extends LitElement {
     const rows = Array.isArray(cfg.rows) ? cfg.rows : [];
     const colCount = cfg.column_count ?? 1;
     const padVal = this._resolveCardPadding();
+    const customTemplateEnabled = !!cfg.custom_template_enabled;
+    const customTemplateRaw = typeof cfg.custom_template_html === 'string' ? cfg.custom_template_html : '';
+    const customTemplateHasContent = customTemplateEnabled && customTemplateRaw.trim() !== '';
 
     if (!rows.length) {
-      return html`<div class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</div>`;
+      const defaultCard = html`<div class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</div>`;
+      if (!customTemplateHasContent) {
+        return defaultCard;
+      }
+      const templateCard = html`
+        <div class="card fcc-template-card" style="padding:${padVal}px;">
+          ${this._renderCustomTemplate(customTemplateRaw, [])}
+        </div>
+      `;
+      return this._isInEditorPreview()
+        ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
+        : templateCard;
     }
 
     const headerIndex = cfg.header_from_first_row
@@ -1778,6 +1998,59 @@ class FlexCellsCard extends LitElement {
     let zebraCounter = 0;
     const zebraIgnoreSeparators = !!cfg.zebra_ignore_separators;
     const hideSortSeparators = sortActive && !!cfg.hide_separators_on_sort;
+    const templateRows = [];
+
+    const bodyContent = rowsForBody.map((row) => {
+      const isSeparator = (row?.type || '') === 'separator';
+      if (isSeparator) {
+        if (cfg.zebra && !zebraIgnoreSeparators) {
+          zebraCounter += 1;
+        }
+        const separatorRow = hideSortSeparators
+          ? {
+              ...row,
+              separator: {
+                ...(row?.separator || {}),
+                thickness: 0,
+                margin_top: 0,
+                margin_bottom: 0,
+              },
+            }
+          : row;
+        return this._renderSeparatorRow(separatorRow, colCount);
+      }
+      const rowDyn = this._evaluateRowRules(row);
+      if (rowDyn?.visibility === 'hidden') {
+        return html``;
+      }
+      if (cfg.zebra) {
+        zebraCounter += 1;
+      }
+      const zebraClass = (cfg.zebra && zebraCounter % 2 === 0) ? 'fc-zebra-alt' : '';
+      const cells = Array.isArray(row?.cells) ? row.cells : [];
+      if (row?.merge_columns) {
+        const cell = cells[0] ?? { type: 'string', value: '', align: 'right' };
+        templateRows.push({
+          row,
+          rowDyn,
+          mergeColumns: true,
+          cells: [cell],
+          colSpan: Math.max(1, colCount || 1),
+        });
+        return html`<tr class=${zebraClass}>${this._renderBodyCell(cell, rowDyn, Math.max(1, colCount || 1))}</tr>`;
+      }
+      const filled = Array.from({ length: colCount }, (_, i) =>
+        cells[i] ?? { type: 'string', value: '', align: 'right' }
+      );
+      templateRows.push({
+        row,
+        rowDyn,
+        mergeColumns: false,
+        cells: filled,
+        colSpan: 1,
+      });
+      return html`<tr class=${zebraClass}>${filled.map((cell) => this._renderBodyCell(cell, rowDyn))}</tr>`;
+    });
 
     const table = html`
       <style>${hideCSS}</style>
@@ -1813,54 +2086,32 @@ class FlexCellsCard extends LitElement {
         ` : ''}
 
         <tbody>
-          ${rowsForBody.map((row) => {
-      const isSeparator = (row?.type || '') === 'separator';
-      if (isSeparator) {
-        if (cfg.zebra && !zebraIgnoreSeparators) {
-          zebraCounter += 1;
-        }
-        const separatorRow = hideSortSeparators
-          ? {
-              ...row,
-              separator: {
-                ...(row?.separator || {}),
-                thickness: 0,
-                margin_top: 0,
-                margin_bottom: 0,
-              },
-            }
-          : row;
-        return this._renderSeparatorRow(separatorRow, colCount);
-      }
-      const rowDyn = this._evaluateRowRules(row);
-      if (rowDyn?.visibility === 'hidden') {
-        return html``;
-      }
-      if (cfg.zebra) {
-        zebraCounter += 1;
-      }
-      const zebraClass = (cfg.zebra && zebraCounter % 2 === 0) ? 'fc-zebra-alt' : '';
-      const cells = Array.isArray(row?.cells) ? row.cells : [];
-      if (row?.merge_columns) {
-        const cell = cells[0] ?? { type: 'string', value: '', align: 'right' };
-        return html`<tr class=${zebraClass}>${this._renderBodyCell(cell, rowDyn, Math.max(1, colCount || 1))}</tr>`;
-      }
-      const filled = Array.from({ length: colCount }, (_, i) =>
-        cells[i] ?? { type: 'string', value: '', align: 'right' }
-      );
-      return html`<tr class=${zebraClass}>${filled.map((cell) => this._renderBodyCell(cell, rowDyn))}</tr>`;
-    })}
+          ${bodyContent}
         </tbody>
       </table>
     `;
 
-    return html`
+    const defaultCard = html`
       <div class="card" style="padding:${padVal}px;">
         ${cfg.overflow_x
         ? html`<div class="wrap"><div class="scroller" style="overflow-x:auto; overflow-y:hidden">${table}</div></div>`
         : html`<div class="wrap">${table}</div>`}
       </div>
     `;
+
+    if (!customTemplateHasContent) {
+      return defaultCard;
+    }
+
+    const templateCard = html`
+      <div class="card fcc-template-card" style="padding:${padVal}px;">
+        ${this._renderCustomTemplate(customTemplateRaw, templateRows)}
+      </div>
+    `;
+
+    return this._isInEditorPreview()
+      ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
+      : templateCard;
   }
 
   // NEW: fallback import — gdyby przeglądarka wczytała wersję bez edytora lub cache „zgubił” definicję
