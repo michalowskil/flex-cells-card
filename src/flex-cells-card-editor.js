@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { t } from './localize/localize.js';
 
 class FlexCellsCardEditor extends LitElement {
@@ -59,6 +59,10 @@ class FlexCellsCardEditor extends LitElement {
     .option.unit ha-textfield { flex: 1 1 auto; margin: 0; }
     .option.group { display:block; cursor: default; margin-bottom:12px; }
     .option.full { width: 100%; box-sizing: border-box; }
+    .option.option-stack { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .option.option-stack label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; }
+    .option.option-stack label span { flex: 1 1 auto; }
+    .option.option-stack label + label { margin-top: 4px; }
 
     .tabs { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
     .tab {
@@ -172,7 +176,7 @@ class FlexCellsCardEditor extends LitElement {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-top: 4px;
+      margin: 0;
       padding: 0;
       border: none;
       background: transparent;
@@ -272,10 +276,64 @@ class FlexCellsCardEditor extends LitElement {
     const row = { ...(rows[r] || {}) };
     const cells = [ ...(row.cells || []) ];
     const cell = { ...(cells[c] || {}) };
-    if (val) cell.show_control = true; else delete cell.show_control;
+    if (val) cell.show_control = true; else { delete cell.show_control; delete cell.show_control_value_right; }
     cells[c] = cell; rows[r] = { ...row, cells };
     this.config = { ...this.config, rows };
     this._fireConfigChanged?.();
+  }
+
+  _cellShowControlValueRightChanged(r, c, e) {
+    const val = !!(e?.target?.checked);
+    const rows = [ ...(this.config.rows || []) ];
+    const row = { ...(rows[r] || {}) };
+    const cells = [ ...(row.cells || []) ];
+    const cell = { ...(cells[c] || {}) };
+    cell.show_control_value_right = val;
+    cells[c] = cell; rows[r] = { ...row, cells };
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged?.();
+  }
+
+  _defaultRowCss() {
+    return `tr {\n   background-color: yellow;\n   border: 2px dashed red;\n}\n`;
+  }
+
+  _defaultCellCss() {
+    return `th, td {\n   background-color: yellow;\n   border: 2px dashed red;\n}\n`;
+  }
+
+  _toggleRowCustomCss(rIdx, e) {
+    const enabled = !!(e?.target?.checked);
+    const row = this.config?.rows?.[rIdx] || {};
+    const currentCss = typeof row.custom_css === 'string' ? row.custom_css : '';
+    const cssValue = currentCss && currentCss.trim() ? currentCss : this._defaultRowCss();
+    if (enabled) {
+      this._patchRow(rIdx, { custom_css_enabled: true, custom_css: cssValue });
+    } else {
+      this._patchRow(rIdx, { custom_css_enabled: false });
+    }
+  }
+
+  _updateRowCustomCss(rIdx, e) {
+    const value = e?.target?.value ?? '';
+    this._patchRow(rIdx, { custom_css: value });
+  }
+
+  _toggleCellCustomCss(r, c, e) {
+    const enabled = !!(e?.target?.checked);
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const currentCss = typeof cell.custom_css === 'string' ? cell.custom_css : '';
+    const cssValue = currentCss && currentCss.trim() ? currentCss : this._defaultCellCss();
+    if (enabled) {
+      this._patchCell(r, c, { custom_css_enabled: true, custom_css: cssValue });
+    } else {
+      this._patchCell(r, c, { custom_css_enabled: false });
+    }
+  }
+
+  _updateCellCustomCss(r, c, e) {
+    const value = e?.target?.value ?? '';
+    this._patchCell(r, c, { custom_css: value });
   }
 
 
@@ -1259,8 +1317,12 @@ class FlexCellsCardEditor extends LitElement {
     const isIconOrString = cellType === 'icon' || cellType === 'string';
 
     const clean = (obj) => {
-      if (!obj || !obj.action || obj.action === 'none') return undefined;
+      if (!obj || !obj.action) return undefined;
       const out = JSON.parse(JSON.stringify(obj));
+
+      if (out.action === 'none') {
+        return { action: 'none' };
+      }
 
       // SANETYZACJA: dla icon/string blokujemy 'more-info' i 'toggle'
       if (isIconOrString && (out.action === 'more-info' || out.action === 'toggle')) {
@@ -1690,7 +1752,24 @@ class FlexCellsCardEditor extends LitElement {
                     const entityDisplay = cell.entity_display || "value";
                     const showEntityIconSize = isEntity && (entityDisplay === "icon" || entityDisplay === "icon_value");
                     const st = cell.style || {};
+                    const entityId = isEntity ? (cell.value || '') : '';
+                    const entityDomain = entityId && entityId.split ? entityId.split('.')[0] : '';
+                    const entityState = entityId ? this._getStateObject(entityId) : undefined;
+                    const entityModeRaw = entityState?.attributes?.mode;
+                    const isInputNumber = entityDomain === 'input_number';
+                    const isInputNumberSlider = isInputNumber && (!entityModeRaw || String(entityModeRaw) === 'slider');
+                    const showValueRightChecked = cell.show_control_value_right !== false;
                     const rowRules = Array.isArray(row?.dyn_row_rules) ? row.dyn_row_rules : [];
+                    const rowCustomCssEnabled = !!row.custom_css_enabled;
+                    const rowCustomCssValue =
+                      typeof row.custom_css === 'string' && row.custom_css.trim()
+                        ? row.custom_css
+                        : this._defaultRowCss();
+                    const cellCustomCssEnabled = !!cell.custom_css_enabled;
+                    const cellCustomCssValue =
+                      typeof cell.custom_css === 'string' && cell.custom_css.trim()
+                        ? cell.custom_css
+                        : this._defaultCellCss();
 
                     // selektory akcji (dla icon/string z ograniczoną listą)
                     const allowed = this._allowedUiActionsForCellType(cell.type);
@@ -1773,12 +1852,22 @@ class FlexCellsCardEditor extends LitElement {
                         <!-- KONTROLKA ZAMIAST WARTOŚCI -->
                         ${ this._isSimpleControlEntity(cell) ? html`
                           <div class="cell-grid cell-wide">
-                            <label class="option full" @click=${(ev)=>{ if(ev.target.tagName!=='INPUT') ev.preventDefault(); }}>
-                              <input type="checkbox"
-                                     .checked=${!!cell.show_control}
-                                     @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
-                              ${t(this.hass,"editor.show_control")}
-                            </label>
+                            <div class="option full option-stack">
+                              <label>
+                                <input type="checkbox"
+                                       .checked=${!!cell.show_control}
+                                       @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
+                                <span>${t(this.hass,"editor.show_control")}</span>
+                              </label>
+                              ${(cell.show_control && isInputNumberSlider) ? html`
+                                <label>
+                                  <input type="checkbox"
+                                         .checked=${showValueRightChecked}
+                                         @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
+                                  <span>${t(this.hass,"editor.show_value_on_right")}</span>
+                                </label>
+                              ` : nothing}
+                            </div>
                           </div>
                         ` : html`` }
 
@@ -1877,11 +1966,13 @@ class FlexCellsCardEditor extends LitElement {
                       ${isEntity ? html`
                         <!-- JEDNOSTKA Z ENCJI -->
                         <div class="cell-grid cell-wide">
-                          <label class="option unit" @click=${(ev)=>{ if(ev.target.tagName!=='INPUT') ev.preventDefault(); }}>
-                            <input type="checkbox"
+                          <div class="option unit option-stack">
+                            <label>
+                              <input type="checkbox"
                                    .checked=${cell.use_entity_unit !== false}
                                    @change=${(e) => this._cellUseEntityUnitChanged(rIdx, cIdx, e)} />
-                            <span class="label">${t(this.hass,"editor.unit_from_entity")}</span>
+                              <span class="label">${t(this.hass,"editor.unit_from_entity")}</span>
+                            </label>
                             ${cell.use_entity_unit === false ? html`
                               <ha-textfield
                                 .label=${""}
@@ -1889,8 +1980,8 @@ class FlexCellsCardEditor extends LitElement {
                                 .value=${cell.unit || ''}
                                 @input=${(e) => this._cellUnitChanged(rIdx, cIdx, e)}>
                               </ha-textfield>
-                            ` : ''}
-                          </label>
+                            ` : nothing}
+                          </div>
                         </div>
 
                         ${isNumeric ? html`
@@ -2036,7 +2127,27 @@ class FlexCellsCardEditor extends LitElement {
                         </div>
                       ` : ''}
 
-                                            </details>
+                        <div class="cell-grid cell-wide" style="margin-top:8px;">
+                          <div class="option full option-stack">
+                            <label>
+                              <input type="checkbox"
+                                     .checked=${cellCustomCssEnabled}
+                                     @change=${(e)=>this._toggleCellCustomCss(rIdx, cIdx, e)} />
+                              <span class="label">${t(this.hass,'editor.custom_css')}</span>
+                            </label>
+                            ${cellCustomCssEnabled ? html`
+                              <textarea
+                                class="text-input"
+                                rows="5"
+                                style="font-family:monospace; min-height:120px;"
+                                .value=${cellCustomCssValue}
+                                @input=${(e)=>this._updateCellCustomCss(rIdx, cIdx, e)}>
+                              </textarea>
+                            ` : nothing}
+                          </div>
+                        </div>
+
+                      </details>
 
                       <!-- Tap & Hold Actions -->
                       <details style="margin-top:12px;">
@@ -2377,8 +2488,34 @@ class FlexCellsCardEditor extends LitElement {
                           </div>
                         `)}
 
-                        <div class="flex" style="margin-top:6px;">
-                          <button class="mini" @click=${()=>this._addRowRule(rIdx)}>➕ ${t(this.hass,'dynamic.add_rule')}</button>
+                      <div class="flex" style="margin-top:6px;">
+                        <button class="mini" @click=${()=>this._addRowRule(rIdx)}>➕ ${t(this.hass,'dynamic.add_rule')}</button>
+                      </div>
+                    </details>
+
+                      <details style="margin-top:12px;">
+                        <summary style="cursor:pointer;font-weight:600;">
+                          ${t(this.hass, 'editor.appearance_row')}
+                        </summary>
+
+                        <div class="cell-grid cell-wide" style="margin-top:10px;">
+                          <div class="option full option-stack">
+                            <label>
+                              <input type="checkbox"
+                                     .checked=${rowCustomCssEnabled}
+                                     @change=${(e)=>this._toggleRowCustomCss(rIdx, e)} />
+                              <span class="label">${t(this.hass,'editor.custom_css')}</span>
+                            </label>
+                            ${rowCustomCssEnabled ? html`
+                              <textarea
+                                class="text-input"
+                                rows="5"
+                                style="font-family:monospace; min-height:120px;"
+                                .value=${rowCustomCssValue}
+                                @input=${(e)=>this._updateRowCustomCss(rIdx, e)}>
+                              </textarea>
+                            ` : nothing}
+                          </div>
                         </div>
                       </details>
                     `;

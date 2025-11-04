@@ -16,6 +16,8 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
 - Visual editor, drag-and-drop rows/columns, zebra rows, responsive columns
+- **HTML templates** thanks to which the card can look exactly as you want (HTML and CSS knowledge required).
+- Each cell and row allows you to configure **custom CSS**, you don't need to use "card_mod" for this.
 
 ## Installation
 
@@ -61,8 +63,13 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
 ## Changelog
-- v0.15.0-beta (Pre-release) —
+- v0.15.0-beta.2 (Pre-release) —
   - Added **custom HTML templates**.
+  - Added **custom CSS** for cells and rows (also works in templates), "card_mod" is no longer needed!
+  - Added support for "mode" variable for input_number.
+  - Added ability to hide values next to the slider (input_number).
+  - Improved "Nothing" behavior in Tap & Hold Actions.
+  - Improved clickable area on "Show control" and "Use unit from entity" labels.
 - v0.14.0 —
   - Added **column merging**.
   - Added entity/metadata overrides.

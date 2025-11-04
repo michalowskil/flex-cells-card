@@ -86,6 +86,11 @@ class FlexCellsCard extends LitElement {
       gap: 6px;
       flex-wrap: nowrap;
     }
+    .fcc-template-row {
+      display: inline-flex;
+      align-items: stretch;
+      flex-wrap: nowrap;
+    }
 
     /* === NEW: blokada zaznaczania/kontekstu tylko dla klikanych pól === */
     .clickable, .icon.clickable, td.clickable, th.clickable {
@@ -141,7 +146,14 @@ class FlexCellsCard extends LitElement {
     }
 `;
 
+  constructor() {
+    super();
+    this._numberControlDrafts = new Map();
+    this._customTemplateCache = new Map();
+  }
+
   setConfig(config) {
+    this._customTemplateCache = new Map();
     const fallbackColCount = (() => {
       if (!Array.isArray(config.rows)) return 1;
       for (const row of config.rows) {
@@ -172,6 +184,34 @@ class FlexCellsCard extends LitElement {
       custom_template_enabled: customTemplateEnabled,
       custom_template_html: customTemplateHtml,
     };
+  }
+
+  updated(changedProps) {
+    super.updated(changedProps);
+    if (!changedProps.has('hass') || !this._numberControlDrafts || !this._numberControlDrafts.size) return;
+    const hassStates = this.hass?.states || {};
+    let mutated = false;
+    for (const [entityId, draft] of [...this._numberControlDrafts.entries()]) {
+      const stateObj = hassStates[entityId];
+      if (!stateObj) {
+        this._numberControlDrafts.delete(entityId);
+        mutated = true;
+        continue;
+      }
+      const stateStr = stateObj.state == null ? '' : String(stateObj.state);
+      if (draft === stateStr) {
+        this._numberControlDrafts.delete(entityId);
+        mutated = true;
+        continue;
+      }
+      const draftNum = Number(draft);
+      const stateNum = Number(stateObj.state);
+      if (Number.isFinite(draftNum) && Number.isFinite(stateNum) && Math.abs(draftNum - stateNum) <= Number.EPSILON * 100) {
+        this._numberControlDrafts.delete(entityId);
+        mutated = true;
+      }
+    }
+    if (mutated) this.requestUpdate();
   }
 
   // ---------- helpers ----------
@@ -648,15 +688,60 @@ class FlexCellsCard extends LitElement {
     }
     if (domain === 'input_number') {
       const attrs = stateObj?.attributes || {};
-      const min = Number(attrs.min ?? 0);
-      const max = Number(attrs.max ?? 100);
+      const rawMin = Number(attrs.min);
+      const rawMax = Number(attrs.max);
+      let min = Number.isFinite(rawMin) ? rawMin : 0;
+      let max = Number.isFinite(rawMax) ? rawMax : 100;
+      if (max < min) {
+        const tmp = min;
+        min = max;
+        max = tmp;
+      }
       const stepRaw = attrs.step;
-      const step = (stepRaw === 'any' || stepRaw == null) ? 1 : Number(stepRaw) || 1;
-      const val = Number(stateObj?.state) || 0;
+      let stepAttr;
+      let stepForCalc;
+      if (stepRaw === 'any' || stepRaw === undefined || stepRaw === null) {
+        stepAttr = 'any';
+        stepForCalc = null;
+      } else {
+        const parsedStep = Number(stepRaw);
+        if (Number.isFinite(parsedStep) && parsedStep > 0) {
+          stepAttr = parsedStep;
+          stepForCalc = parsedStep;
+        } else {
+          stepAttr = 1;
+          stepForCalc = 1;
+        }
+      }
+      const modeRaw = typeof attrs.mode === 'string' ? attrs.mode.trim().toLowerCase() : '';
+      const effectiveMode = modeRaw === 'box' ? 'box' : 'slider';
+      const draft = this._getNumberDraft(entityId);
+      const stateValue = Number(stateObj?.state);
+      let controlValue = Number.isFinite(stateValue) ? stateValue : min;
+      if (draft !== undefined && draft !== null && draft !== '') {
+        const draftNum = Number(draft);
+        if (Number.isFinite(draftNum)) controlValue = draftNum;
+      }
+      controlValue = this._clampNumber(controlValue, min, max);
+      if (effectiveMode === 'box') {
+        const inputValue = draft !== undefined && draft !== null ? draft : (stateObj?.state ?? '');
+        return html`<span class="ctrl-wrap">
+          <input class="ctrl-input" type="number" min="${min}" max="${max}" step="${stepAttr}"
+            .value=${String(inputValue)}
+            @input=${(e) => this._onNumberInput(e, entityId)}
+            @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />
+        </span>`;
+      }
+      const showValue = cell?.show_control_value_right !== false;
+      const displayState = stateObj
+        ? { ...stateObj, state: String(controlValue) }
+        : { state: String(controlValue), attributes: {}, entity_id: entityId };
       return html`<span class="ctrl-wrap">
-        <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${step}" .value=${String(val)}
-          @change=${(e) => this._onSetNumber(entityId, Number(e.target.value))} />
-        <span class="ctrl-value">${this._formatEntityCell(cell, stateObj)}</span>
+        <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${stepAttr}"
+          .value=${String(controlValue)}
+          @input=${(e) => this._onNumberInput(e, entityId)}
+          @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />
+        ${showValue ? html`<span class="ctrl-value">${this._formatEntityCell(cell, displayState)}</span>` : nothing}
       </span>`;
     }
     if (domain === 'input_select') {
@@ -733,8 +818,242 @@ class FlexCellsCard extends LitElement {
     const svc = isOn ? 'turn_on' : 'turn_off';
     try { this.hass?.callService('input_boolean', svc, { entity_id: entityId }); } catch (e) { /* noop */ }
   }
+
   _onSetNumber(entityId, value) {
+    if (!entityId) return;
     try { this.hass?.callService('input_number', 'set_value', { entity_id: entityId, value }); } catch (e) { /* noop */ }
+  }
+  _onNumberInput(event, entityId) {
+    if (!event || !entityId) return;
+    event.stopPropagation?.();
+    const target = event.target;
+    if (!target) return;
+    this._setNumberDraft(entityId, target.value ?? '');
+  }
+  _onNumberChange(event, entityId, min, max, step) {
+    if (!event || !entityId) return;
+    event.stopPropagation?.();
+    const target = event.target;
+    if (!target) return;
+    const raw = target.value ?? '';
+    const normalized = this._normalizeNumberValue(raw, min, max, step);
+    if (normalized === null) {
+      this._clearNumberDraft(entityId);
+      const fallback = this.hass?.states?.[entityId]?.state;
+      const fallbackNum = Number(fallback);
+      target.value = Number.isFinite(fallbackNum) ? String(fallbackNum) : '';
+      return;
+    }
+    const current = Number(this.hass?.states?.[entityId]?.state);
+    if (Number.isFinite(current) && Math.abs(current - normalized) <= Number.EPSILON * 100) {
+      this._clearNumberDraft(entityId);
+      target.value = String(normalized);
+      return;
+    }
+    const normalizedStr = String(normalized);
+    target.value = normalizedStr;
+    this._setNumberDraft(entityId, normalizedStr);
+    this._onSetNumber(entityId, normalized);
+  }
+  _getNumberDraft(entityId) {
+    if (!entityId || !this._numberControlDrafts) return undefined;
+    return this._numberControlDrafts.get(entityId);
+  }
+  _setNumberDraft(entityId, value) {
+    if (!entityId) return;
+    if (!this._numberControlDrafts) this._numberControlDrafts = new Map();
+    if (this._numberControlDrafts.get(entityId) === value) return;
+    this._numberControlDrafts.set(entityId, value);
+    this.requestUpdate();
+  }
+  _clearNumberDraft(entityId) {
+    if (!entityId || !this._numberControlDrafts) return;
+    if (this._numberControlDrafts.delete(entityId)) this.requestUpdate();
+  }
+  _clampNumber(value, min, max) {
+    let result = Number(value);
+    if (!Number.isFinite(result)) {
+      if (Number.isFinite(min)) return min;
+      if (Number.isFinite(max)) return max;
+      return 0;
+    }
+    if (Number.isFinite(min)) result = Math.max(min, result);
+    if (Number.isFinite(max)) result = Math.min(max, result);
+    return result;
+  }
+  _normalizeNumberValue(raw, min, max, step) {
+    if (raw === undefined || raw === null) return null;
+    const str = String(raw).trim();
+    if (!str) return null;
+    const normalizedStr = str.replace(',', '.');
+    let value = Number(normalizedStr);
+    if (!Number.isFinite(value)) return null;
+
+    const minNum = Number(min);
+    const maxNum = Number(max);
+    if (Number.isFinite(minNum) && value < minNum) value = minNum;
+    if (Number.isFinite(maxNum) && value > maxNum) value = maxNum;
+
+    const stepNum = Number(step);
+    if (Number.isFinite(stepNum) && stepNum > 0) {
+      const base = Number.isFinite(minNum) ? minNum : 0;
+      const steps = Math.round((value - base) / stepNum);
+      value = base + steps * stepNum;
+      if (Number.isFinite(minNum) && value < minNum) value = minNum;
+      if (Number.isFinite(maxNum) && value > maxNum) value = maxNum;
+      const decimals = Math.min(
+        Math.max(this._inferFractionDigits(stepNum), this._inferFractionDigits(base)),
+        6
+      );
+      if (decimals > 0) value = Number(value.toFixed(decimals));
+      if (Number.isFinite(minNum) && value < minNum) value = minNum;
+      if (Number.isFinite(maxNum) && value > maxNum) value = maxNum;
+    }
+
+    return Number.isFinite(value) ? value : null;
+  }
+  
+  _rowCssClass(index) {
+    return `fcc-row-css-${index}`;
+  }
+
+  _cellCssClass(rowIndex, cellIndex) {
+    return `fcc-cell-css-${rowIndex}-${cellIndex}`;
+  }
+
+  _defaultRowCss() {
+    return `tr {\n   background-color: yellow;\n   border: 2px dashed red;\n}\n`;
+  }
+
+  _defaultCellCss() {
+    return `th, td {\n   background-color: yellow;\n   border: 2px dashed red;\n}\n`;
+  }
+
+  _collectCustomCss(rows) {
+    const blocks = [];
+    if (!Array.isArray(rows)) return blocks;
+    rows.forEach((row, rowIndex) => {
+      if (row?.custom_css_enabled === true) {
+        const cssText = typeof row.custom_css === 'string' && row.custom_css.trim()
+          ? row.custom_css
+          : this._defaultRowCss();
+        const scoped = this._scopeCss(cssText, `.${this._rowCssClass(rowIndex)}`, 'row');
+        if (scoped) blocks.push(scoped);
+      }
+      const cells = Array.isArray(row?.cells) ? row.cells : [];
+      cells.forEach((cell, cellIndex) => {
+        if (cell?.custom_css_enabled === true) {
+          const cssText = typeof cell.custom_css === 'string' && cell.custom_css.trim()
+            ? cell.custom_css
+            : this._defaultCellCss();
+          const scoped = this._scopeCss(cssText, `.${this._cellCssClass(rowIndex, cellIndex)}`, 'cell');
+          if (scoped) blocks.push(scoped);
+        }
+      });
+    });
+    return blocks;
+  }
+
+  _scopeCss(cssText, scope, mode = 'row') {
+    const text = typeof cssText === 'string' ? cssText : '';
+    const trimmed = text.trim();
+    if (!trimmed) return '';
+    const blocks = [];
+    const regex = /([^{}]+)\{([^{}]*)\}/g;
+    let match;
+    while ((match = regex.exec(trimmed)) !== null) {
+      const selectorPart = match[1];
+      const body = match[2].trim();
+      if (!selectorPart || !body) continue;
+      const scopedSelectors = Array.from(new Set(
+        selectorPart
+          .split(',')
+          .map((sel) => this._applyScopeToSelector(sel, scope, mode))
+          .filter(Boolean)
+      ));
+      if (scopedSelectors.length) {
+        blocks.push(`${scopedSelectors.join(', ')} { ${body} }`);
+      }
+    }
+    return blocks.join('\n');
+  }
+
+  _applyScopeToSelector(selector, scope, mode) {
+    if (!selector) return '';
+    let sel = selector.trim();
+    if (!sel) return '';
+    if (sel.startsWith('@')) return ''; // skip at-rules
+    if (sel.includes(':host')) sel = sel.replace(/:host/g, scope);
+    if (sel.includes('&')) sel = sel.replace(/&/g, scope);
+    if (mode === 'cell') {
+      const tagMatch = sel.match(/^(th|td)\b/i);
+      if (tagMatch) {
+        const tag = tagMatch[0];
+        const tagLower = tag.toLowerCase();
+        const after = sel.slice(tagMatch[0].length);
+        const rest = after.trimStart();
+        const hadLeadingWhitespace = /^\s/.test(after);
+        const attachDirect = rest.length > 0 && !hadLeadingWhitespace && (rest.startsWith(':') || rest.startsWith('.') || rest.startsWith('[') || rest.startsWith('#'));
+        const applyRest = (base) => {
+          if (!rest) return base;
+          if (attachDirect) return `${base}${rest}`;
+          return `${base} ${rest}`.trim();
+        };
+        const selectors = new Set();
+        selectors.add(applyRest(`${tag}${scope}`));
+        const templateBase = `.fcc-template-cell[data-fcc-origin="${tagLower}"]${scope}`;
+        selectors.add(applyRest(templateBase));
+        return Array.from(selectors).filter(Boolean).join(', ');
+      }
+    }
+    if (mode === 'row') {
+      const rowMatch = sel.match(/^tr\b/i);
+      if (rowMatch) {
+        const after = sel.slice(rowMatch[0].length);
+        const rest = after.trim();
+        const compose = (base, part) => {
+          const trimmed = typeof part === 'string' ? part.trim() : '';
+          if (!trimmed) return base;
+          const first = trimmed[0];
+          if (first === ':' || first === '.' || first === '[' || first === '#') {
+            return `${base}${trimmed}`;
+          }
+          if (first === '>' || first === '+' || first === '~') {
+            return `${base} ${trimmed}`;
+          }
+          return `${base} ${trimmed}`.trim();
+        };
+        const selectors = new Set();
+        selectors.add(rest ? compose(scope, rest) : scope);
+        const adapt = (value) => {
+          if (!value) return value;
+          return value
+            .replace(/\btd\b/gi, '.fcc-template-cell[data-fcc-origin="td"]')
+            .replace(/\bth\b/gi, '.fcc-template-cell[data-fcc-origin="th"]');
+        };
+        const templateRest = adapt(rest);
+        const addTemplateSelector = (base) => {
+          if (!base) return;
+          if (templateRest && templateRest.trim()) {
+            selectors.add(compose(base, templateRest));
+            const condensed = templateRest.replace(/\s+(\.fcc-template-cell\b)/g, '$1');
+            if (condensed !== templateRest) {
+              selectors.add(compose(base, condensed));
+            }
+          } else {
+            selectors.add(`${base}.fcc-template-row`);
+          }
+        };
+        addTemplateSelector(scope);
+        const rowIndexMatch = scope.match(/\.fcc-row-css-(\d+)/);
+        if (rowIndexMatch) {
+          addTemplateSelector(`[data-fcc-row-index="${rowIndexMatch[1]}"]`);
+        }
+        return Array.from(selectors).filter(Boolean).join(', ');
+      }
+    }
+    if (sel.startsWith(scope)) return sel;
+    return `${scope} ${sel}`.replace(/\s+/g, ' ').trim();
   }
   _onSelectOption(entityId, option) {
     try { this.hass?.callService('input_select', 'select_option', { entity_id: entityId, option }); } catch (e) { /* noop */ }
@@ -1183,6 +1502,12 @@ class FlexCellsCard extends LitElement {
     return this._hasAction(s.tap) || this._hasAction(s.hold) || this._hasAction(s.dbl);
   }
 
+  _tapActionIsExplicitNone(cell) {
+    if (!cell) return false;
+    const action = cell?.tap_action?.action;
+    return action === 'none';
+  }
+
   _ensureTarget(target, entityId) {
     const t = { ...(target || {}) };
     if (!t.entity_id && entityId) t.entity_id = entityId;
@@ -1281,7 +1606,7 @@ class FlexCellsCard extends LitElement {
     const tap = this._sanitizeActionForCell(cell, cell?.tap_action);
     if (this._hasAction(tap)) {
       this._runAction(tap, entityId);
-    } else if (!this._hasCellActions(cell) && cell?.type === 'entity' && entityId) {
+    } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
       this._openMoreInfo(entityId);
     }
   }
@@ -1338,7 +1663,7 @@ class FlexCellsCard extends LitElement {
         el.__lastTapTs = 0;
         if (hasTap) {
           this._runAction(tap, entityId);
-        } else if (!this._hasCellActions(cell) && cell?.type === 'entity' && entityId) {
+        } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
           this._openMoreInfo(entityId);
         }
       }, dblWindow);
@@ -1347,19 +1672,22 @@ class FlexCellsCard extends LitElement {
 
     if (hasTap) {
       this._runAction(tap, entityId);
-    } else if (!this._hasCellActions(cell) && cell?.type === 'entity' && entityId) {
+    } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
       this._openMoreInfo(entityId);
     }
   }
 
   // ---------- render ----------
 
-  _renderHeaderCell(cell, colSpan = 1) {
+  _renderHeaderCell(cell, colSpan = 1, rowIndex = null, cellIndex = null) {
     const numericSpan = Number(colSpan);
     const span = Number.isFinite(numericSpan) && numericSpan > 1 ? numericSpan : 1;
     const type = cell?.type || 'string';
     const val = cell?.value ?? '';
     const align = cell?.align || 'left';
+    const hasRowIndex = rowIndex !== null && rowIndex !== undefined;
+    const hasCellIndex = cellIndex !== null && cellIndex !== undefined;
+    const cellCssClass = (hasRowIndex && hasCellIndex) ? this._cellCssClass(rowIndex, cellIndex) : '';
 
     if (type === 'icon') {
       const display = val;
@@ -1381,10 +1709,15 @@ class FlexCellsCard extends LitElement {
         content = display ? html`<ha-icon style=${iconStyle} icon="${display}"></ha-icon>` : '';
       }
 
+      const iconClasses = ['icon'];
+      if (hasActions) iconClasses.push('clickable');
+      if (cellCssClass) iconClasses.push(cellCssClass);
+      const iconClassAttr = iconClasses.join(' ');
+
       if (hasActions) {
         const aria = display || 'icon';
         return html`
-          <th class="icon clickable"
+          <th class=${iconClassAttr || nothing}
               colspan=${span}
               style=${thStyle}
               role="button"
@@ -1399,7 +1732,7 @@ class FlexCellsCard extends LitElement {
           </th>
         `;
       }
-      return html`<th class="icon" colspan=${span} style=${thStyle}>${content}</th>`;
+      return html`<th class=${iconClassAttr || nothing} colspan=${span} style=${thStyle}>${content}</th>`;
     }
 
     if (type === 'entity') {
@@ -1409,20 +1742,34 @@ class FlexCellsCard extends LitElement {
         const _disp = this._formatEntityCell(cell, stateObj);
         const _dyn = this._evaluateDynColor(cell, type, _disp);
         const { style: _thStyle } = this._buildTextStyle(cell, type, align, _dyn);
-        return html`<th colspan=${span} style=${_thStyle}>${this._renderEntityControl(cell, stateObj, val)}</th>`;
+        const controlClasses = [];
+        if (cellCssClass) controlClasses.push(cellCssClass);
+        const controlClassAttr = controlClasses.join(' ');
+        return html`
+          <th class=${controlClassAttr || nothing}
+              colspan=${span}
+              style=${_thStyle}>
+            ${this._renderEntityControl(cell, stateObj, val)}
+          </th>
+        `;
       }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const dyn = this._evaluateDynColor(cell, type, display);
       const mode = this._getEntityDisplayMode(cell);
       const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
+      const tapNone = this._tapActionIsExplicitNone(cell);
+      const allowDefault = !hasActions && !tapNone;
       const shown = this._buildEntityDisplayContent(cell, stateObj, display, dyn, textDecoration, mode);
       const aria = stateObj ? `${val}: ${display}` : val;
-      const cls = mode === 'icon' ? 'icon clickable' : 'clickable';
+      const baseTokens = [];
+      if (mode === 'icon') baseTokens.push('icon');
+      if (cellCssClass) baseTokens.push(cellCssClass);
 
       if (hasActions) {
+        const entityClassAttr = [...baseTokens, 'clickable'].join(' ');
         return html`
-          <th class=${cls}
+          <th class=${entityClassAttr || nothing}
               colspan=${span}
               style=${thStyle}
               title=${val}
@@ -1439,20 +1786,25 @@ class FlexCellsCard extends LitElement {
         `;
       }
 
-      // Default 'more-info' for header entity if no actions
-      return html`
-        <th class=${cls}
-            colspan=${span}
-            style=${thStyle}
-            title=${val}
-            role="button"
-            tabindex="0"
-            aria-label=${aria}
-            @click=${() => this._openMoreInfo(val)}
-            @keydown=${(e) => this._onEntityKeydown(e, val)}>
-          ${shown}
-        </th>
-      `;
+      if (allowDefault) {
+        const entityClassAttr = [...baseTokens, 'clickable'].join(' ');
+        return html`
+          <th class=${entityClassAttr || nothing}
+              colspan=${span}
+              style=${thStyle}
+              title=${val}
+              role="button"
+              tabindex="0"
+              aria-label=${aria}
+              @click=${() => this._openMoreInfo(val)}
+              @keydown=${(e) => this._onEntityKeydown(e, val)}>
+            ${shown}
+          </th>
+        `;
+      }
+
+      const entityClassAttr = baseTokens.join(' ');
+      return html`<th class=${entityClassAttr || nothing} colspan=${span} style=${thStyle} title=${val}>${shown}</th>`;
     }
 
     const display = val ?? '';
@@ -1471,10 +1823,14 @@ class FlexCellsCard extends LitElement {
       shown = val ?? '';
     }
 
+    const defaultClassTokens = hasActions ? ['clickable'] : [];
+    if (cellCssClass) defaultClassTokens.push(cellCssClass);
+    const defaultClassAttr = defaultClassTokens.join(' ');
+
     if (hasActions) {
       const aria = String(val || 'text');
       return html`
-        <th class="clickable"
+        <th class=${defaultClassAttr || nothing}
             colspan=${span}
             style=${thStyle}
             role="button"
@@ -1490,7 +1846,7 @@ class FlexCellsCard extends LitElement {
       `;
     }
 
-    return html`<th colspan=${span} style=${thStyle}>${shown}</th>`;
+    return html`<th class=${defaultClassAttr || nothing} colspan=${span} style=${thStyle}>${shown}</th>`;
   }
 
   _describeBodyCell(cell, rowDyn = null, colSpan = 1) {
@@ -1587,17 +1943,24 @@ class FlexCellsCard extends LitElement {
       const mode = this._getEntityDisplayMode(cell);
       const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
+      const tapNone = this._tapActionIsExplicitNone(cell);
+      const allowDefault = !hasActions && !tapNone;
       const shown = this._buildEntityDisplayContent(cell, stateObj, display, dyn, textDecoration, mode);
       const aria = stateObj ? `${val}: ${display}` : val;
-      const cls = mode === 'icon' ? 'icon clickable' : 'clickable';
+      const classTokens = [];
+      if (mode === 'icon') classTokens.push('icon');
+      if (hasActions || allowDefault) classTokens.push('clickable');
 
-      descriptor.className = cls;
+      descriptor.className = classTokens.join(' ');
       descriptor.style = tdStyle;
       descriptor.title = val;
-      descriptor.role = 'button';
-      descriptor.tabIndex = 0;
       descriptor.ariaLabel = aria;
       descriptor.content = shown;
+
+      if (hasActions || allowDefault) {
+        descriptor.role = 'button';
+        descriptor.tabIndex = 0;
+      }
 
       if (hasActions) {
         descriptor.onContextMenu = (e) => e.preventDefault();
@@ -1606,7 +1969,7 @@ class FlexCellsCard extends LitElement {
         descriptor.onPointerCancel = (e) => this._onCellPointerCancel(e);
         descriptor.onMouseLeave = (e) => this._onCellPointerCancel(e);
         descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
-      } else {
+      } else if (allowDefault) {
         descriptor.onClick = () => this._openMoreInfo(val);
         descriptor.onKeydown = (e) => this._onEntityKeydown(e, val);
       }
@@ -1651,7 +2014,7 @@ class FlexCellsCard extends LitElement {
     return descriptor;
   }
 
-  _renderBodyCell(cell, rowDyn = null, colSpan = 1) {
+  _renderBodyCell(cell, rowDyn = null, colSpan = 1, rowIndex = null, cellIndex = null) {
     const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
     if (!descriptor) return html``;
     const {
@@ -1672,9 +2035,16 @@ class FlexCellsCard extends LitElement {
       content,
     } = descriptor;
 
+    const classTokens = [];
+    if (className) classTokens.push(className);
+    if (rowIndex !== null && rowIndex !== undefined && cellIndex !== null && cellIndex !== undefined) {
+      classTokens.push(this._cellCssClass(rowIndex, cellIndex));
+    }
+    const classAttr = classTokens.length ? classTokens.join(' ') : nothing;
+
     return html`
       <td
-        class=${className ? className : nothing}
+        class=${classAttr}
         colspan=${span}
         style=${style ? style : nothing}
         role=${role || nothing}
@@ -1693,7 +2063,7 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
-  _renderStandaloneCell(cell, rowDyn = null, colSpan = 1, extraStyle = '') {
+  _renderStandaloneCell(cell, rowDyn = null, colSpan = 1, extraStyle = '', extraClass = '', originTag = 'td', rowMeta = null) {
     const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
     if (!descriptor) return html``;
     const {
@@ -1713,8 +2083,13 @@ class FlexCellsCard extends LitElement {
       content,
       align,
     } = descriptor;
+    const origin = (originTag === 'th' || originTag === 'td') ? originTag : 'td';
     const classes = ['fcc-template-cell'];
     if (className) classes.push(className);
+    if (extraClass && typeof extraClass === 'string') {
+      const tokens = extraClass.split(/\s+/).filter(Boolean);
+      if (tokens.length) classes.push(...tokens);
+    }
     const alignment = typeof align === 'string' ? align : 'left';
     const styleSegments = [];
     if (style) {
@@ -1739,10 +2114,19 @@ class FlexCellsCard extends LitElement {
       if (appended) styleSegments.push(appended);
     }
     const finalStyle = styleSegments.join(';');
+    const rowIndexAttr = rowMeta && rowMeta.rowIndex !== null && rowMeta.rowIndex !== undefined
+      ? String(rowMeta.rowIndex)
+      : nothing;
+    const rowOrderAttr = rowMeta && rowMeta.rowOrder !== null && rowMeta.rowOrder !== undefined
+      ? String(rowMeta.rowOrder)
+      : nothing;
     return html`
       <span
         class=${classes.join(' ') || nothing}
         style=${finalStyle || nothing}
+        data-fcc-origin=${origin}
+        data-fcc-row-index=${rowIndexAttr}
+        data-fcc-row-order=${rowOrderAttr}
         role=${role || nothing}
         title=${title || nothing}
         aria-label=${ariaLabel || nothing}
@@ -1759,74 +2143,162 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
-  _renderTemplateCell(templateRows, rowNumber, colNumber, inlineStyle = '') {
+  _renderTemplateRow(templateRows, rowNumber, inlineStyle = '', extraClass = '') {
     if (!Number.isInteger(rowNumber) || rowNumber <= 0) return html``;
-    if (!Number.isInteger(colNumber) || colNumber <= 0) return html``;
     const entry = templateRows[rowNumber - 1];
     if (!entry) return html``;
+    const rowMeta = {
+      rowIndex: entry.rowIndex,
+      rowOrder: entry.rowOrder,
+      rowClass: entry.rowClass,
+      zebraClass: entry.zebraClass,
+    };
+    const classes = ['fcc-template-row'];
+    if (entry.rowClass) classes.push(entry.rowClass);
+    if (entry.zebraClass) classes.push(entry.zebraClass);
+    if (extraClass && typeof extraClass === 'string') {
+      const tokens = extraClass.split(/\s+/).filter(Boolean);
+      if (tokens.length) classes.push(...tokens);
+    }
+    let styleAttr = '';
+    if (inlineStyle && typeof inlineStyle === 'string') {
+      const trimmed = inlineStyle.trim().replace(/;+$/, '');
+      if (trimmed) styleAttr = trimmed;
+    }
+    const rowIndexAttr = entry.rowIndex !== null && entry.rowIndex !== undefined
+      ? String(entry.rowIndex)
+      : nothing;
+    const rowOrderAttr = entry.rowOrder !== null && entry.rowOrder !== undefined
+      ? String(entry.rowOrder)
+      : nothing;
+    const originTag = entry.originTag || 'td';
+
+    let cellsContent;
+    if (entry.mergeColumns) {
+      const cell = entry.cells[0] ?? { type: 'string', value: '', align: originTag === 'th' ? 'left' : 'right' };
+      const combinedClass = entry.rowIndex != null ? this._cellCssClass(entry.rowIndex, 0) : '';
+      cellsContent = this._renderStandaloneCell(cell, entry.rowDyn, entry.colSpan, '', combinedClass, originTag, rowMeta);
+    } else {
+      cellsContent = entry.cells.map((cell, idx) => {
+        const combinedClass = entry.rowIndex != null ? this._cellCssClass(entry.rowIndex, idx) : '';
+        return this._renderStandaloneCell(cell, entry.rowDyn, 1, '', combinedClass, originTag, rowMeta);
+      });
+    }
+
+    return html`
+      <span
+        class=${classes.join(' ') || nothing}
+        style=${styleAttr || nothing}
+        data-fcc-row-index=${rowIndexAttr}
+        data-fcc-row-order=${rowOrderAttr}>
+        ${cellsContent}
+      </span>
+    `;
+  }
+
+  _renderTemplateCell(templateRows, rowNumber, colNumber, inlineStyle = '', extraClass = '') {
+    if (!Number.isInteger(rowNumber) || rowNumber <= 0) return html``;
+    if (!Number.isInteger(colNumber) || colNumber <= 0) {
+      return this._renderTemplateRow(templateRows, rowNumber, inlineStyle, extraClass);
+    }
+    const entry = templateRows[rowNumber - 1];
+    if (!entry) return html``;
+    const rowMeta = {
+      rowIndex: entry.rowIndex,
+      rowOrder: entry.rowOrder,
+      rowClass: entry.rowClass,
+      zebraClass: entry.zebraClass,
+    };
+    const originTag = entry.originTag || 'td';
     if (entry.mergeColumns) {
       if (colNumber !== 1) return html``;
       const cell = entry.cells[0] ?? { type: 'string', value: '', align: 'right' };
-      return this._renderStandaloneCell(cell, entry.rowDyn, entry.colSpan, inlineStyle);
+      const combinedClass = [extraClass, entry.rowIndex != null ? this._cellCssClass(entry.rowIndex, 0) : '']
+        .filter((cls) => !!cls)
+        .join(' ')
+        .trim();
+      return this._renderStandaloneCell(cell, entry.rowDyn, entry.colSpan, inlineStyle, combinedClass, originTag, rowMeta);
     }
     const idx = colNumber - 1;
     if (idx < 0 || idx >= entry.cells.length) return html``;
     const cell = entry.cells[idx] ?? { type: 'string', value: '', align: 'right' };
-    return this._renderStandaloneCell(cell, entry.rowDyn, 1, inlineStyle);
+    const combinedClass = [extraClass, entry.rowIndex != null ? this._cellCssClass(entry.rowIndex, idx) : '']
+      .filter((cls) => !!cls)
+      .join(' ')
+      .trim();
+    return this._renderStandaloneCell(cell, entry.rowDyn, 1, inlineStyle, combinedClass, originTag, rowMeta);
   }
 
   _renderCustomTemplate(templateHtml, templateRows) {
     const raw = typeof templateHtml === 'string' ? templateHtml : '';
     if (!raw) return html``;
-    const regex = /<fcc\b([^>]*)\/>/gi;
-    const strings = [];
-    const rawStrings = [];
-    const values = [];
-    let lastIndex = 0;
-    let match;
-    while ((match = regex.exec(raw)) !== null) {
-      const before = raw.slice(lastIndex, match.index);
-      strings.push(before);
-      rawStrings.push(before);
+    if (!this._customTemplateCache) this._customTemplateCache = new Map();
+    let cached = this._customTemplateCache.get(raw);
+    if (!cached) {
+      const regex = /<fcc\b([^>]*)\/>/gi;
+      const segments = [];
+      const rawSegments = [];
+      const slots = [];
+      let lastIndex = 0;
+      let match;
+      while ((match = regex.exec(raw)) !== null) {
+        const before = raw.slice(lastIndex, match.index);
+        segments.push(before);
+        rawSegments.push(before);
 
-      const attrs = match[1] || '';
-      const rowMatch = attrs.match(/row\s*=\s*"(\d+)"/i);
-      const colMatch = attrs.match(/col\s*=\s*"(\d+)"/i);
-      const styleMatch =
-        attrs.match(/style\s*=\s*"([^"]*)"/i) ||
-        attrs.match(/style\s*=\s*'([^']*)'/i);
-      const rowNumber = rowMatch ? parseInt(rowMatch[1], 10) : NaN;
-      const colNumber = colMatch ? parseInt(colMatch[1], 10) : NaN;
-      const styleValue = styleMatch ? styleMatch[1] : '';
+        const attrs = match[1] || '';
+        const rowMatch = attrs.match(/row\s*=\s*"(\d+)"/i);
+        const colMatch = attrs.match(/col\s*=\s*"(\d+)"/i);
+        const styleMatch =
+          attrs.match(/style\s*=\s*"([^"]*)"/i) ||
+          attrs.match(/style\s*=\s*'([^']*)'/i);
+        const classMatch =
+          attrs.match(/class\s*=\s*"([^"]*)"/i) ||
+          attrs.match(/class\s*=\s*'([^']*)'/i);
+        const rowNumber = rowMatch ? parseInt(rowMatch[1], 10) : NaN;
+        const colNumberRaw = colMatch ? parseInt(colMatch[1], 10) : NaN;
+        const hasRow = Number.isInteger(rowNumber) && rowNumber > 0;
+        const hasColAttr = !!colMatch;
+        const hasCol = Number.isInteger(colNumberRaw) && colNumberRaw > 0;
+        const styleValue = styleMatch ? styleMatch[1] : '';
+        const classValue = classMatch ? classMatch[1] : '';
 
-      if (Number.isInteger(rowNumber) && rowNumber > 0 && Number.isInteger(colNumber) && colNumber > 0) {
-        values.push(this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue));
-      } else {
-        const idx = strings.length - 1;
-        strings[idx] = strings[idx] + match[0];
-        rawStrings[idx] = rawStrings[idx] + match[0];
+        if (hasRow && (hasCol || !hasColAttr)) {
+          const colNumber = hasCol ? colNumberRaw : null;
+          slots.push({ rowNumber, colNumber, styleValue, classValue });
+        } else {
+          const idx = segments.length - 1;
+          segments[idx] = segments[idx] + match[0];
+          rawSegments[idx] = rawSegments[idx] + match[0];
+        }
         lastIndex = regex.lastIndex;
-        continue;
       }
 
-      lastIndex = regex.lastIndex;
+      const tail = raw.slice(lastIndex);
+      segments.push(tail);
+      rawSegments.push(tail);
+
+      if (!slots.length) {
+        this._customTemplateCache.set(raw, { slots: [], templateStrings: null });
+        return html`${unsafeHTML(raw)}`;
+      }
+
+      const cooked = segments.slice(0);
+      const rawCopy = rawSegments.slice(0);
+      cooked.raw = rawCopy;
+      Object.freeze(rawCopy);
+      Object.freeze(cooked);
+      cached = { slots, templateStrings: cooked };
+      this._customTemplateCache.set(raw, cached);
     }
 
-    const tail = raw.slice(lastIndex);
-    strings.push(tail);
-    rawStrings.push(tail);
-
-    if (!values.length) {
+    if (!cached || !cached.slots?.length || !cached.templateStrings) {
       return html`${unsafeHTML(raw)}`;
     }
 
-    const stringsCopy = strings.slice(0);
-    const rawCopy = rawStrings.slice(0);
-    const templateStrings = stringsCopy;
-    templateStrings.raw = rawCopy;
-    Object.freeze(rawCopy);
-    Object.freeze(templateStrings);
-    return html(templateStrings, ...values);
+    const values = cached.slots.map(({ rowNumber, colNumber, styleValue, classValue }) =>
+      this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue, classValue));
+    return html(cached.templateStrings, ...values);
   }
 
   _isInEditorPreview() {
@@ -1937,20 +2409,23 @@ class FlexCellsCard extends LitElement {
     const customTemplateEnabled = !!cfg.custom_template_enabled;
     const customTemplateRaw = typeof cfg.custom_template_html === 'string' ? cfg.custom_template_html : '';
     const customTemplateHasContent = customTemplateEnabled && customTemplateRaw.trim() !== '';
+    const customCssBlocks = this._collectCustomCss(rows);
+    const extraStyle = customCssBlocks.length ? html`<style>${customCssBlocks.join('\n')}</style>` : nothing;
 
     if (!rows.length) {
       const defaultCard = html`<div class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</div>`;
       if (!customTemplateHasContent) {
-        return defaultCard;
+        return html`${extraStyle}${defaultCard}`;
       }
       const templateCard = html`
         <div class="card fcc-template-card" style="padding:${padVal}px;">
           ${this._renderCustomTemplate(customTemplateRaw, [])}
         </div>
       `;
-      return this._isInEditorPreview()
+      const combined = this._isInEditorPreview()
         ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
         : templateCard;
+      return html`${extraStyle}${combined}`;
     }
 
     const headerIndex = cfg.header_from_first_row
@@ -1999,6 +2474,50 @@ class FlexCellsCard extends LitElement {
     const zebraIgnoreSeparators = !!cfg.zebra_ignore_separators;
     const hideSortSeparators = sortActive && !!cfg.hide_separators_on_sort;
     const templateRows = [];
+    let templateRowOrder = 0;
+
+    if (hasHeader && headerRow) {
+      const headerCells = Array.isArray(headerRow?.cells) ? headerRow.cells : [];
+      const headerRowIndex = headerIndex >= 0 ? headerIndex : null;
+      const headerRowClass = headerRowIndex !== null ? this._rowCssClass(headerRowIndex) : '';
+      if (headerRow?.merge_columns) {
+        const cell = headerCells[0] ?? { type: 'string', value: '', align: 'left', style: { bold: true } };
+        const withBold = cell.style?.bold === undefined
+          ? { ...cell, style: { ...(cell.style || {}), bold: true } }
+          : cell;
+        templateRows.push({
+          row: headerRow,
+          rowIndex: headerRowIndex,
+          rowClass: headerRowClass,
+          zebraClass: '',
+          rowOrder: ++templateRowOrder,
+          rowDyn: null,
+          mergeColumns: true,
+          cells: [withBold],
+          colSpan: Math.max(1, colCount || 1),
+          originTag: 'th',
+        });
+      } else {
+        const filled = Array.from({ length: colCount }, (_, i) => {
+          const cell = headerCells[i] ?? { type: 'string', value: '', align: 'left', style: { bold: true } };
+          return cell.style?.bold === undefined
+            ? { ...cell, style: { ...(cell.style || {}), bold: true } }
+            : cell;
+        });
+        templateRows.push({
+          row: headerRow,
+          rowIndex: headerRowIndex,
+          rowClass: headerRowClass,
+          zebraClass: '',
+          rowOrder: ++templateRowOrder,
+          rowDyn: null,
+          mergeColumns: false,
+          cells: filled,
+          colSpan: 1,
+          originTag: 'th',
+        });
+      }
+    }
 
     const bodyContent = rowsForBody.map((row) => {
       const isSeparator = (row?.type || '') === 'separator';
@@ -2027,29 +2546,43 @@ class FlexCellsCard extends LitElement {
         zebraCounter += 1;
       }
       const zebraClass = (cfg.zebra && zebraCounter % 2 === 0) ? 'fc-zebra-alt' : '';
+      const safeRowIndex = rows.indexOf(row);
+      const rowIndexForCss = safeRowIndex >= 0 ? safeRowIndex : null;
+      const rowCssClass = rowIndexForCss !== null ? this._rowCssClass(rowIndexForCss) : '';
+      const rowClassAttr = [zebraClass, rowCssClass].filter(Boolean).join(' ');
       const cells = Array.isArray(row?.cells) ? row.cells : [];
       if (row?.merge_columns) {
         const cell = cells[0] ?? { type: 'string', value: '', align: 'right' };
         templateRows.push({
           row,
+          rowIndex: rowIndexForCss,
+          rowClass: rowCssClass,
+          zebraClass,
+          rowOrder: ++templateRowOrder,
           rowDyn,
           mergeColumns: true,
           cells: [cell],
           colSpan: Math.max(1, colCount || 1),
+          originTag: 'td',
         });
-        return html`<tr class=${zebraClass}>${this._renderBodyCell(cell, rowDyn, Math.max(1, colCount || 1))}</tr>`;
+        return html`<tr class=${rowClassAttr || nothing}>${this._renderBodyCell(cell, rowDyn, Math.max(1, colCount || 1), rowIndexForCss, 0)}</tr>`;
       }
       const filled = Array.from({ length: colCount }, (_, i) =>
         cells[i] ?? { type: 'string', value: '', align: 'right' }
       );
       templateRows.push({
         row,
+        rowIndex: rowIndexForCss,
+        rowClass: rowCssClass,
+        zebraClass,
+        rowOrder: ++templateRowOrder,
         rowDyn,
         mergeColumns: false,
         cells: filled,
         colSpan: 1,
+        originTag: 'td',
       });
-      return html`<tr class=${zebraClass}>${filled.map((cell) => this._renderBodyCell(cell, rowDyn))}</tr>`;
+      return html`<tr class=${rowClassAttr || nothing}>${filled.map((cell, cellIdx) => this._renderBodyCell(cell, rowDyn, 1, rowIndexForCss, cellIdx))}</tr>`;
     });
 
     const table = html`
@@ -2063,7 +2596,7 @@ class FlexCellsCard extends LitElement {
 
         ${hasHeader ? html`
           <thead>
-            <tr>
+            <tr class=${headerIndex >= 0 ? this._rowCssClass(headerIndex) : nothing}>
               ${(() => {
       const cells = Array.isArray(headerRow?.cells) ? headerRow.cells : [];
       if (headerRow?.merge_columns) {
@@ -2071,14 +2604,14 @@ class FlexCellsCard extends LitElement {
         const withBold = cell.style?.bold === undefined
           ? { ...cell, style: { ...(cell.style || {}), bold: true } }
           : cell;
-        return this._renderHeaderCell(withBold, Math.max(1, colCount || 1));
+        return this._renderHeaderCell(withBold, Math.max(1, colCount || 1), headerIndex, 0);
       }
       return Array.from({ length: colCount }, (_, i) => {
         const cell = cells[i] ?? { type: 'string', value: '', align: 'left', style: { bold: true } };
         const withBold = cell.style?.bold === undefined
           ? { ...cell, style: { ...(cell.style || {}), bold: true } }
           : cell;
-        return this._renderHeaderCell(withBold);
+        return this._renderHeaderCell(withBold, 1, headerIndex, i);
       });
     })()}
             </tr>
@@ -2100,7 +2633,7 @@ class FlexCellsCard extends LitElement {
     `;
 
     if (!customTemplateHasContent) {
-      return defaultCard;
+      return html`${extraStyle}${defaultCard}`;
     }
 
     const templateCard = html`
@@ -2109,9 +2642,10 @@ class FlexCellsCard extends LitElement {
       </div>
     `;
 
-    return this._isInEditorPreview()
+    const combined = this._isInEditorPreview()
       ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
       : templateCard;
+    return html`${extraStyle}${combined}`;
   }
 
   // NEW: fallback import — gdyby przeglądarka wczytała wersję bez edytora lub cache „zgubił” definicję
