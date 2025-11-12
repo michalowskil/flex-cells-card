@@ -109,10 +109,10 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   
     [![Temperature/Humidity](examples/temperature-humidity-table/images/dark_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
     [![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
-  - [Media Player (template)](./examples/media-player-template/media-player.md) - FCC template example (HTML, CSS).  
+  - [Media Player (template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS).  
 
-    [![Media Player (template)](examples/media-player-template/images/small_dark_300.png)](./examples/media-player-template/media-player.md)
-    [![Media Player (template)](examples/media-player-template/images/small_light_300.png)](./examples/media-player-template/media-player.md)
+    [![Media Player (template)](examples/media-player-template/images/small_dark_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)
+    [![Media Player (template)](examples/media-player-template/images/small_light_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)
   - More examples coming soon.
 
 ## Changelog
