@@ -1,4 +1,2 @@
 theme: jekyll-theme-cayman
 title: Flex Cells Card
-plugins:
-  - jekyll-redirect-from

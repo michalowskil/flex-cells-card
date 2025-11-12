@@ -105,14 +105,14 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - The appearance and rules assigned to cells/rows should work in templates.
 
 ## Examples
-  - [Temperature/Humidity](./examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value.  
+  - [Temperature/Humidity](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value.  
   
-    [![media player](examples/temperature-humidity-table/images/dark_300.png)](./examples/temperature-humidity-table/temperature-humidity.md)
-    [![media player](examples/temperature-humidity-table/images/light_300.png)](./examples/temperature-humidity-table/temperature-humidity.md)
+    [![Temperature/Humidity](examples/temperature-humidity-table/images/dark_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
+    [![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
   - [Media Player (template)](./examples/media-player-template/media-player.md) - FCC template example (HTML, CSS).  
 
-    [![media player](examples/media-player-template/images/small_dark_300.png)](./examples/media-player-template/media-player.md)
-    [![media player](examples/media-player-template/images/small_light_300.png)](./examples/media-player-template/media-player.md)
+    [![Media Player (template)](examples/media-player-template/images/small_dark_300.png)](./examples/media-player-template/media-player.md)
+    [![Media Player (template)](examples/media-player-template/images/small_light_300.png)](./examples/media-player-template/media-player.md)
   - More examples coming soon.
 
 ## Changelog
