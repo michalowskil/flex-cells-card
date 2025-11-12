@@ -66,15 +66,17 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Templates, in addition to standard HTML tags, support their own tag:  
     `<fcc row="3" col="5" />` - inserts the selected cell  
     `<fcc row="3" />` - inserts the selected row  
-    `<fcc />` - inserts the entire table, which looks the same as without templates. This allows you to write custom CSS for the entire table:  
-    ```
+    `<fcc />` - inserts the entire table, which looks the same as without templates. This allows you to write custom CSS for the entire table:
+    
+    ```html
     <style>
       ...
     </style>
     <fcc />
     ```
-  - If you want a non-fcc-table element to be dynamic (for example, `<div>`), you can use the `mode="text"` attribute (alias `as="text"`) for a text-type cell. For example, you can set a dynamic rule like this:  
-    ```
+  - If you want a non-fcc-table element to be dynamic (for example, `<div>`), you can use the `mode="text"` attribute (alias `as="text"`) for a text-type cell. For example, you can set a dynamic rule like this:
+
+    ```yaml
     - cells:
         - type: string
           value: "display: none;"
@@ -93,8 +95,9 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
               overwrite_attr: ""
               text: "display: flex;"
     ```
-    to use this cell like this:  
-    ```
+    to use this cell like this:
+
+    ```html
     <div style="<fcc mode="text" row="22" col="1" />">
         test
     <div>

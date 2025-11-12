@@ -1,3 +1,9 @@
+---
+layout: default
+title: Media player (template)
+permalink: /examples/media-player-template/media-player.md
+---
+
 # Media player (template)
 
 Below you'll find an example of using HTML temples in FCC. The simple instructions below will allow you to run this template on your own, allowing you to see how the templates work.

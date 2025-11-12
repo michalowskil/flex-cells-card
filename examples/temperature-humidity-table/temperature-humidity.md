@@ -1,3 +1,9 @@
+---
+layout: default
+title: Temperature/Humidity table
+permalink: /examples/temperature-humidity-table/temperature-humidity.md
+---
+
 # Temperature/Humidity table
 
  Simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value.
