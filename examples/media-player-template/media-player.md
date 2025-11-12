@@ -2,6 +2,10 @@
 layout: default
 title: Media player (template)
 permalink: /examples/media-player-template/media-player.md
+permalink: /examples/media-player-template/media-player/
+redirect_from:
+  - /flex-cells-card/examples/media-player-template/media-player.md
+  - /examples/media-player-template/media-player.md
 ---
 
 # Media player (template)

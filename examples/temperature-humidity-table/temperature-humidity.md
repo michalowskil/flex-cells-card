@@ -1,7 +1,10 @@
 ---
 layout: default
 title: Temperature/Humidity table
-permalink: /examples/temperature-humidity-table/temperature-humidity.md
+permalink: /examples/temperature-humidity-table/temperature-humidity/
+redirect_from:
+  - /flex-cells-card/examples/temperature-humidity-table/temperature-humidity.md
+  - /examples/temperature-humidity-table/temperature-humidity.md
 ---
 
 # Temperature/Humidity table
