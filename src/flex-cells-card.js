@@ -150,6 +150,8 @@ class FlexCellsCard extends LitElement {
     super();
     this._numberControlDrafts = new Map();
     this._customTemplateCache = new Map();
+    this._narrowMedia = null;
+    this._onNarrowMediaChange = null;
   }
 
   setConfig(config) {
@@ -184,34 +186,119 @@ class FlexCellsCard extends LitElement {
       custom_template_enabled: customTemplateEnabled,
       custom_template_html: customTemplateHtml,
     };
+    this._setupNarrowMediaListener();
+  }
+
+  disconnectedCallback() {
+    this._teardownNarrowMediaListener();
+    super.disconnectedCallback();
+  }
+
+  _normalizeHideColumns(raw, colCount) {
+    const total = Number.isInteger(colCount) && colCount > 0 ? colCount : 0;
+    if (!Array.isArray(raw) || !raw.length || total === 0) return [];
+    const seen = new Set();
+    const normalized = [];
+    raw.forEach((value) => {
+      const num = Number(value);
+      if (!Number.isInteger(num) || num <= 0) return;
+      const idx = num - 1;
+      if (idx < 0 || idx >= total || seen.has(idx)) return;
+      seen.add(idx);
+      normalized.push(idx);
+    });
+    return normalized.sort((a, b) => a - b);
+  }
+
+  _setupNarrowMediaListener() {
+    this._teardownNarrowMediaListener();
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const cfg = this.config || {};
+    const bp = parseInt(cfg.narrow_breakpoint, 10);
+    if (!Number.isFinite(bp) || bp <= 0) return;
+    try {
+      const query = window.matchMedia(`(max-width: ${bp}px)`);
+      const handler = () => this.requestUpdate();
+      if (typeof query.addEventListener === 'function') {
+        query.addEventListener('change', handler);
+      } else if (typeof query.addListener === 'function') {
+        query.addListener(handler);
+      }
+      this._narrowMedia = query;
+      this._onNarrowMediaChange = handler;
+    } catch (_e) {
+      this._narrowMedia = null;
+      this._onNarrowMediaChange = null;
+    }
+  }
+
+  _teardownNarrowMediaListener() {
+    if (!this._narrowMedia || !this._onNarrowMediaChange) {
+      this._narrowMedia = null;
+      this._onNarrowMediaChange = null;
+      return;
+    }
+    try {
+      if (typeof this._narrowMedia.removeEventListener === 'function') {
+        this._narrowMedia.removeEventListener('change', this._onNarrowMediaChange);
+      } else if (typeof this._narrowMedia.removeListener === 'function') {
+        this._narrowMedia.removeListener(this._onNarrowMediaChange);
+      }
+    } catch (_e) { /* noop */ }
+    this._narrowMedia = null;
+    this._onNarrowMediaChange = null;
+  }
+
+  _getActiveHiddenColumns(colCount) {
+    const cfg = this.config || {};
+    const hideCols = this._normalizeHideColumns(cfg.hide_on_narrow, colCount);
+    if (!hideCols.length) return [];
+    const bp = parseInt(cfg.narrow_breakpoint, 10);
+    if (!Number.isFinite(bp) || bp <= 0) return [];
+    if (this._narrowMedia && typeof this._narrowMedia.matches === 'boolean') {
+      return this._narrowMedia.matches ? hideCols : [];
+    }
+    if (typeof window === 'undefined') return [];
+    if (typeof window.matchMedia !== 'function') {
+      if (typeof window.innerWidth === 'number' && Number.isFinite(window.innerWidth)) {
+        return window.innerWidth <= bp ? hideCols : [];
+      }
+      return [];
+    }
+    try {
+      return window.matchMedia(`(max-width: ${bp}px)`).matches ? hideCols : [];
+    } catch (_e) {
+      return [];
+    }
   }
 
   updated(changedProps) {
     super.updated(changedProps);
-    if (!changedProps.has('hass') || !this._numberControlDrafts || !this._numberControlDrafts.size) return;
-    const hassStates = this.hass?.states || {};
-    let mutated = false;
-    for (const [entityId, draft] of [...this._numberControlDrafts.entries()]) {
-      const stateObj = hassStates[entityId];
-      if (!stateObj) {
-        this._numberControlDrafts.delete(entityId);
-        mutated = true;
-        continue;
+    if (changedProps.has('hass') && this._numberControlDrafts && this._numberControlDrafts.size) {
+      const hassStates = this.hass?.states || {};
+      let mutated = false;
+      for (const [entityId, draft] of [...this._numberControlDrafts.entries()]) {
+        const stateObj = hassStates[entityId];
+        if (!stateObj) {
+          this._numberControlDrafts.delete(entityId);
+          mutated = true;
+          continue;
+        }
+        const stateStr = stateObj.state == null ? '' : String(stateObj.state);
+        if (draft === stateStr) {
+          this._numberControlDrafts.delete(entityId);
+          mutated = true;
+          continue;
+        }
+        const draftNum = Number(draft);
+        const stateNum = Number(stateObj.state);
+        if (Number.isFinite(draftNum) && Number.isFinite(stateNum) && Math.abs(draftNum - stateNum) <= Number.EPSILON * 100) {
+          this._numberControlDrafts.delete(entityId);
+          mutated = true;
+        }
       }
-      const stateStr = stateObj.state == null ? '' : String(stateObj.state);
-      if (draft === stateStr) {
-        this._numberControlDrafts.delete(entityId);
-        mutated = true;
-        continue;
-      }
-      const draftNum = Number(draft);
-      const stateNum = Number(stateObj.state);
-      if (Number.isFinite(draftNum) && Number.isFinite(stateNum) && Math.abs(draftNum - stateNum) <= Number.EPSILON * 100) {
-        this._numberControlDrafts.delete(entityId);
-        mutated = true;
-      }
+      if (mutated) this.requestUpdate();
     }
-    if (mutated) this.requestUpdate();
   }
 
   // ---------- helpers ----------
@@ -348,11 +435,13 @@ class FlexCellsCard extends LitElement {
   _formatDateWithPattern(date, pattern) {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
     const locale = (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator !== 'undefined' ? navigator.language : 'en') || 'en');
-    const tokens = ['YYYY','MMMM','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s'];
+    const tokens = ['YYYY','MMMM','REL_SHORT','REL','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s'];
     const hours24 = date.getHours();
     const mapping = {
       'YYYY': String(date.getFullYear()),
       'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(date),
+      'REL_SHORT': this._formatRelativeDurationText(date, locale, { short: true }),
+      'REL': this._formatRelativeDurationText(date, locale),
       'YY': String(date.getFullYear()).slice(-2).padStart(2, '0'),
       'MM': String(date.getMonth() + 1).padStart(2, '0'),
       'M': String(date.getMonth() + 1),
@@ -400,6 +489,84 @@ class FlexCellsCard extends LitElement {
       return out;
     } catch (_e) {
       return null;
+    }
+  }
+
+  _formatRelativeDurationText(date, locale, opts = {}) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const now = Date.now();
+    const diff = now - date.getTime();
+    if (!Number.isFinite(diff)) return '';
+    const absMs = Math.abs(diff);
+    const short = !!opts?.short;
+    if (absMs < 1000) {
+      try {
+        return new Intl.RelativeTimeFormat(locale || undefined, { numeric: 'auto' }).format(0, 'second');
+      } catch (_e) {
+        return 'now';
+      }
+    }
+    const units = [
+      { unit: 'year', ms: 365 * 24 * 60 * 60 * 1000 },
+      { unit: 'month', ms: 30 * 24 * 60 * 60 * 1000 },
+      { unit: 'week', ms: 7 * 24 * 60 * 60 * 1000 },
+      { unit: 'day', ms: 24 * 60 * 60 * 1000 },
+      { unit: 'hour', ms: 60 * 60 * 1000 },
+      { unit: 'minute', ms: 60 * 1000 },
+      { unit: 'second', ms: 1000 },
+    ];
+    const baseUnit = units.find((u) => absMs >= u.ms) || units[units.length - 1];
+    const parts = [];
+    const baseValue = Math.max(1, Math.floor(absMs / baseUnit.ms));
+    const baseText = this._formatRelativeDurationUnit(baseValue, baseUnit.unit, locale, short);
+    if (baseText) parts.push(baseText);
+    let remainder = absMs - (baseValue * baseUnit.ms);
+    for (let idx = units.indexOf(baseUnit) + 1; idx < units.length && parts.length < 2; idx += 1) {
+      const unit = units[idx];
+      if (remainder >= unit.ms) {
+        const value = Math.floor(remainder / unit.ms);
+        if (value > 0) {
+          const formatted = this._formatRelativeDurationUnit(value, unit.unit, locale, short);
+          if (formatted) parts.push(formatted);
+          remainder -= value * unit.ms;
+        }
+      }
+    }
+    return parts.join(short ? ' ' : ' ');
+  }
+
+  _formatRelativeDurationUnit(value, unit, locale, short = false) {
+    if (!Number.isFinite(value) || value <= 0) return '';
+    try {
+      let formatted = new Intl.NumberFormat(locale || undefined, {
+        style: 'unit',
+        unit,
+        unitDisplay: short ? 'narrow' : 'long',
+        maximumFractionDigits: 0,
+      }).format(value);
+      if (short) {
+        formatted = formatted
+          .replace(/[\s\u00A0\u202F]+/g, '')
+          .replace(/[\u2010\u2011\u2012\u2013\u2014-]+/g, '')
+          .replace(/\./g, '');
+      }
+      return formatted;
+    } catch (_e) {
+      if (short) {
+        const shortFallback = {
+          year: 'y',
+          month: 'mo',
+          week: 'w',
+          day: 'd',
+          hour: 'h',
+          minute: 'm',
+          second: 's',
+        };
+        const suffix = shortFallback[unit] || (unit ? unit[0] : '');
+        return `${value}${suffix}`;
+      }
+      const plural = value === 1 ? '' : 's';
+      return `${value} ${unit}${plural}`;
     }
   }
 
@@ -681,12 +848,12 @@ class FlexCellsCard extends LitElement {
   // === Simple input entity controls (input_boolean / input_number / input_select) ===
   _renderEntityControl(cell, stateObj, entityId) {
     const domain = (entityId || '').split('.')[0];
-    if (domain === 'input_boolean') {
+    if (domain === 'input_boolean' || domain === 'switch') {
       const checked = stateObj?.state === 'on';
       return html`<label class="ctrl-wrap"><input class="ctrl-switch" type="checkbox" .checked=${checked}
         @change=${(e) => this._onToggleBoolean(entityId, !!e.target.checked)} /></label>`;
     }
-    if (domain === 'input_number') {
+    if (domain === 'input_number' || domain === 'number') {
       const attrs = stateObj?.attributes || {};
       const rawMin = Number(attrs.min);
       const rawMax = Number(attrs.max);
@@ -744,7 +911,7 @@ class FlexCellsCard extends LitElement {
         ${showValue ? html`<span class="ctrl-value">${this._formatEntityCell(cell, displayState)}</span>` : nothing}
       </span>`;
     }
-    if (domain === 'input_select') {
+    if (domain === 'input_select' || domain === 'select') {
       const rawOpts = stateObj?.attributes?.options;
       const opts = Array.isArray(rawOpts) ? rawOpts.map(o => String(o)) : [];
       const cur = String(stateObj?.state ?? '');
@@ -753,15 +920,18 @@ class FlexCellsCard extends LitElement {
         ${opts.map(o => html`<option value="${o}" ?selected=${o === cur}>${o}</option>`)}
       </select>`;
     }
-    if (domain === 'input_text') {
+    if (domain === 'input_text' || domain === 'text') {
       const cur = String(stateObj?.state ?? '');
       return html`<input class="ctrl-input" type="text" .value=${cur}
     @change=${(e) => this._onSetText(entityId, e.target.value)} />`;
     }
-    if (domain === 'input_datetime') {
+    if (domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time') {
       const attrs = stateObj?.attributes || {};
-      const hasDate = !!attrs.has_date;
-      const hasTime = !!attrs.has_time;
+      const domain = entityId?.split?.('.')?.[0] || '';
+      const hasDateAttr = attrs.has_date;
+      const hasTimeAttr = attrs.has_time;
+      const hasDate = hasDateAttr !== undefined ? !!hasDateAttr : (domain === 'input_datetime' || domain === 'datetime' || domain === 'date');
+      const hasTime = hasTimeAttr !== undefined ? !!hasTimeAttr : (domain === 'input_datetime' || domain === 'datetime' || domain === 'time');
       // Build value for input controls from state string primarily
       const st = String(stateObj?.state ?? '');
       let valueStr = '';
@@ -791,7 +961,7 @@ class FlexCellsCard extends LitElement {
       return this._formatEntityCell(cell, stateObj);
     }
 
-    if (domain === 'input_button') {
+    if (domain === 'input_button' || domain === 'button') {
       const attrs = stateObj?.attributes || {};
       const friendly = attrs.friendly_name ?? attrs.name;
       const label = (friendly && String(friendly)) || (t(this.hass, 'editor.press') || 'Press');
@@ -816,12 +986,16 @@ class FlexCellsCard extends LitElement {
   }
   _onToggleBoolean(entityId, isOn) {
     const svc = isOn ? 'turn_on' : 'turn_off';
-    try { this.hass?.callService('input_boolean', svc, { entity_id: entityId }); } catch (e) { /* noop */ }
+    const domain = entityId?.split?.('.')[0] || 'input_boolean';
+    const serviceDomain = domain === 'switch' ? 'switch' : 'input_boolean';
+    try { this.hass?.callService(serviceDomain, svc, { entity_id: entityId }); } catch (e) { /* noop */ }
   }
 
   _onSetNumber(entityId, value) {
     if (!entityId) return;
-    try { this.hass?.callService('input_number', 'set_value', { entity_id: entityId, value }); } catch (e) { /* noop */ }
+    const domain = entityId?.split?.('.')[0] || 'input_number';
+    const serviceDomain = domain === 'number' ? 'number' : 'input_number';
+    try { this.hass?.callService(serviceDomain, 'set_value', { entity_id: entityId, value }); } catch (e) { /* noop */ }
   }
   _onNumberInput(event, entityId) {
     if (!event || !entityId) return;
@@ -1056,7 +1230,9 @@ class FlexCellsCard extends LitElement {
     return `${scope} ${sel}`.replace(/\s+/g, ' ').trim();
   }
   _onSelectOption(entityId, option) {
-    try { this.hass?.callService('input_select', 'select_option', { entity_id: entityId, option }); } catch (e) { /* noop */ }
+    const domain = entityId?.split?.('.')[0] || 'input_select';
+    const serviceDomain = domain === 'select' ? 'select' : 'input_select';
+    try { this.hass?.callService(serviceDomain, 'select_option', { entity_id: entityId, option }); } catch (e) { /* noop */ }
   }
 
 
@@ -1070,7 +1246,7 @@ class FlexCellsCard extends LitElement {
       source = this._resolveEntityValuePath(stateObj, path, tree);
     } else {
       const domain = String(cell?.value || '').split('.')[0];
-      if (domain === 'input_button') {
+      if (domain === 'input_button' || domain === 'button') {
         const nm = stateObj?.attributes?.friendly_name ?? stateObj?.attributes?.name;
         if (nm !== undefined) return String(nm);
       }
@@ -1738,7 +1914,7 @@ class FlexCellsCard extends LitElement {
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const domain = val?.split?.('.')?.[0];
-      if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
+      if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
         const _disp = this._formatEntityCell(cell, stateObj);
         const _dyn = this._evaluateDynColor(cell, type, _disp);
         const { style: _thStyle } = this._buildTextStyle(cell, type, align, _dyn);
@@ -1881,6 +2057,7 @@ class FlexCellsCard extends LitElement {
       content: '',
       align,
       type,
+      hidden: false,
     };
 
     if (type === 'icon') {
@@ -1907,6 +2084,9 @@ class FlexCellsCard extends LitElement {
       descriptor.className = hasActions ? 'icon clickable' : 'icon';
       descriptor.style = tdStyle;
       descriptor.content = content;
+      if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
+        descriptor.hidden = true;
+      }
 
       if (hasActions) {
         const aria = display || 'icon';
@@ -1927,7 +2107,7 @@ class FlexCellsCard extends LitElement {
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const domain = val?.split?.('.')?.[0];
-      if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'input_number' || domain === 'input_select' || domain === 'input_button' || domain === 'input_datetime' || domain === 'input_text')) {
+      if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
         const display = this._formatEntityCell(cell, stateObj);
         const cellDyn = this._evaluateDynColor(cell, type, display);
         const dyn = mergeDyn(cellDyn);
@@ -1956,6 +2136,9 @@ class FlexCellsCard extends LitElement {
       descriptor.title = val;
       descriptor.ariaLabel = aria;
       descriptor.content = shown;
+      if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
+        descriptor.hidden = true;
+      }
 
       if (hasActions || allowDefault) {
         descriptor.role = 'button';
@@ -1997,6 +2180,9 @@ class FlexCellsCard extends LitElement {
     descriptor.className = hasActions ? 'clickable' : '';
     descriptor.style = tdStyle;
     descriptor.content = shown;
+    if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
+      descriptor.hidden = true;
+    }
 
     if (hasActions) {
       const aria = String(val || 'text');
@@ -2066,6 +2252,7 @@ class FlexCellsCard extends LitElement {
   _renderStandaloneCell(cell, rowDyn = null, colSpan = 1, extraStyle = '', extraClass = '', originTag = 'td', rowMeta = null) {
     const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
     if (!descriptor) return html``;
+    if (descriptor.hidden) return html``;
     const {
       className,
       style,
@@ -2146,7 +2333,7 @@ class FlexCellsCard extends LitElement {
   _renderTemplateRow(templateRows, rowNumber, inlineStyle = '', extraClass = '') {
     if (!Number.isInteger(rowNumber) || rowNumber <= 0) return html``;
     const entry = templateRows[rowNumber - 1];
-    if (!entry) return html``;
+    if (!entry || entry.hidden) return html``;
     const rowMeta = {
       rowIndex: entry.rowIndex,
       rowOrder: entry.rowOrder,
@@ -2202,7 +2389,7 @@ class FlexCellsCard extends LitElement {
       return this._renderTemplateRow(templateRows, rowNumber, inlineStyle, extraClass);
     }
     const entry = templateRows[rowNumber - 1];
-    if (!entry) return html``;
+    if (!entry || entry.hidden) return html``;
     const rowMeta = {
       rowIndex: entry.rowIndex,
       rowOrder: entry.rowOrder,
@@ -2229,12 +2416,65 @@ class FlexCellsCard extends LitElement {
     return this._renderStandaloneCell(cell, entry.rowDyn, 1, inlineStyle, combinedClass, originTag, rowMeta);
   }
 
-  _renderCustomTemplate(templateHtml, templateRows) {
+  _stringifyTemplateValue(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return '';
+  }
+
+  _extractTemplateCellText(cell) {
+    if (!cell) return '';
+    const type = cell?.type || 'string';
+    if (type === 'entity') {
+      const entityId = this._stringifyTemplateValue(cell?.value);
+      if (!entityId) return '';
+      const stateObj = this.hass?.states?.[entityId];
+      const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj) : '';
+      const display = this._stringifyTemplateValue(displayRaw);
+      const dyn = this._evaluateDynColor(cell, type, display);
+      const shown = this._resolveDisplayWithDynamics(display, dyn, cell);
+      return this._stringifyTemplateValue(shown);
+    }
+    const base = this._stringifyTemplateValue(cell?.value);
+    const dyn = this._evaluateDynColor(cell, type, base);
+    const shown = this._resolveDisplayWithDynamics(base, dyn, cell);
+    return this._stringifyTemplateValue(shown);
+  }
+
+  _renderTemplateCellText(templateRows, rowNumber, colNumber) {
+    if (!Number.isInteger(rowNumber) || rowNumber <= 0) return '';
+    if (!Number.isInteger(colNumber) || colNumber <= 0) return '';
+    const entry = templateRows[rowNumber - 1];
+    if (!entry || entry.hidden) return '';
+    if (entry.mergeColumns) {
+      if (colNumber !== 1) return '';
+      const cell = entry.cells[0] ?? { type: 'string', value: '' };
+      return this._extractTemplateCellText(cell);
+    }
+    const idx = colNumber - 1;
+    if (idx < 0 || idx >= entry.cells.length) return '';
+    const cell = entry.cells[idx] ?? { type: 'string', value: '' };
+    return this._extractTemplateCellText(cell);
+  }
+
+  _renderCustomTemplate(templateHtml, templateRows, tableContent = null) {
     const raw = typeof templateHtml === 'string' ? templateHtml : '';
     if (!raw) return html``;
     if (!this._customTemplateCache) this._customTemplateCache = new Map();
     let cached = this._customTemplateCache.get(raw);
     if (!cached) {
+      const readAttrValue = (src, attr) => {
+        if (!src || !attr) return null;
+        const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const doubleQuoted = new RegExp(`${escaped}\\s*=\\s*"([^"]*)"`, 'i');
+        const singleQuoted = new RegExp(`${escaped}\\s*=\\s*'([^']*)'`, 'i');
+        const dblMatch = src.match(doubleQuoted);
+        if (dblMatch) return dblMatch[1];
+        const sglMatch = src.match(singleQuoted);
+        if (sglMatch) return sglMatch[1];
+        return null;
+      };
       const regex = /<fcc\b([^>]*)\/>/gi;
       const segments = [];
       const rawSegments = [];
@@ -2262,10 +2502,14 @@ class FlexCellsCard extends LitElement {
         const hasCol = Number.isInteger(colNumberRaw) && colNumberRaw > 0;
         const styleValue = styleMatch ? styleMatch[1] : '';
         const classValue = classMatch ? classMatch[1] : '';
+        const modeAttr = readAttrValue(attrs, 'mode') ?? readAttrValue(attrs, 'as');
+        const normalizedMode = typeof modeAttr === 'string' && modeAttr.trim().toLowerCase() === 'text' ? 'text' : 'node';
 
         if (hasRow && (hasCol || !hasColAttr)) {
           const colNumber = hasCol ? colNumberRaw : null;
-          slots.push({ rowNumber, colNumber, styleValue, classValue });
+          slots.push({ rowNumber, colNumber, styleValue, classValue, outputMode: normalizedMode });
+        } else if (!hasRow && !hasColAttr) {
+          slots.push({ type: 'table', styleValue, classValue });
         } else {
           const idx = segments.length - 1;
           segments[idx] = segments[idx] + match[0];
@@ -2296,8 +2540,20 @@ class FlexCellsCard extends LitElement {
       return html`${unsafeHTML(raw)}`;
     }
 
-    const values = cached.slots.map(({ rowNumber, colNumber, styleValue, classValue }) =>
-      this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue, classValue));
+    const values = cached.slots.map((slot) => {
+      if (slot?.type === 'table') {
+        const content = tableContent || html``;
+        const cls = slot.classValue ? slot.classValue.trim() : '';
+        const sty = slot.styleValue ? slot.styleValue.trim() : '';
+        if (!cls && !sty) return content;
+        return html`<span class=${cls || nothing} style=${sty || nothing}>${content}</span>`;
+      }
+      const { rowNumber, colNumber, styleValue, classValue, outputMode } = slot;
+      if ((outputMode || '') === 'text') {
+        return this._renderTemplateCellText(templateRows, rowNumber, colNumber);
+      }
+      return this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue, classValue);
+    });
     return html(cached.templateStrings, ...values);
   }
 
@@ -2419,7 +2675,7 @@ class FlexCellsCard extends LitElement {
       }
       const templateCard = html`
         <div class="card fcc-template-card" style="padding:${padVal}px;">
-          ${this._renderCustomTemplate(customTemplateRaw, [])}
+          ${this._renderCustomTemplate(customTemplateRaw, [], null)}
         </div>
       `;
       const combined = this._isInEditorPreview()
@@ -2443,17 +2699,29 @@ class FlexCellsCard extends LitElement {
     const classes = ['datatable'];
     if (cfg.zebra) classes.push('zebra');
 
-    const hideCols = Array.isArray(cfg.hide_on_narrow) ? cfg.hide_on_narrow.filter(n => Number.isInteger(n) && n > 0) : null;
+    const hiddenColumns = this._getActiveHiddenColumns(colCount);
+    const effectiveVisibleCount = Math.max(1, colCount - hiddenColumns.length);
+    const hiddenColumnSet = new Set(hiddenColumns);
+    const firstVisibleColumnIndex = (() => {
+      for (let i = 0; i < colCount; i += 1) {
+        if (!hiddenColumnSet.has(i)) return i;
+      }
+      return 0;
+    })();
+    const normalizedHideCols = this._normalizeHideColumns(cfg.hide_on_narrow, colCount);
     const bp = parseInt(cfg.narrow_breakpoint, 10);
     const hasBP = Number.isFinite(bp) && bp > 0;
-
-    const hideCSS = (hideCols?.length && hasBP)
+    const hideCSS = (!hiddenColumns.length && normalizedHideCols.length && hasBP)
       ? `
       @media (max-width: ${bp}px) {
-        ${hideCols.map((i) => `
-          colgroup col:nth-child(${i}) { display: none; }
-          th:nth-child(${i}), td:nth-child(${i}) { display: none; }
-        `).join('\n')}
+        ${normalizedHideCols.map((idx) => {
+          const nth = idx + 1;
+          return `
+          colgroup col:nth-child(${nth}) { display: none; }
+          thead th:nth-child(${nth}) { display: none; }
+          tbody tr:not(.fc-separator-row) td:nth-child(${nth}) { display: none; }
+        `;
+        }).join('\n')}
       }`
       : '';
 
@@ -2494,7 +2762,7 @@ class FlexCellsCard extends LitElement {
           rowDyn: null,
           mergeColumns: true,
           cells: [withBold],
-          colSpan: Math.max(1, colCount || 1),
+          colSpan: Math.max(1, effectiveVisibleCount),
           originTag: 'th',
         });
       } else {
@@ -2536,10 +2804,26 @@ class FlexCellsCard extends LitElement {
               },
             }
           : row;
-        return this._renderSeparatorRow(separatorRow, colCount);
+        return this._renderSeparatorRow(separatorRow, effectiveVisibleCount);
       }
       const rowDyn = this._evaluateRowRules(row);
       if (rowDyn?.visibility === 'hidden') {
+        const safeRowIndex = rows.indexOf(row);
+        const rowIndexForCss = safeRowIndex >= 0 ? safeRowIndex : null;
+        const rowCssClass = rowIndexForCss !== null ? this._rowCssClass(rowIndexForCss) : '';
+        templateRows.push({
+          row,
+          rowIndex: rowIndexForCss,
+          rowClass: rowCssClass,
+          zebraClass: '',
+          rowOrder: ++templateRowOrder,
+          rowDyn,
+          mergeColumns: false,
+          cells: Array.isArray(row?.cells) ? row.cells : [],
+          colSpan: 1,
+          originTag: 'td',
+          hidden: true,
+        });
         return html``;
       }
       if (cfg.zebra) {
@@ -2562,14 +2846,12 @@ class FlexCellsCard extends LitElement {
           rowDyn,
           mergeColumns: true,
           cells: [cell],
-          colSpan: Math.max(1, colCount || 1),
+          colSpan: Math.max(1, effectiveVisibleCount),
           originTag: 'td',
         });
-        return html`<tr class=${rowClassAttr || nothing}>${this._renderBodyCell(cell, rowDyn, Math.max(1, colCount || 1), rowIndexForCss, 0)}</tr>`;
+        return html`<tr class=${rowClassAttr || nothing}>${this._renderBodyCell(cell, rowDyn, Math.max(1, effectiveVisibleCount), rowIndexForCss, firstVisibleColumnIndex)}</tr>`;
       }
-      const filled = Array.from({ length: colCount }, (_, i) =>
-        cells[i] ?? { type: 'string', value: '', align: 'right' }
-      );
+      const filled = Array.from({ length: colCount }, (_, i) => cells[i] ?? { type: 'string', value: '', align: 'right' });
       templateRows.push({
         row,
         rowIndex: rowIndexForCss,
@@ -2582,7 +2864,11 @@ class FlexCellsCard extends LitElement {
         colSpan: 1,
         originTag: 'td',
       });
-      return html`<tr class=${rowClassAttr || nothing}>${filled.map((cell, cellIdx) => this._renderBodyCell(cell, rowDyn, 1, rowIndexForCss, cellIdx))}</tr>`;
+      const rowCells = filled.map((cell, cellIdx) => {
+        if (hiddenColumnSet.has(cellIdx)) return nothing;
+        return this._renderBodyCell(cell, rowDyn, 1, rowIndexForCss, cellIdx);
+      });
+      return html`<tr class=${rowClassAttr || nothing}>${rowCells}</tr>`;
     });
 
     const table = html`
@@ -2590,7 +2876,7 @@ class FlexCellsCard extends LitElement {
       <table class=${classes.join(' ')} style=${tableStyle} cellpadding="0" cellspacing="0" border="0">
         ${widths ? html`
           <colgroup>
-            ${Array.from({ length: colCount }, (_, i) => html`<col style="width:${widths[i] || 'auto'}">`)}
+            ${Array.from({ length: colCount }, (_, i) => hiddenColumnSet.has(i) ? nothing : html`<col style="width:${widths[i] || 'auto'}">`)}
           </colgroup>
         ` : ''}
 
@@ -2604,9 +2890,10 @@ class FlexCellsCard extends LitElement {
         const withBold = cell.style?.bold === undefined
           ? { ...cell, style: { ...(cell.style || {}), bold: true } }
           : cell;
-        return this._renderHeaderCell(withBold, Math.max(1, colCount || 1), headerIndex, 0);
+        return this._renderHeaderCell(withBold, Math.max(1, effectiveVisibleCount), headerIndex, firstVisibleColumnIndex);
       }
       return Array.from({ length: colCount }, (_, i) => {
+        if (hiddenColumnSet.has(i)) return nothing;
         const cell = cells[i] ?? { type: 'string', value: '', align: 'left', style: { bold: true } };
         const withBold = cell.style?.bold === undefined
           ? { ...cell, style: { ...(cell.style || {}), bold: true } }
@@ -2624,11 +2911,13 @@ class FlexCellsCard extends LitElement {
       </table>
     `;
 
+    const tableViewport = cfg.overflow_x
+      ? html`<div class="wrap"><div class="scroller" style="overflow-x:auto; overflow-y:hidden">${table}</div></div>`
+      : html`<div class="wrap">${table}</div>`;
+
     const defaultCard = html`
       <div class="card" style="padding:${padVal}px;">
-        ${cfg.overflow_x
-        ? html`<div class="wrap"><div class="scroller" style="overflow-x:auto; overflow-y:hidden">${table}</div></div>`
-        : html`<div class="wrap">${table}</div>`}
+        ${tableViewport}
       </div>
     `;
 
@@ -2638,7 +2927,7 @@ class FlexCellsCard extends LitElement {
 
     const templateCard = html`
       <div class="card fcc-template-card" style="padding:${padVal}px;">
-        ${this._renderCustomTemplate(customTemplateRaw, templateRows)}
+        ${this._renderCustomTemplate(customTemplateRaw, templateRows, tableViewport)}
       </div>
     `;
 
@@ -2657,35 +2946,86 @@ class FlexCellsCard extends LitElement {
   }
   _onSetText(entityId, value) {
     try {
-      this.hass?.callService('input_text', 'set_value', { entity_id: entityId, value: value ?? '' });
+      const domain = entityId?.split?.('.')[0] || 'input_text';
+      const serviceDomain = domain === 'text' ? 'text' : 'input_text';
+      this.hass?.callService(serviceDomain, 'set_value', { entity_id: entityId, value: value ?? '' });
     } catch (e) { /* noop */ }
   }
   _onSetDatetime(entityId, raw) {
     try {
       const st = this.hass?.states?.[entityId];
       const attrs = st?.attributes || {};
-      const hasDate = !!attrs.has_date;
-      const hasTime = !!attrs.has_time;
-      const data = { entity_id: entityId };
+      const domain = entityId?.split?.('.')[0] || 'input_datetime';
+      const hasDateAttr = attrs.has_date;
+      const hasTimeAttr = attrs.has_time;
+      const hasDate = hasDateAttr !== undefined ? !!hasDateAttr : (domain === 'input_datetime' || domain === 'datetime' || domain === 'date');
+      const hasTime = hasTimeAttr !== undefined ? !!hasTimeAttr : (domain === 'input_datetime' || domain === 'datetime' || domain === 'time');
+      const input = String(raw || '').trim();
+      let datePart = '';
+      let timePart = '';
       if (hasDate && hasTime) {
-        const s = String(raw || '').replace(' ', 'T');
-        const m = s.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2})(?::[0-9]{2})?$/);
-        if (m) { data.date = m[1]; data.time = m[2] + ':00'; }
+        const s = input.replace(' ', 'T');
+        const m = s.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})[T ]([0-9]{2}:[0-9]{2})(?::([0-9]{2}))?$/);
+        if (m) {
+          datePart = m[1];
+          const seconds = m[3] ?? '00';
+          timePart = `${m[2]}:${seconds}`;
+        }
       } else if (hasDate) {
-        const m = String(raw || '').match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})$/);
-        if (m) data.date = m[1];
+        const m = input.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})$/);
+        if (m) datePart = m[1];
       } else if (hasTime) {
-        let time = String(raw || '');
+        let time = input;
         if (/^[0-9]{2}:[0-9]{2}$/.test(time)) time += ':00';
-        if (/^[0-9]{2}:[0-9]{2}:[0-9]{2}$/.test(time)) data.time = time;
+        if (/^[0-9]{2}:[0-9]{2}:[0-9]{2}$/.test(time)) timePart = time;
       }
-      this.hass?.callService('input_datetime', 'set_datetime', data);
+
+      const serviceDomain = (domain === 'datetime' || domain === 'date' || domain === 'time') ? domain : 'input_datetime';
+      if (serviceDomain === 'input_datetime') {
+        const data = { entity_id: entityId };
+        if (datePart) data.date = datePart;
+        if (timePart) data.time = timePart;
+        this.hass?.callService('input_datetime', 'set_datetime', data);
+        return;
+      }
+
+      const data = { entity_id: entityId };
+      let provided = false;
+      if (serviceDomain === 'datetime') {
+        if (datePart && timePart) {
+          data.datetime = `${datePart} ${timePart}`;
+          provided = true;
+        } else if (datePart) {
+          data.datetime = `${datePart} 00:00:00`;
+          provided = true;
+        } else if (timePart) {
+          data.datetime = `1970-01-01 ${timePart}`;
+          provided = true;
+        }
+      } else if (serviceDomain === 'date') {
+        if (datePart) {
+          data.date = datePart;
+          provided = true;
+        }
+      } else if (serviceDomain === 'time') {
+        if (timePart) {
+          data.time = timePart;
+          provided = true;
+        }
+      }
+      if (!provided && input) {
+        // Fallback: send generic value payload.
+        data.value = input;
+      }
+      this.hass?.callService(serviceDomain, 'set_value', data);
     } catch (e) { /* noop */ }
   }
   _onPressButton(entityId) {
     try {
       // Legacy helper; not used if cell actions are configured.
-      this.hass?.callService('input_button', 'press', { entity_id: entityId });
+      const domain = entityId?.split?.('.')[0] || 'input_button';
+      const serviceDomain = domain === 'button' ? 'button' : 'input_button';
+      this.hass?.callService(serviceDomain, 'press', { entity_id: entityId });
     } catch (e) { /* noop */ }
   }
 }

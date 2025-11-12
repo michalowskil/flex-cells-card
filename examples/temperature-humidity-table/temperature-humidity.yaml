@@ -1,0 +1,252 @@
+rows:
+  - cells:
+      - type: string
+        value: ""
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: Temperatura
+        align: right
+      - type: string
+        value: Wilgotność
+        align: right
+        style:
+          text_transform: ""
+  - cells:
+      - type: icon
+        value: mdi:sofa-outline
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Salon
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.atc_salon_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+      - type: entity
+        value: sensor.atc_salon_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+  - cells:
+      - type: icon
+        value: mdi:fridge-outline
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Kuchnia
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.atc_kuchnia_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+      - type: entity
+        value: sensor.atc_kuchnia_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+  - cells:
+      - type: icon
+        value: mdi:shower-head
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Łazienka
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.kabina_prysznicowa_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+      - type: entity
+        value: sensor.kabina_prysznicowa_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+  - cells:
+      - type: icon
+        value: mdi:bed-outline
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Sypialnia
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.atc_sypialnia_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+      - type: entity
+        value: sensor.atc_sypialnia_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+  - type: separator
+    separator:
+      color: "#d0d7de"
+      background: ""
+      style: dashed
+      thickness: 1.5
+      length: 100%
+      align: stretch
+      opacity: 1
+      margin_top: 0
+      margin_bottom: 0
+    cells: []
+  - cells:
+      - type: icon
+        value: mdi:sun-thermometer-outline
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Prognoza
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: weather.forecast_dom
+        align: right
+        use_entity_unit: false
+        precision: 1
+        attribute: attributes.temperature
+        unit: °C
+      - type: entity
+        value: weather.forecast_dom
+        align: right
+        use_entity_unit: false
+        precision: 1
+        attribute: attributes.humidity
+        unit: "%"
+  - cells:
+      - type: icon
+        value: mdi:balcony
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Balkon
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.balkon_na_zewnatrz_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+      - type: entity
+        value: sensor.balkon_na_zewnatrz_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+  - type: separator
+    separator:
+      color: "#d0d7de"
+      background: ""
+      style: dashed
+      thickness: 1.5
+      length: 100%
+      align: stretch
+      opacity: 1
+      margin_top: 0
+      margin_bottom: 0
+    cells: []
+  - cells:
+      - type: icon
+        value: mdi:laptop
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Laptop
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.szafka_pod_biurkiem_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.szafka_pod_biurkiem_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+  - cells:
+      - type: icon
+        value: mdi:television-classic
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Szafka TV
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.szafka_pod_tv_temperature
+        align: right
+        use_entity_unit: true
+        precision: 1
+        dyn_color:
+          - entity: sensor.szafka_pod_tv_temperature
+            attr: ""
+            op: ">="
+            val: "20"
+            bg: ""
+            fg: red
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: sensor.szafka_pod_tv_humidity
+        align: right
+        use_entity_unit: true
+        precision: 1
+column_count: 4
+card_padding: 0
+overflow_x: true
+header_from_first_row: true
+zebra: true
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 8
+  bottom: 4
+  left: 7
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+column_widths:
+  - 40px
+  - auto
+  - auto
+  - 100px
+zebra_ignore_separators: true
+hide_on_narrow: []
+sort_columns:
+  - 3
+hide_separators_on_sort: false
+sort_desc: false

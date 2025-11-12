@@ -1,0 +1,529 @@
+rows:
+  - cells:
+      - type: string
+        value: Salon
+        align: left
+        style:
+          text_transform: ""
+  - cells:
+      - type: entity
+        value: media_player.spotify_lukasz
+        align: center
+        use_entity_unit: true
+        style:
+          text_transform: uppercase
+  - cells:
+      - type: entity
+        value: media_player.spotify_lukasz
+        attribute: media_title
+        align: left
+        use_entity_unit: true
+        style:
+          text_transform: ""
+  - cells:
+      - type: entity
+        value: media_player.spotify_lukasz
+        attribute: media_artist
+        align: left
+        use_entity_unit: true
+        style:
+          text_transform: ""
+  - cells:
+      - type: icon
+        value: mdi:skip-previous
+        align: center
+        tap_action:
+          action: call-service
+          service: media_player.media_previous_track
+          data:
+            entity_id: media_player.spotify_lukasz
+  - cells:
+      - type: icon
+        value: mdi:play
+        align: center
+        style:
+          color: "#ffffff"
+        tap_action:
+          action: call-service
+          service: media_player.media_play_pause
+          data:
+            entity_id: media_player.spotify_lukasz
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: ""
+            op: "="
+            val: playing
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:pause
+  - cells:
+      - type: icon
+        value: mdi:skip-next
+        align: center
+        tap_action:
+          action: call-service
+          service: media_player.media_next_track
+          data:
+            entity_id: media_player.spotify_lukasz
+  - cells:
+      - type: icon
+        value: mdi:volume-high
+        align: center
+  - cells:
+      - type: entity
+        value: input_number.spotify_volume_slider
+        style:
+          min_width: 150px
+          text_transform: ""
+        precision: 0
+        align: center
+        use_entity_unit: true
+        show_control: true
+        show_control_value_right: true
+  - cells:
+      - type: icon
+        value: mdi:repeat-off
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: perform-action
+          perform_action: media_player.repeat_set
+          target:
+            entity_id:
+              - media_player.spotify_lukasz
+          data:
+            repeat: all
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: repeat
+            op: "="
+            val: "off"
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:repeat-off
+          - entity: media_player.spotify_lukasz
+            attr: repeat
+            op: "!="
+            val: "off"
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+    dyn_row_rules: []
+  - cells:
+      - type: icon
+        value: mdi:repeat
+        align: left
+        style:
+          text_transform: ""
+          icon_size: ""
+        tap_action:
+          action: perform-action
+          perform_action: media_player.repeat_set
+          target:
+            entity_id:
+              - media_player.spotify_lukasz
+          data:
+            repeat: one
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: repeat
+            op: "="
+            val: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:repeat
+          - entity: media_player.spotify_lukasz
+            attr: repeat
+            op: "!="
+            val: all
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: icon
+        value: mdi:repeat-once
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: perform-action
+          perform_action: media_player.repeat_set
+          target:
+            entity_id:
+              - media_player.spotify_lukasz
+          data:
+            repeat: "off"
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: repeat
+            op: "="
+            val: one
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:repeat-once
+          - entity: media_player.spotify_lukasz
+            attr: repeat
+            op: "!="
+            val: one
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: entity
+        value: media_player.spotify_lukasz
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attribute: repeat
+        dyn_color: []
+        tap_action:
+          action: none
+  - cells:
+      - type: entity
+        value: media_player.spotify_lukasz
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attribute: attributes.media_playlist
+        dyn_color:
+          - entity: ""
+            attr: ""
+            op: "="
+            val: n/a
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: icon
+        value: mdi:shuffle
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: perform-action
+          perform_action: media_player.shuffle_set
+          data:
+            shuffle: false
+          target:
+            entity_id: media_player.spotify_lukasz
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: attributes.shuffle
+            op: "!="
+            val: "true"
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: string
+        value: ""
+        align: left
+        style:
+          text_transform: ""
+        attribute: attributes.shuffle
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: attributes.shuffle
+            op: "="
+            val: "true"
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: "on"
+  - cells:
+      - type: string
+        value: ""
+        align: left
+        style:
+          text_transform: ""
+        attribute: attributes.shuffle
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: attributes.shuffle
+            op: "="
+            val: "false"
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: "off"
+  - cells:
+      - type: icon
+        value: mdi:shuffle-disabled
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: perform-action
+          perform_action: media_player.shuffle_set
+          data:
+            shuffle: true
+          target:
+            entity_id: media_player.spotify_lukasz
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: attributes.shuffle
+            op: "!="
+            val: "false"
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: entity
+        value: media_player.spotify_lukasz
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attribute: attributes.media_album_name
+        dyn_color: []
+  - cells:
+      - type: string
+        value: "Playlist:"
+        align: left
+        style:
+          text_transform: ""
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: attributes.media_playlist
+            op: "="
+            val: ""
+            bg: ""
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: string
+        value: ""
+        align: left
+        style:
+          text_transform: ""
+        dyn_color:
+          - entity: media_player.spotify_lukasz
+            attr: ""
+            op: "="
+            val: idle
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: "display: none;"
+column_count: 1
+card_padding: 0
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <style>
+    .main {
+      border-radius: 11px;
+      background: linear-gradient(135deg, rgba(33,150,243,0.24), rgba(21,101,192,0.12));
+      display: flex;
+      flex-wrap: wrap;
+      padding: 15px
+    }
+    .ctrl {
+      flex: 0 0 auto;
+      margin-left: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0;
+    }
+    .header .meta .artist span,
+    .header .meta .title span {
+      white-space: wrap !important;
+    }
+    .buttons,
+    .volume {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .meta {
+      display: flex;
+      flex-direction: column;
+    }
+    /* above location, below appearance */
+    .header {
+      .title {
+        font-weight: 600;
+        color: var(--ha-color-text-primary);
+      }
+      .status {
+        font-size: 0.75rem;
+        letter-spacing: 0.16em;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.55);
+        color: rgba(0,0,0,0.65);
+      }
+    }
+    .meta {
+      padding-top: 13px;
+      gap: 5px;
+      .title {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--ha-color-text-primary);
+      }
+      .artist {
+        font-size: 0.9rem;
+        opacity: 0.55;
+        color: var(--ha-color-text-primary);
+      }
+      .playlist, .album {
+        font-size: 0.6rem;
+        opacity: 0.55;
+      }
+    }
+    .prev span, .next span {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.75);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .playPause span {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: #1e88e5;
+      box-shadow: 0 6px 16px rgba(30,136,229,0.35);
+    }
+    .ctrl-value {
+      opacity: 0.55;
+      font-size: 12px;
+      width: 25px;
+    }
+    .slider {
+      margin-top: 6px
+    }
+    .volume {
+      margin-top: 3px
+    }
+    .options {
+      display: flex
+    }
+    .repeat .info,
+    .shuffle .info{
+      opacity: 0.55;
+      font-size: 12px;
+      width: 67px;
+      display: inline-block;
+    }
+  </style>
+  <div class="fcc-media-player">
+    <div class="main">
+      <div class="header">
+        <span class="title">
+          <fcc row="1" col="1" />
+        </span>
+        <span class="status">
+          <fcc row="2" col="1" />
+        </span>
+        <div class="meta" style="<fcc mode="text" row="21" col="1" />">
+          <span class="title">
+            <fcc row="3" col="1" />
+          </span>
+          <span class="artist">
+            <fcc row="4" col="1" />
+          </span>
+          <span class="album">
+            Album:
+            <fcc row="19" col="1" />
+          </span>
+          <span class="playlist">
+            <fcc row="20" col="1" />
+            <fcc row="14" col="1" />
+          </span>
+        </div>
+      </div>
+
+      <div class="ctrl" style="<fcc mode="text" row="21" col="1" />">
+        <div class="buttons">
+          <span class="prev">
+            <fcc row="5" col="1" />
+          </span>
+          <span class="playPause">
+            <fcc row="6" col="1" />
+          </span>
+          <span class="next">
+            <fcc row="7" col="1" />
+          </span>
+        </div>
+        <div class="volume">
+          <span class="icon">
+            <fcc row="8" col="1" />
+          </span>
+          <span class="slider">
+            <fcc row="9" col="1" />
+          </span>
+        </div>
+        <div class="options">
+          <div class="repeat">
+            <fcc row="10" col="1" />
+            <fcc row="11" col="1" />
+            <fcc row="12" col="1" />
+            <span class="info">
+              repeat: 
+              <fcc row="13" col="1" />
+            </span>
+          </div>
+          <div class="shuffle">
+              <fcc row="15" col="1" />
+              <fcc row="18" col="1" />
+              <span class="info">
+                shuffle:
+                <fcc row="16" col="1" />
+                <fcc row="17" col="1" />
+              </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+type: custom:flex-cells-card
+hide_separators_on_sort: false
+sort_desc: false
+zebra_ignore_separators: false

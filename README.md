@@ -16,8 +16,8 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 - Per-cell **alignment**, **text transform**, **color**, **size**, **letter spacing**
 - Entities with unit handling and optional precision
 - Visual editor, drag-and-drop rows/columns, zebra rows, responsive columns
-- **HTML templates** thanks to which the card can look exactly as you want (HTML and CSS knowledge required).
-- Each cell and row allows you to configure **custom CSS**, you don't need to use "card_mod" for this.
+- **HTML templates** thanks to which the card can look exactly as you want (HTML and CSS knowledge required)
+- Each cell and row allows you to configure **custom CSS**, you don't need to use "card_mod" for this
 
 ## Installation
 
@@ -62,13 +62,66 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
+## Templates
+  - Templates, in addition to standard HTML tags, support their own tag:  
+    `<fcc row="3" col="5" />` - inserts the selected cell  
+    `<fcc row="3" />` - inserts the selected row  
+    `<fcc />` - inserts the entire table, which looks the same as without templates. This allows you to write custom CSS for the entire table:  
+    ```
+    <style>
+      ...
+    </style>
+    <fcc />
+    ```
+  - If you want a non-fcc-table element to be dynamic (for example, `<div>`), you can use the `mode="text"` attribute (alias `as="text"`) for a text-type cell. For example, you can set a dynamic rule like this:  
+    ```
+    - cells:
+        - type: string
+          value: "display: none;"
+          align: left
+          style:
+            text_transform: ""
+          dyn_color:
+            - entity: light.hue_bulb
+              attr: ""
+              op: "="
+              val: "on"
+              bg: ""
+              fg: ""
+              overwrite: text
+              overwrite_entity: ""
+              overwrite_attr: ""
+              text: "display: flex;"
+    ```
+    to use this cell like this:  
+    ```
+    <div style="<fcc mode="text" row="22" col="1" />">
+        test
+    <div>
+    ```
+  - The appearance and rules assigned to cells/rows should work in templates.
+
+## Examples
+  - [Temperature/Humidity](./examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value.  
+  
+    [![media player](examples/temperature-humidity-table/images/dark_300.png)](./examples/temperature-humidity-table/temperature-humidity.md)
+    [![media player](examples/temperature-humidity-table/images/light_300.png)](./examples/temperature-humidity-table/temperature-humidity.md)
+  - [Media Player (template)](./examples/media-player-template/media-player.md) - FCC template example (HTML, CSS).  
+
+    [![media player](examples/media-player-template/images/small_dark_300.png)](./examples/media-player-template/media-player.md)
+    [![media player](examples/media-player-template/images/small_light_300.png)](./examples/media-player-template/media-player.md)
+  - More examples coming soon.
+
 ## Changelog
-- v0.15.0-beta.2 (Pre-release) —
+- v0.15.0 —
   - Added **custom HTML templates**.
   - Added **custom CSS** for cells and rows (also works in templates), "card_mod" is no longer needed!
-  - Added support for "mode" variable for input_number.
+  - Added **new domains**. The existing list of domains (input_boolean, input_number, input_select, input_button, input_datetime, input_text) that the editor considers as "input controls" has been expanded with new ones: **switch, number, select, button, datetime, date, time, text**.
+  - Added **REL and REL_SHORT tokens** in the "Date/Time format & Text override" field, they return a localized description of the time elapsed (full and short).
+  - Added support for "mode" variable for input_number. Now you can render a box in addition to the slider.
   - Added ability to hide values next to the slider (input_number).
-  - Improved "Nothing" behavior in Tap & Hold Actions.
+  - Improved "Nothing" behavior in "Tap & Hold Actions".
+  - Fixed separator width when breakpoint hides column.
   - Improved clickable area on "Show control" and "Use unit from entity" labels.
 - v0.14.0 —
   - Added **column merging**.

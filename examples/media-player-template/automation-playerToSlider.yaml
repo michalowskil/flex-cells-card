@@ -1,0 +1,35 @@
+alias: Spotify volume - player to slider
+description: ""
+triggers:
+  - entity_id: media_player.spotify_lukasz
+    attribute: volume_level
+    trigger: state
+conditions:
+  - condition: template
+    value_template: >-
+      {{ state_attr('media_player.spotify_lukasz','volume_level') is not none
+      }}
+  - condition: template
+    value_template: >
+      {% set player =
+      (state_attr('media_player.spotify_lukasz','volume_level')|float(0)*100)|int
+      %} {% set stored = states('input_number.spotify_volume_state')|int %} {{
+      (player - stored) | abs > 1 }}
+actions:
+  - variables:
+      player_percent: >
+        {{
+        (state_attr('media_player.spotify_lukasz','volume_level')|float(0)*100)|round(0)
+        }}
+  - target:
+      entity_id: input_number.spotify_volume_state
+    data:
+      value: "{{ player_percent }}"
+    action: input_number.set_value
+  - target:
+      entity_id: input_number.spotify_volume_slider
+    data:
+      value: "{{ player_percent }}"
+    action: input_number.set_value
+mode: queued
+max: 10

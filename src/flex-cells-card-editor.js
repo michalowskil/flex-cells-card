@@ -262,11 +262,19 @@ class FlexCellsCardEditor extends LitElement {
     const domain = (id.split ? id.split('.')[0] : '');
     const allowed = [
       'input_boolean',
+      'switch',
       'input_number',
+      'number',
       'input_select',
+      'select',
       'input_button',
+      'button',
       'input_datetime',
-      'input_text'
+      'datetime',
+      'date',
+      'time',
+      'input_text',
+      'text'
     ];
     return allowed.includes(domain);
   }
@@ -1756,8 +1764,9 @@ class FlexCellsCardEditor extends LitElement {
                     const entityDomain = entityId && entityId.split ? entityId.split('.')[0] : '';
                     const entityState = entityId ? this._getStateObject(entityId) : undefined;
                     const entityModeRaw = entityState?.attributes?.mode;
-                    const isInputNumber = entityDomain === 'input_number';
-                    const isInputNumberSlider = isInputNumber && (!entityModeRaw || String(entityModeRaw) === 'slider');
+                    const entityMode = typeof entityModeRaw === 'string' ? entityModeRaw.trim().toLowerCase() : '';
+                    const isNumberEntity = entityDomain === 'input_number' || entityDomain === 'number';
+                    const isNumberSlider = isNumberEntity && (!entityMode || entityMode === 'slider' || entityMode === 'auto');
                     const showValueRightChecked = cell.show_control_value_right !== false;
                     const rowRules = Array.isArray(row?.dyn_row_rules) ? row.dyn_row_rules : [];
                     const rowCustomCssEnabled = !!row.custom_css_enabled;
@@ -1852,17 +1861,17 @@ class FlexCellsCardEditor extends LitElement {
                         <!-- KONTROLKA ZAMIAST WARTOŚCI -->
                         ${ this._isSimpleControlEntity(cell) ? html`
                           <div class="cell-grid cell-wide">
-                            <div class="option full option-stack">
-                              <label>
-                                <input type="checkbox"
-                                       .checked=${!!cell.show_control}
-                                       @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
-                                <span>${t(this.hass,"editor.show_control")}</span>
-                              </label>
-                              ${(cell.show_control && isInputNumberSlider) ? html`
+                              <div class="option full option-stack">
                                 <label>
                                   <input type="checkbox"
-                                         .checked=${showValueRightChecked}
+                                        .checked=${!!cell.show_control}
+                                        @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
+                                  <span>${t(this.hass,"editor.show_control")}</span>
+                                </label>
+                                ${(cell.show_control && isNumberSlider) ? html`
+                                  <label>
+                                    <input type="checkbox"
+                                           .checked=${showValueRightChecked}
                                          @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
                                   <span>${t(this.hass,"editor.show_value_on_right")}</span>
                                 </label>

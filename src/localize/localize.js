@@ -51,7 +51,7 @@ const DICTS = {
       add_row: "Add row",
       add_separator: "Add separator",
       custom_template: "Custom template (beta)",
-      custom_template_hint: "Use any HTML and the tag <fcc row=\"3\" col=\"2\" /> to insert a cell from a table, or <fcc row=\"3\" /> to insert an entire row.",
+      custom_template_hint: "Use any HTML and the tag <fcc row=\"3\" col=\"2\" /> to insert a cell from a table, or <fcc row=\"3\" /> to insert an entire row. If you want to use global CSS, do this: <style>...</style><fcc />.",
       delete_row: "Delete row",
       separator_title: "Separator",
       separator_appearance: "Separator appearance",
@@ -101,14 +101,14 @@ const DICTS = {
       dynamic_row_title: "Dynamic Rules (row): Color & Row Hiding",
       dynamic_hint: "Evaluate rules from top to bottom, the last match wins.",
       datetime_format: "Date/Time format & Text override",
-      available_tokens: "Available tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [literals in brackets]",
+      available_tokens: "Available tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (elapsed time), REL_SHORT (short elapsed time), [literals in brackets]",
       value: "Value"
     },
     placeholder: {
       entity: "Select entity",
       string: "Text to display",
       icon: "mdi:icon-name",
-      datetime_format: "e.g. H:mm:ss, YYYY-MM-DD H:mm or [Custom text]",
+      datetime_format: "e.g. H:mm:ss, YYYY-MM-DD H:mm, REL [ago], REL_SHORT [ago] or [Custom text]",
       attribute_path: "Metadata path (e.g. a.b[0].c)"
     },
     dynamic: {
@@ -204,7 +204,7 @@ const DICTS = {
       add_row: "Dodaj wiersz",
       add_separator: "Dodaj separator",
       custom_template: "Własny szablon (beta)",
-      custom_template_hint: "Użyj dowolnego HTML oraz tagu <fcc row=\"3\" col=\"2\" /> aby wstawić komorkę z tabeli, lub <fcc row=\"3\" /> aby wstawić cały wiersz.",
+      custom_template_hint: "Użyj dowolnego HTML oraz tagu <fcc row=\"3\" col=\"2\" /> aby wstawić komorkę z tabeli, lub <fcc row=\"3\" /> aby wstawić cały wiersz. Jeśli chcesz użyć globalnego CSS to zrób tak: <style>...</style><fcc />.",
       delete_row: "Usuń wiersz",
       separator_title: "Separator",
       separator_appearance: "Wyglad separatora",
@@ -254,14 +254,14 @@ const DICTS = {
       dynamic_row_title: "Reguły dynamiczne (wiersz): kolor i ukrywanie wiersza",
       dynamic_hint: "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa.",
       datetime_format: "Format daty/czasu i nadpisanie tekstu",
-      available_tokens: "Dostępne tokeny: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [literały w nawiasach]",
+      available_tokens: "Dostępne tokeny: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (czas, który upłynął), REL_SHORT (skrót czasu), [literały w nawiasach]",
       value: "Wartość"
     },
     placeholder: {
       entity: "Wybierz encję",
       string: "Tekst do wyświetlenia",
       icon: "mdi:nazwa-ikony",
-      datetime_format: "np. H:mm:ss, YYYY-MM-DD H:mm lub [dowolny tekst]",
+      datetime_format: "np. H:mm:ss, YYYY-MM-DD H:mm, REL [temu], REL_SHORT [temu] lub [dowolny tekst]",
       attribute_path: "Ścieżka metadanych (np. a.b[0].c)"
     },
     dynamic: {
@@ -357,7 +357,7 @@ const DICTS = {
       add_row: "Zeile hinzufügen",
       add_separator: "Separator hinzufuegen",
       custom_template: "Eigenes Template (Beta)",
-      custom_template_hint: "Nutze beliebiges HTML und den Tag <fcc row=\"3\" col=\"2\" /> um eine Tabellenzelle einzufügen, oder <fcc row=\"3\" /> um die vollständige Zeile einzufügen.",
+      custom_template_hint: "Nutze beliebiges HTML und den Tag <fcc row=\"3\" col=\"2\" /> um eine Tabellenzelle einzufügen, oder <fcc row=\"3\" /> um die vollständige Zeile einzufügen. Wenn Sie globales CSS verwenden möchten, gehen Sie wie folgt vor: <style>...</style><fcc />.",
       delete_row: "Zeile löschen",
       separator_title: "Separator",
       separator_appearance: "Separator Darstellung",
@@ -407,14 +407,14 @@ const DICTS = {
       dynamic_row_title: "Dynamische Regeln (Zeile): Farben und Zeilenausblenden",
       dynamic_hint: "Regeln von oben nach unten prüfen, die letzte Übereinstimmung gewinnt.",
       datetime_format: "Datums-/Zeitformat & Textüberschreibung",
-      available_tokens: "Verfügbare Tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, [Literale in Klammern]",
+      available_tokens: "Verfügbare Tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (verstrichene Zeit), REL_SHORT (kompakte Zeit), [Literale in Klammern]",
       value: "Wert"
     },
     placeholder: {
       entity: "Entität auswählen",
       string: "Anzuzeigender Text",
       icon: "mdi:icon-name",
-      datetime_format: "z. B. H:mm:ss, YYYY-MM-DD H:mm oder [eigener Text]",
+      datetime_format: "z. B. H:mm:ss, YYYY-MM-DD H:mm, REL [vor], REL_SHORT [vor] oder [eigener Text]",
       attribute_path: "Metadatenpfad (z. B. a.b[0].c)"
     },
     dynamic: {
