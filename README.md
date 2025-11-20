@@ -116,6 +116,8 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - More examples coming soon.
 
 ## Changelog
+- v0.16.0 —
+  - Added **advanced copy and paste** of table configuration.
 - v0.15.0 —
   - Added **custom HTML templates**.
   - Added **custom CSS** for cells and rows (also works in templates), "card_mod" is no longer needed!

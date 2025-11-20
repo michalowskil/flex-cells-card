@@ -63,6 +63,19 @@ class FlexCellsCardEditor extends LitElement {
     .option.option-stack label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; }
     .option.option-stack label span { flex: 1 1 auto; }
     .option.option-stack label + label { margin-top: 4px; }
+    .copy-section { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+    .copy-group {
+      border: 1px solid var(--divider-color, #ddd);
+      border-radius: 10px;
+      background: var(--card-background-color, #fff);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .copy-group-title { font-weight: 600; font-size: 13px; }
+    .copy-group-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .muted.copy-summary { margin: 0; }
 
     .tabs { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
     .tab {
@@ -361,7 +374,8 @@ class FlexCellsCardEditor extends LitElement {
       custom_template_html: ''
     };
     this._activeTabs = {};
-    this._clipboardCell = null;
+    this._clipboardCell = this._createClipboardBucket();
+    this._clipboardRow = this._createClipboardBucket();
     this._collapsed = [];
     this._dragIndex = null;
     this._dragOverIndex = null;
@@ -494,7 +508,19 @@ class FlexCellsCardEditor extends LitElement {
     } catch (_e) {}
   }
 
-  _clone(x){ return JSON.parse(JSON.stringify(x)); }
+  _clone(x){
+    if (x === null || typeof x !== 'object') return x;
+    if (Array.isArray(x)) return x.map((item) => this._clone(item));
+    const out = {};
+    Object.keys(x).forEach((key) => {
+      out[key] = this._clone(x[key]);
+    });
+    return out;
+  }
+
+  _createClipboardBucket(){
+    return { full: null, appearance: null, rules: null, actions: null };
+  }
 
   _defaultSeparator() {
     return {
@@ -969,30 +995,248 @@ class FlexCellsCardEditor extends LitElement {
 
 
   _setActiveTab(rowIdx,tab){ this._activeTabs={...this._activeTabs,[rowIdx]:tab}; this.requestUpdate(); }
-  _copyActiveCell(rowIdx){
-    const row=this.config.rows?.[rowIdx]; if(!row) return;
-    const colCount=this.config.column_count||1;
-    const merge=!!row.merge_columns;
-    const active=merge?0:Math.min(this._activeTabs[rowIdx]||0,colCount-1);
-    const cell=row.cells?.[active]; if(!cell) return;
-    this._clipboardCell=this._clone(cell); this.requestUpdate();
+
+  _resolveActiveCell(rowIdx){
+    const row = this.config.rows?.[rowIdx];
+    if (!row || (row?.type || '') === 'separator') return null;
+    const colCount = this.config.column_count || 1;
+    const merge = !!row.merge_columns;
+    const index = merge ? 0 : Math.min(this._activeTabs[rowIdx] || 0, colCount - 1);
+    const cell = row.cells?.[index];
+    return { row, index, cell };
   }
-  _pasteToActiveCell(rowIdx){
-    if(!this._clipboardCell) return;
-    const row=this.config.rows?.[rowIdx]; if(!row) return;
-    const colCount=this.config.column_count||1;
-    const merge=!!row.merge_columns;
-    const active=merge?0:Math.min(this._activeTabs[rowIdx]||0,colCount-1);
-    const clone=this._clone(this._clipboardCell);
-    const rows=[...this.config.rows];
-    const current={...row};
-    const cells=Array.isArray(current.cells)?[...current.cells]:[];
-    cells[active]=clone; current.cells=cells; rows[rowIdx]=current;
-    this.config={...this.config, rows}; this._fireConfigChanged();
-    if (Array.isArray(this._fullCells) && this._fullCells[rowIdx]) {
-      const full=[...this._fullCells[rowIdx]]; if (active>=full.length) { for(let i=full.length;i<=active;i++) full[i]={type:'string',value:'',align:'right'}; }
-      full[active]=this._clone(clone); this._fullCells[rowIdx]=full;
+
+  _extractCellAppearance(cell){
+    if (!cell) return null;
+    return {
+      align: cell.align,
+      use_entity_unit: cell.use_entity_unit,
+      unit: cell.unit,
+      precision: cell.precision,
+      custom_css_enabled: cell.custom_css_enabled,
+      custom_css: cell.custom_css,
+      style: cell.style ? this._clone(cell.style) : undefined,
+    };
+  }
+
+  _applyCellAppearance(rowIdx, cellIdx, appearance){
+    if (!appearance || rowIdx === null || rowIdx === undefined || cellIdx === null || cellIdx === undefined) return;
+    const has = (key) => Object.prototype.hasOwnProperty.call(appearance, key);
+    const patch = {};
+    if (has('align')) patch.align = appearance.align;
+    if (has('use_entity_unit')) patch.use_entity_unit = appearance.use_entity_unit;
+    if (has('unit')) patch.unit = appearance.unit;
+    if (has('precision')) patch.precision = appearance.precision;
+    if (has('custom_css_enabled')) patch.custom_css_enabled = appearance.custom_css_enabled;
+    if (has('custom_css')) patch.custom_css = appearance.custom_css;
+    if (has('style')) patch.style = appearance.style ? this._clone(appearance.style) : appearance.style;
+    this._patchCell(rowIdx, cellIdx, patch);
+  }
+
+  _extractCellActions(cell){
+    if (!cell) return null;
+    const clean = (action) => (action && typeof action === 'object' ? this._clone(action) : undefined);
+    return {
+      tap_action: clean(cell.tap_action),
+      hold_action: clean(cell.hold_action),
+      double_tap_action: clean(cell.double_tap_action),
+    };
+  }
+
+  _applyCellActions(rowIdx, cellIdx, actions){
+    if (!actions || rowIdx === null || rowIdx === undefined || cellIdx === null || cellIdx === undefined) return;
+    const patch = {};
+    const set = (key) => {
+      if (Object.prototype.hasOwnProperty.call(actions, key)) {
+        patch[key] = actions[key] ? this._clone(actions[key]) : undefined;
+      }
+    };
+    set('tap_action');
+    set('hold_action');
+    set('double_tap_action');
+    this._patchCell(rowIdx, cellIdx, patch);
+  }
+
+  _clipboardSummary(clip){
+    if (!clip) return '';
+    const scopes = [];
+    if (clip.full) scopes.push('full');
+    if (clip.appearance) scopes.push('appearance');
+    if (clip.rules) scopes.push('rules');
+    if (clip.actions) scopes.push('actions');
+    if (!scopes.length) return t(this.hass, 'editor.clipboard_empty');
+    const label = (scope) => t(this.hass, `editor.clipboard_scope_${scope}`);
+    return scopes.map((scope) => label(scope)).join(', ');
+  }
+
+  _copyActiveCell(rowIdx){
+    const resolved = this._resolveActiveCell(rowIdx);
+    if (!resolved?.cell) return;
+    this._clipboardCell.full = this._clone(resolved.cell);
+    this.requestUpdate();
+  }
+
+  _copyCellAppearance(rowIdx){
+    const resolved = this._resolveActiveCell(rowIdx);
+    if (!resolved?.cell) return;
+    this._clipboardCell.appearance = this._extractCellAppearance(resolved.cell);
+    this.requestUpdate();
+  }
+
+  _copyCellRules(rowIdx){
+    const resolved = this._resolveActiveCell(rowIdx);
+    if (!resolved) return;
+    const rules = this._getCellRules(rowIdx, resolved.index);
+    this._clipboardCell.rules = this._clone(rules);
+    this.requestUpdate();
+  }
+
+  _copyCellActions(rowIdx){
+    const resolved = this._resolveActiveCell(rowIdx);
+    if (!resolved?.cell) return;
+    this._clipboardCell.actions = this._extractCellActions(resolved.cell);
+    this.requestUpdate();
+  }
+
+  _assignFullCell(rowIdx, cellIdx, cellData){
+    if (!cellData || rowIdx === null || rowIdx === undefined || cellIdx === null || cellIdx === undefined) return;
+    const rows = Array.isArray(this.config.rows) ? [...this.config.rows] : [];
+    if (!rows[rowIdx] || (rows[rowIdx]?.type || '') === 'separator') return;
+    const current = { ...(rows[rowIdx] || {}) };
+    const cells = Array.isArray(current.cells) ? [...current.cells] : [];
+    const clone = this._clone(cellData);
+    cells[cellIdx] = clone;
+    current.cells = cells;
+    rows[rowIdx] = current;
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged();
+    if (!Array.isArray(this._fullCells)) this._fullCells = [];
+    if (!Array.isArray(this._fullCells[rowIdx])) this._fullCells[rowIdx] = [];
+    const full = [...this._fullCells[rowIdx]];
+    if (cellIdx >= full.length) {
+      for (let i = full.length; i <= cellIdx; i += 1) full[i] = { type: 'string', value: '', align: 'right' };
     }
+    full[cellIdx] = this._clone(clone);
+    this._fullCells[rowIdx] = full;
+  }
+
+  _applyClipboardCellScope(rowIdx, cellIdx, scope = 'full'){
+    if (rowIdx === null || rowIdx === undefined || cellIdx === null || cellIdx === undefined) return;
+    const bucket = scope === 'full' ? 'full' : scope;
+    const clip = this._clipboardCell?.[bucket];
+    if (!clip) return;
+
+    if (scope === 'appearance') {
+      this._applyCellAppearance(rowIdx, cellIdx, clip);
+      return;
+    }
+
+    if (scope === 'rules') {
+      this._setCellRules(rowIdx, cellIdx, this._clone(clip));
+      return;
+    }
+
+    if (scope === 'actions') {
+      this._applyCellActions(rowIdx, cellIdx, clip);
+      return;
+    }
+
+    this._assignFullCell(rowIdx, cellIdx, clip);
+  }
+
+  _pasteToActiveCell(rowIdx, scope = 'full'){
+    const resolved = this._resolveActiveCell(rowIdx);
+    if (!resolved) return;
+    this._applyClipboardCellScope(rowIdx, resolved.index, scope);
+  }
+
+  _pasteCellAppearance(rowIdx){
+    this._pasteToActiveCell(rowIdx, 'appearance');
+  }
+
+  _pasteCellRules(rowIdx){
+    this._pasteToActiveCell(rowIdx, 'rules');
+  }
+
+  _pasteCellActions(rowIdx){
+    this._pasteToActiveCell(rowIdx, 'actions');
+  }
+
+  _applyClipboardCellBulk(rowIdx, target, scope = 'full'){
+    const bucket = scope === 'full' ? 'full' : scope;
+    if (!this._clipboardCell?.[bucket]) return;
+
+    if (target === 'column') {
+      const resolved = this._resolveActiveCell(rowIdx);
+      if (!resolved) return;
+      const columnIdx = resolved.index;
+      (this.config.rows || []).forEach((row, idx) => {
+        if (!row || (row.type || '') === 'separator') return;
+        if (row.merge_columns && columnIdx > 0) return;
+        this._applyClipboardCellScope(idx, columnIdx, scope);
+      });
+      return;
+    }
+
+    const row = this.config.rows?.[rowIdx];
+    if (!row || (row.type || '') === 'separator') return;
+    const baseCount = Array.isArray(row.cells) ? row.cells.length : 0;
+    const colCount = row.merge_columns ? 1 : Math.max(this.config.column_count || 1, baseCount || 1);
+    for (let col = 0; col < colCount; col += 1) this._applyClipboardCellScope(rowIdx, col, scope);
+  }
+
+  _copyRow(rowIdx){
+    const row = this.config.rows?.[rowIdx];
+    if (!row || (row?.type || '') === 'separator') return;
+    this._clipboardRow.full = this._clone(row);
+    this.requestUpdate();
+  }
+
+  _pasteRow(rowIdx){
+    const clip = this._clipboardRow?.full;
+    if (!clip) return;
+    const rows = [...(this.config.rows || [])];
+    if (!rows[rowIdx] || (rows[rowIdx]?.type || '') === 'separator') return;
+    const normalized = this._ensureCells(this._clone(clip), this.config.column_count || 1);
+    rows[rowIdx] = normalized;
+    this.config = { ...this.config, rows };
+    if (!Array.isArray(this._fullCells)) this._fullCells = [];
+    this._fullCells[rowIdx] = normalized.cells.map((c) => this._clone(c));
+    this._fireConfigChanged();
+  }
+
+  _copyRowAppearance(rowIdx){
+    const row = this.config.rows?.[rowIdx];
+    if (!row || (row?.type || '') === 'separator') return;
+    this._clipboardRow.appearance = {
+      custom_css_enabled: row.custom_css_enabled,
+      custom_css: row.custom_css,
+    };
+    this.requestUpdate();
+  }
+
+  _pasteRowAppearance(rowIdx){
+    const clip = this._clipboardRow?.appearance;
+    if (!clip) return;
+    const patch = {};
+    const has = (key) => Object.prototype.hasOwnProperty.call(clip, key);
+    if (has('custom_css_enabled')) patch.custom_css_enabled = clip.custom_css_enabled;
+    if (has('custom_css')) patch.custom_css = clip.custom_css;
+    this._patchRow(rowIdx, patch);
+  }
+
+  _copyRowRules(rowIdx){
+    const row = this.config.rows?.[rowIdx];
+    if (!row || (row?.type || '') === 'separator') return;
+    const rules = this._getRowRules(rowIdx);
+    this._clipboardRow.rules = this._clone(rules);
+    this.requestUpdate();
+  }
+
+  _pasteRowRules(rowIdx){
+    const clip = this._clipboardRow?.rules;
+    if (!clip) return;
+    this._setRowRules(rowIdx, this._clone(clip));
   }
   _toggleMergeColumns(rowIdx,e){
     const checked=!!e.target.checked;
@@ -1745,12 +1989,6 @@ class FlexCellsCardEditor extends LitElement {
                       @change=${(e)=>this._toggleMergeColumns(rIdx,e)} />
                     <span>${t(this.hass,"editor.merge_all_columns")}</span>
                   </label>
-                  <div class="flex" style="gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;">
-                    <button @click=${() => this._copyActiveCell(rIdx)}>${t(this.hass,"editor.copy")}</button>
-                    <button ?disabled=${!this._clipboardCell} @click=${() => this._pasteToActiveCell(rIdx)}>${t(this.hass,"editor.paste")}</button>
-                    <span class="muted">${this._clipboardCell ? `Clipboard: ${this._clipboardCell.type}` : t(this.hass,"editor.clipboard_empty")}</span>
-                  </div>
-
                   ${(() => {
                     const cIdx = mergeColumns ? 0 : active;
                     const cell = row.cells?.[cIdx] ?? { type: 'string', value: '', align: 'right' };
@@ -2524,6 +2762,78 @@ class FlexCellsCardEditor extends LitElement {
                                 @input=${(e)=>this._updateRowCustomCss(rIdx, e)}>
                               </textarea>
                             ` : nothing}
+                          </div>
+                        </div>
+                      </details>
+
+                      <div style="border-top:1px solid var(--divider-color, #e0e0e0); margin:16px 0 12px;"></div>
+
+                      <details style="margin-top:0;">
+                        <summary style="cursor:pointer;font-weight:600;">
+                          ${t(this.hass, 'editor.copy_paste_section')}
+                        </summary>
+
+                        <div class="copy-section">
+                          <div class="copy-group">
+                            <div class="copy-group-title">${t(this.hass, 'editor.copy_row_group')}</div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyRow(rIdx)}>${t(this.hass,'editor.copy_row')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardRow?.full} @click=${() => this._pasteRow(rIdx)}>${t(this.hass,'editor.paste_row')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyRowAppearance(rIdx)}>${t(this.hass,'editor.copy_row_appearance')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardRow?.appearance} @click=${() => this._pasteRowAppearance(rIdx)}>${t(this.hass,'editor.paste_row_appearance')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyRowRules(rIdx)}>${t(this.hass,'editor.copy_row_rules')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardRow?.rules} @click=${() => this._pasteRowRules(rIdx)}>${t(this.hass,'editor.paste_row_rules')}</button>
+                            </div>
+                            <div class="muted copy-summary">
+                              ${t(this.hass,'editor.clipboard_row_label')}: ${this._clipboardSummary(this._clipboardRow)}
+                            </div>
+                          </div>
+
+                          <div class="copy-group">
+                            <div class="copy-group-title">${t(this.hass, 'editor.copy_cell_group')}</div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyActiveCell(rIdx)}>${t(this.hass,'editor.copy_cell')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.full} @click=${() => this._pasteToActiveCell(rIdx)}>${t(this.hass,'editor.paste_cell')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyCellAppearance(rIdx)}>${t(this.hass,'editor.copy_cell_appearance')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.appearance} @click=${() => this._pasteCellAppearance(rIdx)}>${t(this.hass,'editor.paste_cell_appearance')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyCellRules(rIdx)}>${t(this.hass,'editor.copy_cell_rules')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.rules} @click=${() => this._pasteCellRules(rIdx)}>${t(this.hass,'editor.paste_cell_rules')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" @click=${() => this._copyCellActions(rIdx)}>${t(this.hass,'editor.copy_cell_actions')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.actions} @click=${() => this._pasteCellActions(rIdx)}>${t(this.hass,'editor.paste_cell_actions')}</button>
+                            </div>
+                            <div class="muted copy-summary">
+                              ${t(this.hass,'editor.clipboard_cell_label')}: ${this._clipboardSummary(this._clipboardCell)}
+                            </div>
+                          </div>
+
+                          <div class="copy-group">
+                            <div class="copy-group-title">${t(this.hass, 'editor.copy_multi_cell_group')}</div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" ?disabled=${!this._clipboardCell?.full} @click=${() => this._applyClipboardCellBulk(rIdx, 'column', 'full')}>${t(this.hass,'editor.paste_cell_column')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.full} @click=${() => this._applyClipboardCellBulk(rIdx, 'row', 'full')}>${t(this.hass,'editor.paste_cell_row')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" ?disabled=${!this._clipboardCell?.appearance} @click=${() => this._applyClipboardCellBulk(rIdx, 'column', 'appearance')}>${t(this.hass,'editor.paste_cell_appearance_column')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.appearance} @click=${() => this._applyClipboardCellBulk(rIdx, 'row', 'appearance')}>${t(this.hass,'editor.paste_cell_appearance_row')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" ?disabled=${!this._clipboardCell?.rules} @click=${() => this._applyClipboardCellBulk(rIdx, 'column', 'rules')}>${t(this.hass,'editor.paste_cell_rules_column')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.rules} @click=${() => this._applyClipboardCellBulk(rIdx, 'row', 'rules')}>${t(this.hass,'editor.paste_cell_rules_row')}</button>
+                            </div>
+                            <div class="copy-group-buttons">
+                              <button class="mini" ?disabled=${!this._clipboardCell?.actions} @click=${() => this._applyClipboardCellBulk(rIdx, 'column', 'actions')}>${t(this.hass,'editor.paste_cell_actions_column')}</button>
+                              <button class="mini" ?disabled=${!this._clipboardCell?.actions} @click=${() => this._applyClipboardCellBulk(rIdx, 'row', 'actions')}>${t(this.hass,'editor.paste_cell_actions_row')}</button>
+                            </div>
                           </div>
                         </div>
                       </details>
