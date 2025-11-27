@@ -63,7 +63,7 @@ class FlexCellsCard extends LitElement {
     }
     .wrap { width: 100%; border-radius: inherit; overflow: hidden; }
     .scroller { width: 100%; display: block; }
-    .datatable { width: 100%; border-collapse: collapse; }
+    .datatable { width: auto; min-width: 100%; border-collapse: collapse; }
     td, th { padding: 0; vertical-align: middle; white-space: nowrap; }
     thead th {
       font-weight: 700; text-align: left;
@@ -712,13 +712,18 @@ class FlexCellsCard extends LitElement {
     return String(value).trim();
   }
 
-  _getDynamicEntityOverwriteValue(cell, dyn) {
-    if (!dyn || (dyn.overwrite || '').toLowerCase() !== 'entity') return '';
+  _normalizeDynamicEntityDisplay(mode) {
+    const raw = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
+    return raw === 'icon' || raw === 'icon_value' ? raw : 'value';
+  }
+
+  _resolveDynamicEntityOverwrite(cell, dyn) {
+    if (!dyn || (dyn.overwrite || '').toLowerCase() !== 'entity') return null;
     const fallbackEntity = cell?.type === 'entity' ? cell?.value : '';
     const targetEntity = dyn.overwrite_entity || dyn.entity || fallbackEntity || '';
-    if (!targetEntity) return '';
+    if (!targetEntity) return null;
     const stateObj = this.hass?.states?.[targetEntity];
-    if (!stateObj) return '';
+    if (!stateObj) return null;
     let attrPath = dyn.overwrite_attr !== undefined ? dyn.overwrite_attr : dyn.attr;
     if ((attrPath === undefined || attrPath === null || attrPath === '') && targetEntity === (cell?.value || '') && cell?.attribute) {
       attrPath = cell.attribute;
@@ -726,6 +731,16 @@ class FlexCellsCard extends LitElement {
     const stub = { type: 'entity', value: targetEntity };
     if (cell?.precision !== undefined) stub.precision = cell.precision;
     if (cell?.scale !== undefined) stub.scale = cell.scale;
+    if (dyn.overwrite_datetime_format !== undefined) stub.datetime_format = dyn.overwrite_datetime_format;
+    const setNumber = (key, raw) => {
+      if (raw === undefined || raw === null || raw === '') return;
+      const n = Number(raw);
+      if (Number.isFinite(n)) stub[key] = n;
+    };
+    setNumber('scale_in_min', dyn.overwrite_scale_in_min);
+    setNumber('scale_in_max', dyn.overwrite_scale_in_max);
+    setNumber('scale_out_min', dyn.overwrite_scale_out_min);
+    setNumber('scale_out_max', dyn.overwrite_scale_out_max);
     if (attrPath !== undefined && attrPath !== null && attrPath !== '') {
       stub.attribute = String(attrPath);
       stub.use_entity_unit = false;
@@ -733,7 +748,44 @@ class FlexCellsCard extends LitElement {
     } else if (dyn.overwrite_unit !== undefined) {
       stub.unit = dyn.overwrite_unit;
     }
-    return this._formatEntityCell(stub, stateObj);
+    const displayMode = this._normalizeDynamicEntityDisplay(dyn.overwrite_entity_display);
+    if (displayMode !== 'value') stub.entity_display = displayMode;
+    const display = this._formatEntityCell(stub, stateObj);
+    return { display, stateObj, mode: displayMode };
+  }
+
+  _getDynamicEntityOverwriteValue(cell, dyn) {
+    const resolved = this._resolveDynamicEntityOverwrite(cell, dyn);
+    return resolved ? resolved.display : '';
+  }
+
+  _renderDynamicEntityContent(cell, dyn, textDecoration) {
+    const resolved = this._resolveDynamicEntityOverwrite(cell, dyn);
+    if (!resolved) return null;
+    const mode = resolved.mode || 'value';
+    const textDisplay = resolved.display != null ? String(resolved.display) : '';
+    if (mode === 'icon' || mode === 'icon_value') {
+      const iconTemplate = this._renderEntityIconTemplate(cell, resolved.stateObj, dyn);
+      if (mode === 'icon') return iconTemplate || textDisplay;
+      let deco = textDecoration;
+      if (deco === undefined) {
+        const st = cell?.style || {};
+        const underline = st.underline === undefined ? false : !!st.underline;
+        const strike = !!st.strike;
+        const decos = [];
+        if (underline) decos.push('underline');
+        if (strike) decos.push('line-through');
+        deco = decos.length ? decos.join(' ') : 'none';
+      }
+      const decoStyle = deco && deco !== 'none' ? `text-decoration:${deco}` : '';
+      const textSpan = decoStyle
+        ? html`<span class="celltext" style=${decoStyle}>${textDisplay}</span>`
+        : html`<span class="celltext">${textDisplay}</span>`;
+      return iconTemplate
+        ? html`<span class="fc-entity-icon-text">${iconTemplate}${textSpan}</span>`
+        : textSpan;
+    }
+    return textDisplay;
   }
 
   _resolveDisplayWithDynamics(baseValue, dyn, cell) {
@@ -1310,111 +1362,137 @@ class FlexCellsCard extends LitElement {
       return this._resolveEntityValuePath(stObj, attrPath, tree);
     };
 
+    const normalizeConditions = (rule) => {
+      if (Array.isArray(rule?.conditions) && rule.conditions.length) return rule.conditions;
+      return [{ entity: rule?.entity, attr: rule?.attr, op: rule?.op, val: rule?.val, val2: rule?.val2, src: rule?.src }];
+    };
+    const normalizeMatch = (rule) => {
+      const raw = (rule?.match || rule?.condition_match || '').toLowerCase();
+      return (raw === 'any' || raw === 'or') ? 'any' : 'all';
+    };
+
     for (const r of rules) {
       if (!r || typeof r !== 'object') continue;
-      const op = r.op || '=';
-      let sourceVal;
-      let isThisEntity = false; // for rescale
+      const conds = normalizeConditions(r);
+      const matchMode = normalizeMatch(r);
 
-      if (r.entity) {
-        // NEW: always read from selected entity/attribute
-        const stObj = this.hass?.states?.[r.entity];
-        sourceVal = r.attr ? readAttr(stObj, r.attr) : stObj?.state;
-        isThisEntity = (type === 'entity' && r.entity === cell?.value);
-      } else if (r.src) {
-        // LEGACY support
-        const src = r.src || 'this_display';
-        if (src === 'this_display') {
-          sourceVal = displayText ?? (cell?.value ?? '');
-        } else if (src === 'this_state') {
-          if (type === 'entity') {
-            const stObj = this.hass?.states?.[cell?.value];
+      const evaluateCondition = (cond) => {
+        const op = (cond?.op || r.op || '=');
+        const condEntity = cond?.entity ?? r.entity;
+        const condAttr = cond?.attr ?? r.attr;
+        const condVal = cond?.val ?? r.val;
+        const condVal2 = cond?.val2 ?? r.val2;
+        const condSrc = cond?.src ?? r.src;
+        let sourceVal;
+        let isThisEntity = false; // for rescale
+
+        if (condEntity) {
+          const stObj = this.hass?.states?.[condEntity];
+          sourceVal = condAttr ? readAttr(stObj, condAttr) : stObj?.state;
+          isThisEntity = (type === 'entity' && condEntity === cell?.value);
+        } else if (condSrc) {
+          const src = condSrc || 'this_display';
+          if (src === 'this_display') {
+            sourceVal = displayText ?? (cell?.value ?? '');
+          } else if (src === 'this_state') {
+            if (type === 'entity') {
+              const stObj = this.hass?.states?.[cell?.value];
+              sourceVal = stObj?.state;
+            } else {
+              sourceVal = displayText ?? (cell?.value ?? '');
+            }
+          } else if (src === 'this_attr') {
+            if (type === 'entity') {
+              const stObj = this.hass?.states?.[cell?.value];
+              sourceVal = readAttr(stObj, condAttr);
+            }
+          } else if (src === 'other_state') {
+            const stObj = this.hass?.states?.[condEntity];
             sourceVal = stObj?.state;
+          } else if (src === 'other_attr') {
+            const stObj = this.hass?.states?.[condEntity];
+            sourceVal = readAttr(stObj, condAttr);
           } else {
             sourceVal = displayText ?? (cell?.value ?? '');
           }
-        } else if (src === 'this_attr') {
-          if (type === 'entity') {
-            const stObj = this.hass?.states?.[cell?.value];
-            sourceVal = readAttr(stObj, r.attr);
-          }
-        } else if (src === 'other_state') {
-          const stObj = this.hass?.states?.[r.entity];
-          sourceVal = stObj?.state;
-        } else if (src === 'other_attr') {
-          const stObj = this.hass?.states?.[r.entity];
-          sourceVal = readAttr(stObj, r.attr);
+          isThisEntity =
+            (type === 'entity') &&
+            (src === 'this_display' || src === 'this_state' || src === 'this_attr');
         } else {
+          // default: this cell visible value
           sourceVal = displayText ?? (cell?.value ?? '');
+          isThisEntity = (type === 'entity');
         }
-        isThisEntity =
-          (type === 'entity') &&
-          (src === 'this_display' || src === 'this_state' || src === 'this_attr');
-      } else {
-        // default: this cell visible value
-        sourceVal = displayText ?? (cell?.value ?? '');
-        isThisEntity = (type === 'entity');
+
+        const isNumOp = op === '>' || op === '>=' || op === '<' || op === '<=' || op === 'between';
+        let match = false;
+
+        if (isNumOp) {
+          let num = this._coerceNumber(sourceVal);
+          if (isThisEntity && Number.isFinite(num)) {
+            num = this._rescaleIfConfigured(cell, num);
+          }
+          if (!Number.isFinite(num)) {
+            match = false;
+          } else if (op === 'between') {
+            const a = this._coerceNumber(condVal);
+            const b = this._coerceNumber(condVal2);
+            if (Number.isFinite(a) && Number.isFinite(b)) {
+              const min = Math.min(a, b);
+              const max = Math.max(a, b);
+              match = (num >= min && num <= max);
+            } else {
+              match = false;
+            }
+          } else {
+            const ref = this._coerceNumber(condVal);
+            if (!Number.isFinite(ref)) {
+              match = false;
+            } else {
+              if (op === '>') match = num > ref;
+              else if (op === '>=') match = num >= ref;
+              else if (op === '<') match = num < ref;
+              else if (op === '<=') match = num <= ref;
+            }
+          }
+        } else if (op === 'contains' || op === 'not_contains') {
+          const s = String(sourceVal ?? '').toLowerCase();
+          const needle = String(condVal ?? '').toLowerCase();
+          match = s.includes(needle);
+          if (op === 'not_contains') match = !match;
+        } else {
+          const leftNum = this._coerceNumber(sourceVal);
+          const rightNum = this._coerceNumber(condVal);
+          if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
+            match = (leftNum === rightNum);
+          } else {
+            const a = String(sourceVal ?? '').toLowerCase();
+            const b = String(condVal ?? '').toLowerCase();
+            match = (a === b);
+          }
+          if (op === '!=') match = !match;
+        }
+
+        return !!match;
+      };
+
+      let matchesRule = matchMode === 'any' ? false : true;
+      for (const cond of conds) {
+        const condMatch = evaluateCondition(cond);
+        if (matchMode === 'any') {
+          if (condMatch) { matchesRule = true; break; }
+        } else {
+          if (!condMatch) { matchesRule = false; break; }
+        }
       }
 
-      // numeric operators
-      const isNumOp = op === '>' || op === '>=' || op === '<' || op === '<=' || op === 'between';
-      let match = false;
-
-      if (isNumOp) {
-        let num = this._coerceNumber(sourceVal);
-        if (isThisEntity && Number.isFinite(num)) {
-          num = this._rescaleIfConfigured(cell, num);
-        }
-        if (!Number.isFinite(num)) {
-          match = false;
-        } else if (op === 'between') {
-          const a = this._coerceNumber(r.val);
-          const b = this._coerceNumber(r.val2);
-          if (Number.isFinite(a) && Number.isFinite(b)) {
-            const min = Math.min(a, b);
-            const max = Math.max(a, b);
-            match = (num >= min && num <= max);
-          } else {
-            match = false;
-          }
-        } else {
-          const ref = this._coerceNumber(r.val);
-          if (!Number.isFinite(ref)) {
-            match = false;
-          } else {
-            if (op === '>') match = num > ref;
-            else if (op === '>=') match = num >= ref;
-            else if (op === '<') match = num < ref;
-            else if (op === '<=') match = num <= ref;
-          }
-        }
-      } else if (op === 'contains' || op === 'not_contains') {
-        const s = String(sourceVal ?? '').toLowerCase();
-        const needle = String(r.val ?? '').toLowerCase();
-        match = s.includes(needle);
-        if (op === 'not_contains') match = !match;
-      } else {
-        // '=' or '!=' : try numeric if both numeric, else case-insensitive string
-        const leftNum = this._coerceNumber(sourceVal);
-        const rightNum = this._coerceNumber(r.val);
-        if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
-          match = (leftNum === rightNum);
-        } else {
-          const a = String(sourceVal ?? '').toLowerCase();
-          const b = String(r.val ?? '').toLowerCase();
-          match = (a === b);
-        }
-        if (op === '!=') match = !match;
-      }
-
-      if (match) {
+      if (matchesRule) {
         if (r.bg) res.bg = r.bg;
         if (r.fg) res.fg = r.fg;
         if (r.visibility) {
           const visRaw = String(r.visibility).toLowerCase();
           if (visRaw === 'visible' || visRaw === 'hidden') res.visibility = visRaw;
         }
-        // New overwrite API
         const ow = (r.overwrite || '').toLowerCase();
         if (ow === 'hide') {
           res.hide = true;
@@ -1426,7 +1504,7 @@ class FlexCellsCard extends LitElement {
           res.overwrite = 'text';
           res.text = r.text || '';
         } else if (ow === 'icon') {
-          res.hide = true; // hide original
+          res.hide = true;
           res.overwrite = 'icon';
           res.icon = r.icon || '';
         } else if (ow === 'entity') {
@@ -1436,9 +1514,14 @@ class FlexCellsCard extends LitElement {
           else if (r.entity !== undefined) res.overwrite_entity = r.entity;
           if (r.overwrite_attr !== undefined) res.overwrite_attr = r.overwrite_attr;
           else if (r.attr !== undefined) res.overwrite_attr = r.attr;
+          if (r.overwrite_datetime_format !== undefined) res.overwrite_datetime_format = r.overwrite_datetime_format;
+          if (r.overwrite_entity_display !== undefined) res.overwrite_entity_display = r.overwrite_entity_display;
+          if (r.overwrite_scale_in_min !== undefined) res.overwrite_scale_in_min = r.overwrite_scale_in_min;
+          if (r.overwrite_scale_in_max !== undefined) res.overwrite_scale_in_max = r.overwrite_scale_in_max;
+          if (r.overwrite_scale_out_min !== undefined) res.overwrite_scale_out_min = r.overwrite_scale_out_min;
+          if (r.overwrite_scale_out_max !== undefined) res.overwrite_scale_out_max = r.overwrite_scale_out_max;
           if (r.overwrite_unit !== undefined) res.overwrite_unit = r.overwrite_unit;
         } else {
-          // Legacy support
           if (r.hide !== undefined) res.hide = !!r.hide;
           if (r.mask !== undefined) res.mask = r.mask;
         }
@@ -1613,8 +1696,8 @@ class FlexCellsCard extends LitElement {
       return dyn?.text ?? dyn?.mask ?? "";
     }
     if (overwrite === "entity") {
-      const dynamicValue = this._getDynamicEntityOverwriteValue(cell, dyn);
-      if (dynamicValue !== undefined && dynamicValue !== null && dynamicValue !== '') {
+      const dynamicValue = this._renderDynamicEntityContent(cell, dyn, textDecoration);
+      if (dynamicValue !== null && dynamicValue !== undefined && dynamicValue !== '') {
         return dynamicValue;
       }
       return dyn?.mask || "";
@@ -1875,9 +1958,9 @@ class FlexCellsCard extends LitElement {
       if (dyn && dyn.overwrite === 'icon') {
         content = dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '';
       } else if (dyn && dyn.overwrite === 'entity') {
-        const dynValue = this._getDynamicEntityOverwriteValue(cell, dyn);
-        content = dynValue !== undefined && dynValue !== null && dynValue !== ''
-          ? dynValue
+        const dynContent = this._renderDynamicEntityContent(cell, dyn);
+        content = (dynContent !== null && dynContent !== undefined && dynContent !== '')
+          ? dynContent
           : (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '');
       } else if (dyn && dyn.hide) {
         content = dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '';
@@ -1931,7 +2014,11 @@ class FlexCellsCard extends LitElement {
       }
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const dyn = this._evaluateDynColor(cell, type, display);
-      const mode = this._getEntityDisplayMode(cell);
+      const baseMode = this._getEntityDisplayMode(cell);
+      const dynMode = dyn && dyn.overwrite === 'entity'
+        ? this._normalizeDynamicEntityDisplay(dyn.overwrite_entity_display)
+        : null;
+      const mode = dynMode || baseMode;
       const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
       const tapNone = this._tapActionIsExplicitNone(cell);
@@ -1991,8 +2078,8 @@ class FlexCellsCard extends LitElement {
     if (dyn && dyn.overwrite === 'icon') {
       shown = html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>`;
     } else if (dyn && dyn.overwrite === 'entity') {
-      const dynValue = this._getDynamicEntityOverwriteValue(cell, dyn);
-      shown = (dynValue !== undefined && dynValue !== null && dynValue !== '') ? dynValue : (dyn?.mask || '');
+      const dynContent = this._renderDynamicEntityContent(cell, dyn);
+      shown = (dynContent !== null && dynContent !== undefined && dynContent !== '') ? dynContent : (dyn?.mask || '');
     } else if (dyn && dyn.hide) {
       shown = dyn.mask || '';
     } else {
@@ -2071,9 +2158,9 @@ class FlexCellsCard extends LitElement {
       if (dyn && dyn.overwrite === 'icon') {
         content = dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '';
       } else if (dyn && dyn.overwrite === 'entity') {
-        const dynValue = this._getDynamicEntityOverwriteValue(cell, dyn);
-        content = dynValue !== undefined && dynValue !== null && dynValue !== ''
-          ? dynValue
+        const dynContent = this._renderDynamicEntityContent(cell, dyn);
+        content = (dynContent !== null && dynContent !== undefined && dynContent !== '')
+          ? dynContent
           : (dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '');
       } else if (dyn && dyn.hide) {
         content = dyn?.mask ? html`<span class="icon-mask">${dyn.mask}</span>` : '';
@@ -2120,7 +2207,11 @@ class FlexCellsCard extends LitElement {
       const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
       const cellDyn = this._evaluateDynColor(cell, type, display);
       const dyn = mergeDyn(cellDyn);
-      const mode = this._getEntityDisplayMode(cell);
+      const baseMode = this._getEntityDisplayMode(cell);
+      const dynMode = dyn && dyn.overwrite === 'entity'
+        ? this._normalizeDynamicEntityDisplay(dyn.overwrite_entity_display)
+        : null;
+      const mode = dynMode || baseMode;
       const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn, { skipTextDecoration: mode === 'icon_value' });
       const hasActions = this._hasCellActions(cell);
       const tapNone = this._tapActionIsExplicitNone(cell);
@@ -2169,8 +2260,8 @@ class FlexCellsCard extends LitElement {
     if (dyn && dyn.overwrite === 'icon') {
       shown = html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>`;
     } else if (dyn && dyn.overwrite === 'entity') {
-      const dynValue = this._getDynamicEntityOverwriteValue(cell, dyn);
-      shown = (dynValue !== undefined && dynValue !== null && dynValue !== '') ? dynValue : (dyn?.mask || '');
+      const dynContent = this._renderDynamicEntityContent(cell, dyn);
+      shown = (dynContent !== null && dynContent !== undefined && dynContent !== '') ? dynContent : (dyn?.mask || '');
     } else if (dyn && dyn.hide) {
       shown = dyn.mask || '';
     } else {

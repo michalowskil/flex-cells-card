@@ -1,0 +1,361 @@
+rows:
+  - cells:
+      - type: entity
+        value: sensor.samsung_galaxy_battery_level
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: false
+        entity_display: icon
+      - type: string
+        value: Smartphone
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: sensor.samsung_galaxy_battery_state
+        align: right
+        use_entity_unit: true
+        style:
+          text_transform: ""
+        dyn_color:
+          - entity: ""
+            attr: ""
+            op: "="
+            val: discharging
+            bg: ""
+            fg: ""
+            overwrite: entity
+            overwrite_entity: sensor.samsung_galaxy_battery_state
+            overwrite_attr: last_changed
+            conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: discharging
+                val2: ""
+            match: all
+            overwrite_datetime_format: REL_SHORT
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: full
+                val2: ""
+              - entity: sensor.samsung_galaxy_battery_level
+                attr: ""
+                op: "="
+                val: "100"
+                val2: ""
+            match: all
+            bg: ""
+            fg: red
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: disconnect!
+      - type: entity
+        value: sensor.samsung_galaxy_battery_level
+        align: right
+        use_entity_unit: true
+        style:
+          text_transform: ""
+  - cells:
+      - type: entity
+        value: sensor.roleta_w_sypialni_battery
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: false
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "100"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-100
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "90"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-90
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "80"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-80
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "70"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-70
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "60"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-60
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "50"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-50
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "40"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-40
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "30"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-30
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "20"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-20
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "10"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging-10
+      - type: string
+        value: Window blinds
+        align: left
+        style:
+          text_transform: ""
+      - type: entity
+        value: binary_sensor.roleta_w_sypialni_charging_status
+        align: right
+        use_entity_unit: true
+        dyn_color:
+          - entity: ""
+            attr: ""
+            op: "="
+            val: "off"
+            bg: ""
+            fg: ""
+            overwrite: entity
+            overwrite_entity: binary_sensor.roleta_w_sypialni_charging_status
+            overwrite_attr: last_changed
+            conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            overwrite_datetime_format: REL_SHORT
+          - entity: ""
+            attr: ""
+            op: "="
+            val: "on"
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: charging
+            conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: sensor.roleta_w_sypialni_battery
+                attr: ""
+                op: "="
+                val: "100"
+                val2: ""
+            match: all
+            bg: ""
+            fg: red
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: disconnect!
+      - type: entity
+        value: sensor.roleta_w_sypialni_battery
+        align: right
+        use_entity_unit: true
+  - cells:
+      - type: entity
+        value: sensor.balkon_na_zewnatrz_battery
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: false
+        entity_display: icon
+      - type: string
+        value: Temp sensor
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: ""
+        align: right
+      - type: entity
+        value: sensor.balkon_na_zewnatrz_battery
+        align: right
+        use_entity_unit: true
+column_count: 4
+card_padding: ""
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+zebra_ignore_separators: false
+column_widths:
+  - 30px
+  - auto
+  - auto
+  - 70px
+sort_columns: []
+sort_desc: false
+hide_on_narrow: []

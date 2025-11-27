@@ -1,5 +1,7 @@
-[![GitHub Discussions](https://img.shields.io/github/discussions/michalowskil/flex-cells-card)](https://github.com/michalowskil/flex-cells-card/discussions)
- [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases) [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest) [![Forum](https://img.shields.io/badge/Forum-41BDF5?style=flat&logo=homeassistant&logoColor=white)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780)
+[![Forum](https://img.shields.io/badge/dynamic/json?style=flat&label=Forum&color=41BDF5&logo=homeassistant&logoColor=white&suffix=%20posts&url=https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780.json&query=$.posts_count)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780)
+[![GitHub Discussions](https://img.shields.io/github/discussions/michalowskil/flex-cells-card?logo=github&logoColor=white&label=Discussions)](https://github.com/michalowskil/flex-cells-card/discussions)
+[![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=Downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases)
+[![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=Latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
 
 # Flex Cells Card
 
@@ -105,17 +107,26 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - The appearance and rules assigned to cells/rows should work in templates.
 
 ## Examples
-  - [Temperature/Humidity](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value.  
+  - [Temperature/Humidity](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)  
   
-    [![Temperature/Humidity](examples/temperature-humidity-table/images/dark_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
-    [![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
-  - [Media Player (template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS).  
+    ![Temperature/Humidity](examples/temperature-humidity-table/images/dark_300.png)
+    ![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)
+  - [Media Player (template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)  
 
-    [![Media Player (template)](examples/media-player-template/images/small_dark_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)
-    [![Media Player (template)](examples/media-player-template/images/small_light_300.png)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)
+    ![Media Player (template)](examples/media-player-template/images/small_dark_300.png)
+    ![Media Player (template)](examples/media-player-template/images/small_light_300.png)
+  - [Batteries](https://github.com/michalowskil/flex-cells-card/blob/main/examples/batteries-table/batteries.md) - displaying the device's battery status. An example of using dynamic rules to overwrite an icon when an entity doesn't provide it correctly. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/batteries-table/batteries.md)  
+
+    ![Batteries](examples/batteries-table/images/dark-charging-300.png)
+    ![Batteries](examples/batteries-table/images/light-disconnect-300.png)
   - More examples coming soon.
 
 ## Changelog
+- v0.17.0 —
+  - **Added "AND/OR" logical operators** in dynamic rules.
+  - Added new fields in dynamic cell rules for the "Overwrite with entity/metadata" option: Date/Time format & Text override, Entity display, Rescale.
+  - Fixed an issue related to changing the number of columns and the disappearance of unsaved dynamic rules.
+  - Fixed an issue related to the column width for the "auto" value.
 - v0.16.0 —
   - Added **advanced copy and paste** of table configuration.
 - v0.15.0 —
@@ -176,10 +187,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 ## Screenshots
 
 ![Flex Cells Card](images/flex-cells-card-10.png)
-![Flex Cells Card](images/flex-cells-card-9.png)
 ![Flex Cells Card](images/flex-cells-card-8.png)
-![Flex Cells Card](images/flex-cells-card-4.png)
-![Flex Cells Card](images/flex-cells-card-5.png)
 ![Flex Cells Card](images/flex-cells-card-1.png)
 ![Flex Cells Card](images/flex-cells-card-2.png)
 ![Flex Cells Card](images/flex-cells-card-6.png)

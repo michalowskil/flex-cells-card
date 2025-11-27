@@ -933,10 +933,36 @@ class FlexCellsCardEditor extends LitElement {
     return isPl ? `Reguła ${idx + 1}` : `Rule ${idx + 1}`;
   }
 
+  _normalizeRuleConditions(rule) {
+    const fallback = { entity: rule?.entity || '', attr: rule?.attr || '', op: rule?.op || '=', val: rule?.val ?? '', val2: rule?.val2 ?? '', src: rule?.src };
+    if (!rule || typeof rule !== 'object') return [fallback];
+    const conds = Array.isArray(rule.conditions) && rule.conditions.length ? rule.conditions : [fallback];
+    return conds.map((c) => ({
+      entity: c?.entity || '',
+      attr: c?.attr || '',
+      op: c?.op || '=',
+      val: c?.val ?? '',
+      val2: c?.val2 ?? '',
+      src: c?.src,
+    }));
+  }
+
+  _normalizeRuleMatch(rule) {
+    const raw = (rule?.match || rule?.condition_match || '').toLowerCase();
+    if (raw === 'any' || raw === 'or') return 'any';
+    return 'all';
+  }
+
   // === Dynamic coloring: simple rules ===
   _getCellRules(r,c){
-    try { return Array.isArray(this.config?.rows?.[r]?.cells?.[c]?.dyn_color) ? [...this.config.rows[r].cells[c].dyn_color] : []; }
-    catch(_) { return []; }
+    try {
+      const raw = Array.isArray(this.config?.rows?.[r]?.cells?.[c]?.dyn_color) ? [...this.config.rows[r].cells[c].dyn_color] : [];
+      return raw.map((rule) => ({
+        ...rule,
+        conditions: this._normalizeRuleConditions(rule),
+        match: this._normalizeRuleMatch(rule),
+      }));
+    } catch(_) { return []; }
   }
   _setCellRules(r,c,rules){
     const rows = [...(this.config.rows||[])];
@@ -945,11 +971,24 @@ class FlexCellsCardEditor extends LitElement {
     const cell = { ...cells[c], dyn_color: rules };
     cells[c] = cell; rows[r] = { ...row, cells };
     this.config = { ...this.config, rows };
+    // Mirror do bufora _fullCells, żeby zmiany reguł nie ginęły przy zmianie liczby kolumn.
+    if (Array.isArray(this._fullCells) && this._fullCells[r]) {
+      const full = [...this._fullCells[r]];
+      if (c >= full.length) {
+        for (let i = full.length; i <= c; i += 1) full[i] = { type: 'string', value: '', align: 'right' };
+      }
+      full[c] = this._clone(cell);
+      this._fullCells[r] = full;
+    }
     this._fireConfigChanged();
   }
   _addRule(r,c){
     const rules = this._getCellRules(r,c);
-    rules.push({ entity:'', attr:'', op:'=', val:'', bg:'', fg:'', overwrite:'', overwrite_entity:'', overwrite_attr:'' });
+    rules.push({
+      conditions: [{ entity:'', attr:'', op:'=', val:'', val2:'' }],
+      match: 'all',
+      bg:'', fg:'', overwrite:'', overwrite_entity:'', overwrite_attr:''
+    });
     this._setCellRules(r,c,rules);
   }
   _removeRule(r,c,idx){
@@ -957,13 +996,58 @@ class FlexCellsCardEditor extends LitElement {
     rules.splice(idx,1);
     this._setCellRules(r,c,rules);
   }
+  _addCondition(r,c,ruleIdx){
+    const rules = this._getCellRules(r,c);
+    if (!rules[ruleIdx]) return;
+    const conds = this._normalizeRuleConditions(rules[ruleIdx]);
+    conds.push({ entity: rules[ruleIdx].entity || '', attr:'', op:'=', val:'', val2:'' });
+    rules[ruleIdx] = { ...(rules[ruleIdx]||{}), conditions: conds };
+    this._setCellRules(r,c,rules);
+  }
+  _removeCondition(r,c,ruleIdx,condIdx){
+    const rules = this._getCellRules(r,c);
+    if (!rules[ruleIdx]) return;
+    const conds = this._normalizeRuleConditions(rules[ruleIdx]);
+    if (conds.length <= 1) return;
+    conds.splice(condIdx,1);
+    rules[ruleIdx] = { ...(rules[ruleIdx]||{}), conditions: conds };
+    this._setCellRules(r,c,rules);
+  }
+  _updateCondition(r,c,ruleIdx,condIdx,patch){
+    const rules = this._getCellRules(r,c);
+    if (!rules[ruleIdx]) return;
+    const conds = this._normalizeRuleConditions(rules[ruleIdx]);
+    conds[condIdx] = { ...(conds[condIdx]||{}), ...(patch||{}) };
+    rules[ruleIdx] = { ...(rules[ruleIdx]||{}), conditions: conds };
+    this._setCellRules(r,c,rules);
+  }
   _updateRule(r,c,idx,patch){
     const rules = this._getCellRules(r,c);
     rules[idx] = { ...(rules[idx]||{}), ...(patch||{}) };
     this._setCellRules(r,c,rules);
   }
+  _updateRuleEntityDisplay(r,c,idx,e){
+    const raw = e?.target?.value;
+    const value = (typeof raw === 'string' && raw.trim()) ? raw.trim() : 'value';
+    const overwrite_entity_display = value === 'value' ? undefined : value;
+    this._updateRule(r,c,idx,{ overwrite_entity_display });
+  }
+  _updateRuleScale(r,c,idx,key,e){
+    const raw = (e?.target?.value ?? '').trim();
+    const val = raw === '' ? undefined : Number(String(raw).replace(',', '.'));
+    if (val === undefined || Number.isFinite(val)) {
+      this._updateRule(r,c,idx,{ [key]: val });
+    }
+  }
   _getRowRules(r){
-    try { return Array.isArray(this.config?.rows?.[r]?.dyn_row_rules) ? [...this.config.rows[r].dyn_row_rules] : []; }
+    try {
+      const raw = Array.isArray(this.config?.rows?.[r]?.dyn_row_rules) ? [...this.config.rows[r].dyn_row_rules] : [];
+      return raw.map((rule) => ({
+        ...rule,
+        conditions: this._normalizeRuleConditions(rule),
+        match: this._normalizeRuleMatch(rule),
+      }));
+    }
     catch(_) { return []; }
   }
   _setRowRules(r, rules){
@@ -975,13 +1059,42 @@ class FlexCellsCardEditor extends LitElement {
   }
   _addRowRule(r){
     const rules = this._getRowRules(r);
-    rules.push({ entity:'', attr:'', op:'=', val:'', val2:'', bg:'', fg:'' });
+    rules.push({
+      conditions: [{ entity:'', attr:'', op:'=', val:'', val2:'' }],
+      match: 'all',
+      bg:'', fg:''
+    });
     this._setRowRules(r, rules);
   }
   _removeRowRule(r, idx){
     const rules = this._getRowRules(r);
     if (idx < 0 || idx >= rules.length) return;
     rules.splice(idx, 1);
+    this._setRowRules(r, rules);
+  }
+  _addRowCondition(r, ruleIdx){
+    const rules = this._getRowRules(r);
+    if (!rules[ruleIdx]) return;
+    const conds = this._normalizeRuleConditions(rules[ruleIdx]);
+    conds.push({ entity: rules[ruleIdx].entity || '', attr:'', op:'=', val:'', val2:'' });
+    rules[ruleIdx] = { ...(rules[ruleIdx]||{}), conditions: conds };
+    this._setRowRules(r, rules);
+  }
+  _removeRowCondition(r, ruleIdx, condIdx){
+    const rules = this._getRowRules(r);
+    if (!rules[ruleIdx]) return;
+    const conds = this._normalizeRuleConditions(rules[ruleIdx]);
+    if (conds.length <= 1) return;
+    conds.splice(condIdx,1);
+    rules[ruleIdx] = { ...(rules[ruleIdx]||{}), conditions: conds };
+    this._setRowRules(r, rules);
+  }
+  _updateRowCondition(r, ruleIdx, condIdx, patch){
+    const rules = this._getRowRules(r);
+    if (!rules[ruleIdx]) return;
+    const conds = this._normalizeRuleConditions(rules[ruleIdx]);
+    conds[condIdx] = { ...(conds[condIdx]||{}), ...(patch||{}) };
+    rules[ruleIdx] = { ...(rules[ruleIdx]||{}), conditions: conds };
     this._setRowRules(r, rules);
   }
   _updateRowRule(r, idx, patch){
@@ -2433,72 +2546,102 @@ class FlexCellsCardEditor extends LitElement {
 
                         <div class="muted dyn-hint">${t(this.hass, 'editor.dynamic_hint')}</div>
 
-                        ${ (Array.isArray(cell?.dyn_color) ? cell.dyn_color : []).map((rule, ridx) => html`
+                        ${ (Array.isArray(cell?.dyn_color) ? cell.dyn_color : []).map((rule, ridx) => {
+                          const conditions = this._normalizeRuleConditions(rule);
+                          const match = this._normalizeRuleMatch(rule);
+                          return html`
                           <div class="option group full">
-                            <!-- Entity full width -->
                             <div class="cols1">
                               <div class="rulehdr">${this._ruleTitle(ridx)}</div>
-                              <ha-entity-picker
-                                .hass=${this.hass}
-                                .value=${rule.entity || ''}
-                                allow-custom-entity
-                                @value-changed=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ entity: e.detail?.value || e.target.value })}>
-                              </ha-entity-picker>
                             </div>
 
-                            <!-- Attribute full width with spacing -->
                             <div class="cols1">
-                              <input
-                                class="text-input attr-input"
-                                list=${`dynattr-list-${rIdx}-${cIdx}-${ridx}`}
-                                .value=${rule.attr || ''}
-                                placeholder=${t(this.hass,"placeholder.attribute_path")}
-                                @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ attr: (e.target.value||'') }) }
-                              />
-                              <datalist id=${`dynattr-list-${rIdx}-${cIdx}-${ridx}`}>
-                                ${ (this._buildAttrSuggestionsForEntity(rule.entity, rule.attr || '') || [])
-                                    .map(opt => html`<option value="${opt}"></option>`) }
-                              </datalist>
+                              <ha-select
+                                .label=${t(this.hass, 'dynamic.match')}
+                                .value=${match}
+                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ match: e.target.value })}
+                                @closed=${(e)=>e.stopPropagation()}>
+                                <mwc-list-item value="all">${t(this.hass,'dynamic.match_all')}</mwc-list-item>
+                                <mwc-list-item value="any">${t(this.hass,'dynamic.match_any')}</mwc-list-item>
+                              </ha-select>
                             </div>
 
-                            <!-- Operator + Value row (50/50) -->
-                            <div class="cols2">
-                              <ha-select
-                                .label=${t(this.hass, 'dynamic.operator')}
-                                .value=${rule.op || '='}
-                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ op: e.target.value })}
-                                @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value=">">&gt;</mwc-list-item>
-                                <mwc-list-item value=">=">&ge;</mwc-list-item>
-                                <mwc-list-item value="<">&lt;</mwc-list-item>
-                                <mwc-list-item value="<=">&le;</mwc-list-item>
-                                <mwc-list-item value="=">=</mwc-list-item>
-                                <mwc-list-item value="!=">≠</mwc-list-item>
-                                <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
-                                <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
-                                <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
-                              </ha-select>
-
-                              ${ rule && rule.op === 'between' ? html`
-                                <div class="cols2">
-                                  <ha-textfield
-                                    .label=${t(this.hass, 'dynamic.min')}
-                                    .value=${rule.val || ''}
-                                    @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ val: e.target.value })}>
-                                  </ha-textfield>
-                                  <ha-textfield
-                                    .label=${t(this.hass, 'dynamic.max')}
-                                    .value=${rule.val2 || ''}
-                                    @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ val2: e.target.value })}>
-                                  </ha-textfield>
+                            ${conditions.map((cond, condIdx) => html`
+                              <div class="option group full" style="margin:6px 0; padding:10px; border:1px dashed var(--divider-color,#ddd);">
+                                <div class="cols1">
+                                  <ha-entity-picker
+                                    .hass=${this.hass}
+                                    .value=${cond.entity || ''}
+                                    allow-custom-entity
+                                    @value-changed=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ entity: e.detail?.value || e.target.value })}>
+                                  </ha-entity-picker>
                                 </div>
-                              ` : html`
-                                <ha-textfield
-                                  .label=${t(this.hass, 'editor.value')}
-                                  .value=${rule.val || ''}
-                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ val: e.target.value })}>
-                                </ha-textfield>
-                              ` }
+
+                                <div class="cols1">
+                                  <input
+                                    class="text-input attr-input"
+                                    list=${`dynattr-list-${rIdx}-${cIdx}-${ridx}-${condIdx}`}
+                                    .value=${cond.attr || ''}
+                                    placeholder=${t(this.hass,"placeholder.attribute_path")}
+                                    @input=${(e)=> this._updateCondition(rIdx,cIdx,ridx,condIdx,{ attr: (e.target.value||'') }) }
+                                  />
+                                  <datalist id=${`dynattr-list-${rIdx}-${cIdx}-${ridx}-${condIdx}`}>
+                                    ${ (this._buildAttrSuggestionsForEntity(cond.entity, cond.attr || '') || [])
+                                        .map(opt => html`<option value="${opt}"></option>`) }
+                                  </datalist>
+                                </div>
+
+                                <div class="cols2">
+                                  <ha-select
+                                    .label=${t(this.hass, 'dynamic.operator')}
+                                    .value=${cond.op || '='}
+                                    @selected=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ op: e.target.value })}
+                                    @closed=${(e)=>e.stopPropagation()}>
+                                    <mwc-list-item value=">">&gt;</mwc-list-item>
+                                    <mwc-list-item value=">=">&ge;</mwc-list-item>
+                                    <mwc-list-item value="<">&lt;</mwc-list-item>
+                                    <mwc-list-item value="<=">&le;</mwc-list-item>
+                                    <mwc-list-item value="=">=</mwc-list-item>
+                                    <mwc-list-item value="!=">≠</mwc-list-item>
+                                    <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
+                                    <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
+                                    <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
+                                  </ha-select>
+
+                                  ${ cond && cond.op === 'between' ? html`
+                                    <div class="cols2">
+                                      <ha-textfield
+                                        .label=${t(this.hass, 'dynamic.min')}
+                                        .value=${cond.val || ''}
+                                        @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val: e.target.value })}>
+                                      </ha-textfield>
+                                      <ha-textfield
+                                        .label=${t(this.hass, 'dynamic.max')}
+                                        .value=${cond.val2 || ''}
+                                        @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val2: e.target.value })}>
+                                      </ha-textfield>
+                                    </div>
+                                  ` : html`
+                                    <ha-textfield
+                                      .label=${t(this.hass, 'editor.value')}
+                                      .value=${cond.val || ''}
+                                      @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val: e.target.value })}>
+                                    </ha-textfield>
+                                  ` }
+                                </div>
+
+                                ${ conditions.length > 1 ? html`
+                                  <div class="cols1 right">
+                                    <button class="danger mini" @click=${()=>this._removeCondition(rIdx,cIdx,ridx,condIdx)}>
+                                      ${t(this.hass,'dynamic.delete_condition')}
+                                    </button>
+                                  </div>
+                                ` : nothing }
+                              </div>
+                            `)}
+
+                            <div class="flex" style="margin:4px 0 10px;">
+                              <button class="mini" @click=${()=>this._addCondition(rIdx,cIdx,ridx)}>➕ ${t(this.hass,'dynamic.add_condition')}</button>
                             </div>
 
                             <!-- Colors row: Background + Content 50/50 with pickers -->
@@ -2549,7 +2692,7 @@ class FlexCellsCardEditor extends LitElement {
                               <div class="cols1">
                                 <ha-entity-picker
                                   .hass=${this.hass}
-                                  .value=${rule.overwrite_entity || rule.entity || ''}
+                                  .value=${rule.overwrite_entity || (conditions?.[0]?.entity) || ''}
                                   allow-custom-entity
                                   @value-changed=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite_entity: e.detail?.value || e.target.value })}>
                                 </ha-entity-picker>
@@ -2562,10 +2705,66 @@ class FlexCellsCardEditor extends LitElement {
                                   placeholder=${t(this.hass,"placeholder.attribute_path")}
                                   @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ overwrite_attr: (e.target.value||'') }) }
                                 />
-                                <datalist id=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}>
-                                  ${ (this._buildAttrSuggestionsForEntity(rule.overwrite_entity || rule.entity, rule.overwrite_attr || '') || [])
+                                  <datalist id=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}>
+                                  ${ (this._buildAttrSuggestionsForEntity(rule.overwrite_entity || conditions?.[0]?.entity, rule.overwrite_attr || '') || [])
                                       .map(opt => html`<option value="${opt}"></option>`) }
                                 </datalist>
+                              </div>
+                              <div class="cols1">
+                                <ha-textfield class="mask-input"
+                                  .label=${t(this.hass,"editor.datetime_format")}
+                                  .value=${rule.overwrite_datetime_format || ''}
+                                  .placeholder=${t(this.hass,"placeholder.datetime_format")}
+                                  @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{
+                                    overwrite_datetime_format: (e.target?.value || '').trim()
+                                      ? e.target.value
+                                      : undefined
+                                  })}>
+                                </ha-textfield>
+                                <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
+                              </div>
+                              <div class="cols1">
+                                <ha-select
+                                  .label=${t(this.hass, 'editor.entity_display_label')}
+                                  .value=${rule.overwrite_entity_display || 'value'}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  @selected=${(e)=>this._updateRuleEntityDisplay(rIdx,cIdx,ridx,e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                  <mwc-list-item value="value">${t(this.hass,"editor.entity_display_option_value")}</mwc-list-item>
+                                  <mwc-list-item value="icon">${t(this.hass,"editor.entity_display_option_icon")}</mwc-list-item>
+                                  <mwc-list-item value="icon_value">${t(this.hass,"editor.entity_display_option_icon_value")}</mwc-list-item>
+                                </ha-select>
+                              </div>
+                              <div class="cols1">
+                                <div class="option group scale full">
+                                  <span class="label" style="font-weight:600;">${t(this.hass,"editor.scale_title")}</span>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_in_min")}
+                                    .value=${rule.overwrite_scale_in_min ?? ''}
+                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_min',e)}>
+                                  </ha-textfield>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_in_max")}
+                                    .value=${rule.overwrite_scale_in_max ?? ''}
+                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_max',e)}>
+                                  </ha-textfield>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_out_min")}
+                                    .value=${rule.overwrite_scale_out_min ?? ''}
+                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_min',e)}>
+                                  </ha-textfield>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_out_max")}
+                                    .value=${rule.overwrite_scale_out_max ?? ''}
+                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_max',e)}>
+                                  </ha-textfield>
+                                  <div class="muted">${t(this.hass,"editor.scale_hint")}</div>
+                                </div>
                               </div>
                             ` : html`` }
 
@@ -2599,14 +2798,14 @@ class FlexCellsCardEditor extends LitElement {
                               </div>
                             ` : html`` }
 
-                            <!-- Delete aligned right, auto width -->
                             <div class="cols1 right">
                               <button class="danger mini" @click=${()=>this._removeRule(rIdx,cIdx,ridx)}>
                                 ${t(this.hass, 'dynamic.delete_rule')}
                               </button>
                             </div>
                           </div>
-                        `)}
+                        `;
+                        })}
 
                         <div class="flex" style="margin-top:6px;">
                           <button class="mini" @click=${()=>this._addRule(rIdx,cIdx)}>➕ ${t(this.hass,'dynamic.add_rule')}</button>
@@ -2622,69 +2821,102 @@ class FlexCellsCardEditor extends LitElement {
 
                         <div class="muted dyn-hint">${t(this.hass, 'editor.dynamic_hint')}</div>
 
-                        ${rowRules.map((rule, ridx) => html`
+                        ${rowRules.map((rule, ridx) => {
+                          const conditions = this._normalizeRuleConditions(rule);
+                          const match = this._normalizeRuleMatch(rule);
+                          return html`
                           <div class="option group full">
                             <div class="cols1">
                               <div class="rulehdr">${this._ruleTitle(ridx)}</div>
-                              <ha-entity-picker
-                                .hass=${this.hass}
-                                .value=${rule?.entity || ''}
-                                allow-custom-entity
-                                @value-changed=${(e)=>this._updateRowRule(rIdx,ridx,{ entity: e.detail?.value || e.target.value })}>
-                              </ha-entity-picker>
                             </div>
 
                             <div class="cols1">
-                              <input
-                                class="text-input attr-input"
-                                list=${`rowdynattr-list-${rIdx}-${ridx}`}
-                                .value=${rule?.attr || ''}
-                                placeholder=${t(this.hass,"placeholder.attribute_path")}
-                                @input=${(e)=> this._updateRowRule(rIdx,ridx,{ attr: (e.target.value||'') }) }
-                              />
-                              <datalist id=${`rowdynattr-list-${rIdx}-${ridx}`}>
-                                ${ (this._buildAttrSuggestionsForEntity(rule?.entity, rule?.attr || '') || [])
-                                    .map(opt => html`<option value="${opt}"></option>`) }
-                              </datalist>
+                              <ha-select
+                                .label=${t(this.hass, 'dynamic.match')}
+                                .value=${match}
+                                @selected=${(e)=>this._updateRowRule(rIdx,ridx,{ match: e.target.value })}
+                                @closed=${(e)=>e.stopPropagation()}>
+                                <mwc-list-item value="all">${t(this.hass,'dynamic.match_all')}</mwc-list-item>
+                                <mwc-list-item value="any">${t(this.hass,'dynamic.match_any')}</mwc-list-item>
+                              </ha-select>
                             </div>
 
-                            <div class="cols2">
-                              <ha-select
-                                .label=${t(this.hass, 'dynamic.operator')}
-                                .value=${rule?.op || '='}
-                                @selected=${(e)=>this._updateRowRule(rIdx,ridx,{ op: e.target.value })}
-                                @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value=">">&gt;</mwc-list-item>
-                                <mwc-list-item value=">=">&ge;</mwc-list-item>
-                                <mwc-list-item value="<">&lt;</mwc-list-item>
-                                <mwc-list-item value="<=">&le;</mwc-list-item>
-                                <mwc-list-item value="=">=</mwc-list-item>
-                                <mwc-list-item value="!=">≠</mwc-list-item>
-                                <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
-                                <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
-                                <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
-                              </ha-select>
-
-                              ${ rule?.op === 'between' ? html`
-                                <div class="cols2">
-                                  <ha-textfield
-                                    .label=${t(this.hass, 'dynamic.min')}
-                                    .value=${rule?.val || ''}
-                                    @input=${(e)=>this._updateRowRule(rIdx,ridx,{ val: e.target.value })}>
-                                  </ha-textfield>
-                                  <ha-textfield
-                                    .label=${t(this.hass, 'dynamic.max')}
-                                    .value=${rule?.val2 || ''}
-                                    @input=${(e)=>this._updateRowRule(rIdx,ridx,{ val2: e.target.value })}>
-                                  </ha-textfield>
+                            ${conditions.map((cond, condIdx) => html`
+                              <div class="option group full" style="margin:6px 0; padding:10px; border:1px dashed var(--divider-color,#ddd);">
+                                <div class="cols1">
+                                  <ha-entity-picker
+                                    .hass=${this.hass}
+                                    .value=${cond?.entity || ''}
+                                    allow-custom-entity
+                                    @value-changed=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ entity: e.detail?.value || e.target.value })}>
+                                  </ha-entity-picker>
                                 </div>
-                              ` : html`
-                                <ha-textfield
-                                  .label=${t(this.hass, 'editor.value')}
-                                  .value=${rule?.val || ''}
-                                  @input=${(e)=>this._updateRowRule(rIdx,ridx,{ val: e.target.value })}>
-                                </ha-textfield>
-                              ` }
+
+                                <div class="cols1">
+                                  <input
+                                    class="text-input attr-input"
+                                    list=${`rowdynattr-list-${rIdx}-${ridx}-${condIdx}`}
+                                    .value=${cond?.attr || ''}
+                                    placeholder=${t(this.hass,"placeholder.attribute_path")}
+                                    @input=${(e)=> this._updateRowCondition(rIdx,ridx,condIdx,{ attr: (e.target.value||'') }) }
+                                  />
+                                  <datalist id=${`rowdynattr-list-${rIdx}-${ridx}-${condIdx}`}>
+                                    ${ (this._buildAttrSuggestionsForEntity(cond?.entity, cond?.attr || '') || [])
+                                        .map(opt => html`<option value="${opt}"></option>`) }
+                                  </datalist>
+                                </div>
+
+                                <div class="cols2">
+                                  <ha-select
+                                    .label=${t(this.hass, 'dynamic.operator')}
+                                    .value=${cond?.op || '='}
+                                    @selected=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ op: e.target.value })}
+                                    @closed=${(e)=>e.stopPropagation()}>
+                                    <mwc-list-item value=">">&gt;</mwc-list-item>
+                                    <mwc-list-item value=">=">&ge;</mwc-list-item>
+                                    <mwc-list-item value="<">&lt;</mwc-list-item>
+                                    <mwc-list-item value="<=">&le;</mwc-list-item>
+                                    <mwc-list-item value="=">=</mwc-list-item>
+                                    <mwc-list-item value="!=">≠</mwc-list-item>
+                                    <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
+                                    <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
+                                    <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
+                                  </ha-select>
+
+                                  ${ cond && cond.op === 'between' ? html`
+                                    <div class="cols2">
+                                      <ha-textfield
+                                        .label=${t(this.hass, 'dynamic.min')}
+                                        .value=${cond?.val || ''}
+                                        @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val: e.target.value })}>
+                                      </ha-textfield>
+                                      <ha-textfield
+                                        .label=${t(this.hass, 'dynamic.max')}
+                                        .value=${cond?.val2 || ''}
+                                        @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val2: e.target.value })}>
+                                      </ha-textfield>
+                                    </div>
+                                  ` : html`
+                                    <ha-textfield
+                                      .label=${t(this.hass, 'editor.value')}
+                                      .value=${cond?.val || ''}
+                                      @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val: e.target.value })}>
+                                    </ha-textfield>
+                                  ` }
+                                </div>
+
+                                ${ conditions.length > 1 ? html`
+                                  <div class="cols1 right">
+                                    <button class="danger mini" @click=${()=>this._removeRowCondition(rIdx, ridx, condIdx)}>
+                                      ${t(this.hass,'dynamic.delete_condition')}
+                                    </button>
+                                  </div>
+                                ` : nothing }
+                              </div>
+                            `)}
+
+                            <div class="flex" style="margin:4px 0 10px;">
+                              <button class="mini" @click=${()=>this._addRowCondition(rIdx,ridx)}>➕ ${t(this.hass,'dynamic.add_condition')}</button>
                             </div>
 
                             <div class="cols2">
@@ -2733,7 +2965,8 @@ class FlexCellsCardEditor extends LitElement {
                               </button>
                             </div>
                           </div>
-                        `)}
+                        `;
+                        })}
 
                       <div class="flex" style="margin-top:6px;">
                         <button class="mini" @click=${()=>this._addRowRule(rIdx)}>➕ ${t(this.hass,'dynamic.add_rule')}</button>
