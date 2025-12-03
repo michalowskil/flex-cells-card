@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing } from 'lit';
+﻿import { LitElement, html, css, nothing } from 'lit';
 import { t } from './localize/localize.js';
 
 class FlexCellsCardEditor extends LitElement {
@@ -180,11 +180,31 @@ class FlexCellsCardEditor extends LitElement {
     }
     .option-group label.disabled {
       opacity: 0.6;
-      cursor: not-allowed;
+      cursor: pointer;
     }
     .option-group input {
       margin: 0;
     }
+    .service-id-preview {
+      display: block;
+      margin: 6px 0 10px;
+      padding-left: 2px;
+      font-size: 12px;
+      font-family: "Roboto Mono", monospace;
+      letter-spacing: 0.1px;
+      color: var(--secondary-text-color, #666);
+      opacity: 0.9;
+    }
+    .service-id-preview::before {
+      content: "• ";
+      color: var(--primary-text-color, #444);
+      opacity: 0.7;
+    }
+    .attr-edit-toggle { 
+      margin-bottom: 10px;
+      margin-top: 10px;
+    }
+    .attr-edit-fields.disabled { opacity: 0.6; pointer-events: none; }
     .simple-check {
       display: flex;
       align-items: center;
@@ -207,8 +227,8 @@ class FlexCellsCardEditor extends LitElement {
       display: grid;
       grid-template-columns: repeat(2, minmax(140px, 1fr));
       gap: 8px 12px;
-      padding: 12px;
-      border: 1px solid var(--divider-color, #ddd);
+      padding: 0 !important;
+      border: none;
       border-radius: 12px;
       background: var(--card-background-color, #fff);
       margin: 8px 0 12px; /* odstęp pod ramką przed "Alignment" */
@@ -222,6 +242,7 @@ class FlexCellsCardEditor extends LitElement {
     .option.group.scale ha-textfield.mini {
       width: 100%;
       margin: 0;
+      padding: 0;
     }
 
     @media (max-width: 680px) {
@@ -496,6 +517,27 @@ class FlexCellsCardEditor extends LitElement {
     return filtered.map(k => (basePath ? basePath + '.' : '') + k);
   }
 
+  _listServiceNames() {
+    const services = this.hass?.services || {};
+    const result = [];
+    Object.keys(services).forEach((domain) => {
+      const svc = services[domain];
+      if (!svc || typeof svc !== 'object') return;
+      Object.keys(svc).forEach((name) => result.push(`${domain}.${name}`));
+    });
+    return result.sort();
+  }
+
+  _listServiceFields(serviceId) {
+    const svc = typeof serviceId === 'string' ? serviceId.trim() : '';
+    if (!svc || !svc.includes('.')) return [];
+    const [domain, name] = svc.split('.', 2);
+    const serviceObj = this.hass?.services?.[domain]?.[name];
+    const fields = serviceObj?.fields;
+    if (!fields || typeof fields !== 'object') return [];
+    return Object.keys(fields).sort();
+  }
+
   async _ensureEntityPickerLoaded() {
     try {
       if (!customElements.get("ha-entity-picker")) {
@@ -503,6 +545,17 @@ class FlexCellsCardEditor extends LitElement {
         if (helpers) {
           const ent = await helpers.createCardElement({ type: "entities", entities: [] });
           if (ent?.constructor?.getConfigElement) await ent.constructor.getConfigElement();
+        }
+      }
+    } catch (_e) {}
+  }
+  async _ensureServicePickerLoaded() {
+    try {
+      if (!customElements.get("ha-service-picker")) {
+        const helpers = await (window.loadCardHelpers ? window.loadCardHelpers() : undefined);
+        if (helpers) {
+          const el = await helpers.createCardElement({ type: "entities", entities: [] });
+          if (el?.constructor?.getConfigElement) await el.constructor.getConfigElement();
         }
       }
     } catch (_e) {}
@@ -915,6 +968,58 @@ class FlexCellsCardEditor extends LitElement {
     if (val === undefined || Number.isFinite(val)) {
       this._patchCell(r, c, { [key]: val });
     }
+  }
+  _getAttrEditConfig(cell){
+    const raw = (cell?.attr_edit && typeof cell.attr_edit === 'object') ? cell.attr_edit : {};
+    const controlRaw = typeof raw.control === 'string' ? raw.control.trim().toLowerCase() : 'slider';
+    const control = controlRaw === 'switch' ? 'switch' : 'slider';
+    const minNum = Number(raw.min);
+    const maxNum = Number(raw.max);
+    const stepNum = Number(raw.step);
+    return {
+      enabled: raw.enabled === true,
+      service: typeof raw.service === 'string' ? raw.service : '',
+      field: typeof raw.field === 'string' ? raw.field : (cell?.attribute || ''),
+      control,
+      min: Number.isFinite(minNum) ? minNum : undefined,
+      max: Number.isFinite(maxNum) ? maxNum : undefined,
+      step: Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined,
+      checked: raw.checked !== undefined ? raw.checked : true,
+      unchecked: raw.unchecked !== undefined ? raw.unchecked : false,
+    };
+  }
+  _patchAttrEdit(r,c,patch){
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._getAttrEditConfig(cell);
+    const next = { ...current, ...(patch || {}) };
+    this._patchCell(r,c,{ attr_edit: next });
+  }
+  _toggleAttrEditEnabled(r,c,e){
+    const enabled = !!(e?.target?.checked);
+    this._patchAttrEdit(r,c,{ enabled });
+  }
+  _updateAttrEditText(r,c,key,e){
+    const val = (e?.target?.value ?? '').trim();
+    this._patchAttrEdit(r,c,{ [key]: val });
+  }
+  _updateAttrEditNumber(r,c,key,e){
+    const raw = (e?.target?.value ?? '').trim();
+    if (raw === '') {
+      const next = { ...this._getAttrEditConfig(this.config?.rows?.[r]?.cells?.[c]) };
+      delete next[key];
+      this._patchCell(r,c,{ attr_edit: next });
+      return;
+    }
+    const val = Number(String(raw).replace(',', '.'));
+    if (Number.isFinite(val)) this._patchAttrEdit(r,c,{ [key]: val });
+  }
+  _updateAttrEditLiteral(r,c,key,e){
+    const raw = (e?.target?.value ?? '').trim();
+    if (!raw) { this._patchAttrEdit(r,c,{ [key]: '' }); return; }
+    if (/^(true|false)$/i.test(raw)) { this._patchAttrEdit(r,c,{ [key]: raw.toLowerCase() === 'true' }); return; }
+    const num = Number(raw);
+    if (Number.isFinite(num)) { this._patchAttrEdit(r,c,{ [key]: num }); return; }
+    this._patchAttrEdit(r,c,{ [key]: raw });
   }
   _isEntityNumeric(cell){
     const id = cell?.value;
@@ -1658,7 +1763,10 @@ class FlexCellsCardEditor extends LitElement {
     this._updateSeparator(idx, { [key]: value });
   }
 
-  firstUpdated() { this._ensureEntityPickerLoaded(); }
+  firstUpdated() {
+    this._ensureEntityPickerLoaded();
+    this._ensureServicePickerLoaded();
+  }
   _onEntityPicked(rIdx, cIdx, e) {
     const value = e?.detail?.value ?? e?.target?.value ?? '';
     this._patchCell(rIdx, cIdx, { type: 'entity', value });
@@ -2130,6 +2238,11 @@ class FlexCellsCardEditor extends LitElement {
                       typeof cell.custom_css === 'string' && cell.custom_css.trim()
                         ? cell.custom_css
                         : this._defaultCellCss();
+                    const attrEdit = this._getAttrEditConfig(cell);
+                    const attrEditEnabled = attrEdit.enabled === true;
+                    const attrEditControl = attrEdit.control || 'slider';
+                    const serviceOptions = this._listServiceNames();
+                    const serviceFieldOptions = this._listServiceFields(attrEdit.service);
 
                     // selektory akcji (dla icon/string z ograniczoną listą)
                     const allowed = this._allowedUiActionsForCellType(cell.type);
@@ -2208,22 +2321,21 @@ class FlexCellsCardEditor extends LitElement {
                             <mwc-list-item value="icon_value">${t(this.hass,"editor.entity_display_option_icon_value")}</mwc-list-item>
                           </ha-select>
                         </div>
-                          
-                        <!-- KONTROLKA ZAMIAST WARTOŚCI -->
+
                         ${ this._isSimpleControlEntity(cell) ? html`
                           <div class="cell-grid cell-wide">
-                              <div class="option full option-stack">
+                            <div class="option full option-stack">
+                              <label>
+                                <input type="checkbox"
+                                      .checked=${!!cell.show_control}
+                                      @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
+                                <span>${t(this.hass,"editor.show_control")}</span>
+                              </label>
+                              ${(cell.show_control && isNumberSlider) ? html`
                                 <label>
                                   <input type="checkbox"
-                                        .checked=${!!cell.show_control}
-                                        @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
-                                  <span>${t(this.hass,"editor.show_control")}</span>
-                                </label>
-                                ${(cell.show_control && isNumberSlider) ? html`
-                                  <label>
-                                    <input type="checkbox"
-                                           .checked=${showValueRightChecked}
-                                         @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
+                                        .checked=${showValueRightChecked}
+                                        @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
                                   <span>${t(this.hass,"editor.show_value_on_right")}</span>
                                 </label>
                               ` : nothing}
@@ -2231,35 +2343,169 @@ class FlexCellsCardEditor extends LitElement {
                           </div>
                         ` : html`` }
 
-                          <!-- PRZESKALOWANIE -->
-                          <div class="option group scale full">
-                            <span class="label" style="font-weight:600;">${t(this.hass,"editor.scale_title")}</span>
-                            <ha-textfield class="mini"
-                              type="number"
-                              .label=${t(this.hass,"editor.scale_in_min")}
-                              .value=${cell.scale_in_min ?? ''}
-                              @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_in_min',e)}>
-                            </ha-textfield>
-                            <ha-textfield class="mini"
-                              type="number"
-                              .label=${t(this.hass,"editor.scale_in_max")}
-                              .value=${cell.scale_in_max ?? ''}
-                              @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_in_max',e)}>
-                            </ha-textfield>
-                            <ha-textfield class="mini"
-                              type="number"
-                              .label=${t(this.hass,"editor.scale_out_min")}
-                              .value=${cell.scale_out_min ?? ''}
-                              @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_out_min',e)}>
-                            </ha-textfield>
-                            <ha-textfield class="mini"
-                              type="number"
-                              .label=${t(this.hass,"editor.scale_out_max")}
-                              .value=${cell.scale_out_max ?? ''}
-                              @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_out_max',e)}>
-                            </ha-textfield>
-                            <div class="muted">${t(this.hass,"editor.scale_hint")}</div>
+                        <details style="margin-top:12px;">
+                          <summary style="cursor:pointer;font-weight:600;">
+                            ${t(this.hass, 'editor.attr_edit_title')}
+                          </summary>
+
+                          <div class="option-group attr-edit-toggle">
+                            <label class=${attrEditEnabled ? '' : 'disabled'}>
+                              <input type="checkbox"
+                                .checked=${attrEditEnabled}
+                                @change=${(e)=> this._toggleAttrEditEnabled(rIdx,cIdx,e)} />
+                              ${t(this.hass, 'editor.attr_edit_enable')}
+                            </label>
+                            <div class="muted">${t(this.hass, 'editor.attr_edit_hint')}</div>
                           </div>
+
+                          <div class=${`cols1 attr-edit-fields ${attrEditEnabled ? '' : 'disabled'}`}>
+                            <div class="cols1">
+                              ${customElements.get('ha-service-picker') ? html`
+                                <ha-service-picker
+                                  .hass=${this.hass}
+                                  .value=${attrEdit.service || ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @value-changed=${(e)=> this._updateAttrEditText(rIdx,cIdx,'service',{ target:{ value: e.detail?.value || e.target?.value || '' }})}>
+                                </ha-service-picker>
+                                ${attrEdit.service ? html`
+                                  <div class="service-id-preview">${attrEdit.service}</div>
+                                ` : html`
+                                  <div class="service-id-preview" style="opacity:0.4;">domain.service</div>
+                                `}
+                              ` : html`
+                                <input
+                                  class="text-input"
+                                  list=${`attr-service-list-${rIdx}-${cIdx}`}
+                                  .value=${attrEdit.service || ''}
+                                  placeholder=${t(this.hass,"editor.attr_edit_service")}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'service',e)} />
+                                <datalist id=${`attr-service-list-${rIdx}-${cIdx}`}>
+                                  ${serviceOptions.map(opt => html`<option value="${opt}"></option>`)}
+                                </datalist>
+                                ${attrEdit.service ? html`
+                                  <div class="service-id-preview">${attrEdit.service}</div>
+                                ` : html`
+                                  <div class="service-id-preview" style="opacity:0.4;">domain.service</div>
+                                `}
+                              `}
+                            </div>
+
+                            <div class="cols1">
+                              <input
+                                class="text-input"
+                                list=${`attr-service-field-${rIdx}-${cIdx}`}
+                                .value=${attrEdit.field || ''}
+                                placeholder=${t(this.hass,"editor.attr_edit_service_field")}
+                                ?disabled=${!attrEditEnabled}
+                                @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'field',e)} />
+                              <datalist id=${`attr-service-field-${rIdx}-${cIdx}`}>
+                                ${serviceFieldOptions.map(opt => html`<option value="${opt}"></option>`)}
+                              </datalist>
+                            </div>
+
+                            <div class="cell-grid cell-wide">
+                              <ha-select
+                                .label=${t(this.hass,"editor.attr_edit_control_type")}
+                                .value=${attrEditControl}
+                                ?disabled=${!attrEditEnabled}
+                                naturalMenuWidth
+                                fixedMenuPosition
+                                @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'control',{ target:{ value:e.target.value }})}
+                                @closed=${(e)=>e.stopPropagation()}>
+                                <mwc-list-item value="slider">${t(this.hass,"editor.attr_edit_control_slider")}</mwc-list-item>
+                                <mwc-list-item value="switch">${t(this.hass,"editor.attr_edit_control_switch")}</mwc-list-item>
+                              </ha-select>
+                            </div>
+
+                            ${attrEditControl === 'slider' || attrEditControl === 'switch' ? html`
+                              <div class="cell-grid cell-wide">
+                                <label class="option full">
+                                  <input type="checkbox"
+                                    .checked=${showValueRightChecked}
+                                    ?disabled=${!attrEditEnabled}
+                                    @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
+                                  ${t(this.hass,"editor.show_value_on_right")}
+                                </label>
+                              </div>
+                            ` : nothing}
+
+                            ${attrEditControl === 'switch' ? html`
+                              <div class="cols2">
+                                <ha-textfield
+                                  .label=${t(this.hass,"editor.attr_edit_checked")}
+                                  .value=${attrEdit.checked ?? true}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditLiteral(rIdx,cIdx,'checked',e)}>
+                                </ha-textfield>
+                                <ha-textfield
+                                  .label=${t(this.hass,"editor.attr_edit_unchecked")}
+                                  .value=${attrEdit.unchecked ?? false}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditLiteral(rIdx,cIdx,'unchecked',e)}>
+                                </ha-textfield>
+                              </div>
+                            ` : html`
+                              <div class="cols3">
+                                <ha-textfield
+                                  type="number"
+                                  .label=${t(this.hass,"editor.attr_edit_min")}
+                                  .value=${attrEdit.min ?? ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'min',e)}>
+                                </ha-textfield>
+                                <ha-textfield
+                                  type="number"
+                                  .label=${t(this.hass,"editor.attr_edit_max")}
+                                  .value=${attrEdit.max ?? ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'max',e)}>
+                                </ha-textfield>
+                                <ha-textfield
+                                  type="number"
+                                  .label=${t(this.hass,"editor.attr_edit_step")}
+                                  .value=${attrEdit.step ?? ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'step',e)}>
+                                </ha-textfield>
+                              </div>
+                            `}
+                          </div>
+                        </details>
+                          
+                        <!-- PRZESKALOWANIE -->
+                        <details style="margin-top:12px;">
+                          <summary style="cursor:pointer;font-weight:600;">
+                            ${t(this.hass, 'editor.scale_title')}
+                          </summary>
+                          <div class="muted dyn-hint">${t(this.hass, 'editor.scale_hint')}</div>
+                          <div class="option group scale full">
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_in_min")}
+                                    .value=${cell.scale_in_min ?? ''}
+                                    @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_in_min',e)}>
+                                  </ha-textfield>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_in_max")}
+                                    .value=${cell.scale_in_max ?? ''}
+                                    @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_in_max',e)}>
+                                  </ha-textfield>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_out_min")}
+                                    .value=${cell.scale_out_min ?? ''}
+                                    @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_out_min',e)}>
+                                  </ha-textfield>
+                                  <ha-textfield class="mini"
+                                    type="number"
+                                    .label=${t(this.hass,"editor.scale_out_max")}
+                                    .value=${cell.scale_out_max ?? ''}
+                                    @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_out_max',e)}>
+                                  </ha-textfield>
+                          </div>
+                        </details>
                       ` : isIcon ? html`
                         <div class="cell-grid cell-wide">
                           ${customElements.get('ha-icon-picker') ? html`
@@ -2737,34 +2983,39 @@ class FlexCellsCardEditor extends LitElement {
                                 </ha-select>
                               </div>
                               <div class="cols1">
-                                <div class="option group scale full">
-                                  <span class="label" style="font-weight:600;">${t(this.hass,"editor.scale_title")}</span>
-                                  <ha-textfield class="mini"
-                                    type="number"
-                                    .label=${t(this.hass,"editor.scale_in_min")}
-                                    .value=${rule.overwrite_scale_in_min ?? ''}
-                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_min',e)}>
-                                  </ha-textfield>
-                                  <ha-textfield class="mini"
-                                    type="number"
-                                    .label=${t(this.hass,"editor.scale_in_max")}
-                                    .value=${rule.overwrite_scale_in_max ?? ''}
-                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_max',e)}>
-                                  </ha-textfield>
-                                  <ha-textfield class="mini"
-                                    type="number"
-                                    .label=${t(this.hass,"editor.scale_out_min")}
-                                    .value=${rule.overwrite_scale_out_min ?? ''}
-                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_min',e)}>
-                                  </ha-textfield>
-                                  <ha-textfield class="mini"
-                                    type="number"
-                                    .label=${t(this.hass,"editor.scale_out_max")}
-                                    .value=${rule.overwrite_scale_out_max ?? ''}
-                                    @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_max',e)}>
-                                  </ha-textfield>
-                                  <div class="muted">${t(this.hass,"editor.scale_hint")}</div>
-                                </div>
+                                <details style="margin-top:12px;">
+                                  <summary style="cursor:pointer;font-weight:600;">
+                                    ${t(this.hass, 'editor.scale_title')}
+                                  </summary>
+
+                                  <div class="muted dyn-hint">${t(this.hass, 'editor.scale_hint')}</div>
+                                  <div class="option group scale full">
+                                          <ha-textfield class="mini"
+                                            type="number"
+                                            .label=${t(this.hass,"editor.scale_in_min")}
+                                            .value=${rule.overwrite_scale_in_min ?? ''}
+                                            @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_min',e)}>
+                                          </ha-textfield>
+                                          <ha-textfield class="mini"
+                                            type="number"
+                                            .label=${t(this.hass,"editor.scale_in_max")}
+                                            .value=${rule.overwrite_scale_in_max ?? ''}
+                                            @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_max',e)}>
+                                          </ha-textfield>
+                                          <ha-textfield class="mini"
+                                            type="number"
+                                            .label=${t(this.hass,"editor.scale_out_min")}
+                                            .value=${rule.overwrite_scale_out_min ?? ''}
+                                            @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_min',e)}>
+                                          </ha-textfield>
+                                          <ha-textfield class="mini"
+                                            type="number"
+                                            .label=${t(this.hass,"editor.scale_out_max")}
+                                            .value=${rule.overwrite_scale_out_max ?? ''}
+                                            @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_max',e)}>
+                                          </ha-textfield>
+                                  </div>                                  
+                                </details>
                               </div>
                             ` : html`` }
 

@@ -149,6 +149,9 @@ class FlexCellsCard extends LitElement {
   constructor() {
     super();
     this._numberControlDrafts = new Map();
+    this._attrControlDrafts = new Map();
+    this._attrActivePointers = new Set();
+    this._attrDraftTimestamps = new Map();
     this._customTemplateCache = new Map();
     this._narrowMedia = null;
     this._onNarrowMediaChange = null;
@@ -295,6 +298,53 @@ class FlexCellsCard extends LitElement {
         if (Number.isFinite(draftNum) && Number.isFinite(stateNum) && Math.abs(draftNum - stateNum) <= Number.EPSILON * 100) {
           this._numberControlDrafts.delete(entityId);
           mutated = true;
+        }
+      }
+      if (mutated) this.requestUpdate();
+    }
+
+    if (changedProps.has('hass') && this._attrControlDrafts && this._attrControlDrafts.size) {
+      const hassStates = this.hass?.states || {};
+      let mutated = false;
+      for (const [key, draft] of [...this._attrControlDrafts.entries()]) {
+        if (this._attrActivePointers && this._attrActivePointers.has(key)) continue;
+        const { entityId, attrPath } = this._parseAttrEditKey(key);
+        if (!entityId) {
+          this._attrControlDrafts.delete(key);
+          mutated = true;
+          continue;
+        }
+        const stateObj = hassStates[entityId];
+        if (!stateObj) {
+          this._attrControlDrafts.delete(key);
+          mutated = true;
+          continue;
+        }
+        const tree = this._buildEntityValueTree(stateObj);
+        const raw = attrPath ? this._resolveEntityValuePath(stateObj, attrPath, tree) : undefined;
+        if (raw === null || raw === undefined) {
+          this._attrControlDrafts.delete(key);
+          if (this._attrDraftTimestamps) this._attrDraftTimestamps.delete(key);
+          mutated = true;
+          continue;
+        }
+        const expected = draft && typeof draft === 'object'
+          ? (draft.actual !== undefined ? draft.actual : draft.display)
+          : draft;
+        if (this._attrValuesEqual(raw, expected)) {
+          this._attrControlDrafts.delete(key);
+          if (this._attrDraftTimestamps) this._attrDraftTimestamps.delete(key);
+          mutated = true;
+        } else {
+          const ts = this._attrDraftTimestamps ? this._attrDraftTimestamps.get(key) : null;
+          const now = Date.now();
+          const tooOld = ts && (now - ts > 1700);
+          if (tooOld) {
+            // After grace window, follow external changes.
+            this._attrControlDrafts.delete(key);
+            if (this._attrDraftTimestamps) this._attrDraftTimestamps.delete(key);
+            mutated = true;
+          }
         }
       }
       if (mutated) this.requestUpdate();
@@ -623,6 +673,17 @@ class FlexCellsCard extends LitElement {
     // domyślnie: clamp do [0,1] — zachowuje się „intuicyjnie” dla zakresów typu 0–255 -> 0–100
     t = Math.max(0, Math.min(1, t));
     return c + t * (d - c);
+  }
+
+  _rescaleOutputToInput(cell, n) {
+    const a = Number(cell?.scale_in_min);
+    const b = Number(cell?.scale_in_max);
+    const c = Number(cell?.scale_out_min);
+    const d = Number(cell?.scale_out_max);
+    if (![a, b, c, d].every(Number.isFinite) || c === d) return n;
+    const t = (Number(n) - c) / (d - c);
+    const clamped = Math.max(0, Math.min(1, t));
+    return a + clamped * (b - a);
   }
 
   _normalizePrecision(precision) {
@@ -1036,6 +1097,60 @@ class FlexCellsCard extends LitElement {
     }
     return this._formatEntityCell(cell, stateObj);
   }
+
+  _renderAttributeEditControl(cell, stateObj, attrEdit) {
+    if (!attrEdit?.enabled) return null;
+    const entityId = cell?.value || '';
+    const attrPath = cell?.attribute || attrEdit.field || '';
+    if (!entityId || !attrPath) return null;
+    const key = this._attrEditKey(cell);
+    const draft = key ? this._getAttrDraft(key) : undefined;
+    const tree = this._buildEntityValueTree(stateObj);
+    const raw = this._resolveEntityValuePath(stateObj, attrPath, tree);
+    const showValueRight = cell?.show_control_value_right !== false;
+    const disabled = !attrEdit.service || !attrEdit.field || !entityId;
+    const range = this._attrEffectiveRange(cell, attrEdit);
+
+    if (attrEdit.control === 'switch') {
+      const draftDisplay = typeof draft?.display === 'boolean' ? draft.display : null;
+      const isChecked = draftDisplay !== null
+        ? draftDisplay
+        : this._attrValuesEqual(raw, attrEdit.checked) || (!this._attrValuesEqual(raw, attrEdit.unchecked) && !!raw);
+      const valueSource = draft && draft.actual !== undefined ? draft.actual : raw;
+      const formatted = this._formatAttrDisplayValue(valueSource, cell);
+      return html`<span class="ctrl-wrap">
+        <input class="ctrl-switch" type="checkbox"
+          .checked=${!!isChecked}
+          ?disabled=${disabled}
+          @change=${(e) => this._onAttrSwitchChange(e, cell)} />
+        ${showValueRight ? html`<span class="ctrl-value">${formatted || ''}</span>` : nothing}
+      </span>`;
+    }
+
+    const rawNum = Number(raw);
+    const stateDisplay = Number.isFinite(rawNum) ? this._rescaleIfConfigured(cell, rawNum) : rawNum;
+    const draftDisplay = draft && draft.display !== undefined ? draft.display : null;
+    let controlValue = draftDisplay !== null && draftDisplay !== undefined ? draftDisplay : stateDisplay;
+    const min = Number.isFinite(range.min) ? range.min : 0;
+    const max = Number.isFinite(range.max) ? range.max : 1;
+    const step = Number.isFinite(range.step) && range.step > 0 ? range.step : 'any';
+    if (!Number.isFinite(Number(controlValue))) controlValue = min;
+    controlValue = Math.max(min, Math.min(max, Number(controlValue)));
+    const formattedValue = this._formatAttrDisplayValue(controlValue, cell);
+
+    return html`<span class="ctrl-wrap">
+      <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${step}"
+        .value=${String(controlValue)}
+        ?disabled=${disabled}
+        @pointerdown=${(e) => this._onAttrSliderPointerDown(e, cell)}
+        @pointerup=${(e) => this._onAttrSliderPointerUp(e, cell)}
+        @pointercancel=${(e) => this._onAttrSliderPointerUp(e, cell)}
+        @input=${(e) => this._onAttrSliderInput(e, cell)}
+        @change=${(e) => this._onAttrSliderChange(e, cell)} />
+      ${showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing}
+    </span>`;
+  }
+
   _onToggleBoolean(entityId, isOn) {
     const svc = isOn ? 'turn_on' : 'turn_off';
     const domain = entityId?.split?.('.')[0] || 'input_boolean';
@@ -1095,6 +1210,206 @@ class FlexCellsCard extends LitElement {
   _clearNumberDraft(entityId) {
     if (!entityId || !this._numberControlDrafts) return;
     if (this._numberControlDrafts.delete(entityId)) this.requestUpdate();
+  }
+
+  _attrEditKey(cell) {
+    const entityId = cell?.value || '';
+    if (!entityId) return null;
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    const attrPath = cell?.attribute || attrEdit.field || '';
+    return `${entityId}||${attrPath}`;
+  }
+
+  _parseAttrEditKey(key) {
+    if (!key) return { entityId: '', attrPath: '' };
+    const [entityId, ...rest] = String(key).split('||');
+    return { entityId: entityId || '', attrPath: rest.join('||') || '' };
+  }
+
+  _getAttrDraft(key) {
+    if (!key || !this._attrControlDrafts) return undefined;
+    return this._attrControlDrafts.get(key);
+  }
+
+  _setAttrDraft(key, draft) {
+    if (!key) return;
+    if (!this._attrControlDrafts) this._attrControlDrafts = new Map();
+    this._attrControlDrafts.set(key, draft);
+    if (!this._attrDraftTimestamps) this._attrDraftTimestamps = new Map();
+    this._attrDraftTimestamps.set(key, Date.now());
+    this.requestUpdate();
+  }
+
+  _clearAttrDraft(key) {
+    if (!key || !this._attrControlDrafts) return;
+    const removed = this._attrControlDrafts.delete(key);
+    if (this._attrDraftTimestamps) this._attrDraftTimestamps.delete(key);
+    if (removed) this.requestUpdate();
+  }
+
+  _attrValuesEqual(a, b) {
+    if (a === b) return true;
+    if ((a === undefined || a === null || a === '') && (b === undefined || b === null || b === '')) return true;
+    const numA = Number(a);
+    const numB = Number(b);
+    if (Number.isFinite(numA) && Number.isFinite(numB)) {
+      return Math.abs(numA - numB) <= Number.EPSILON * 100;
+    }
+    return String(a).trim() === String(b).trim();
+  }
+
+  _normalizeAttrEditConfig(cell) {
+    const raw = (cell?.attr_edit && typeof cell.attr_edit === 'object') ? cell.attr_edit : {};
+    const controlRaw = typeof raw.control === 'string' ? raw.control.trim().toLowerCase() : 'slider';
+    const control = controlRaw === 'switch' ? 'switch' : 'slider';
+    const minNum = Number(raw.min);
+    const maxNum = Number(raw.max);
+    const stepNum = Number(raw.step);
+    const min = Number.isFinite(minNum) ? minNum : undefined;
+    const max = Number.isFinite(maxNum) ? maxNum : undefined;
+    const step = Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined;
+    const field = typeof raw.field === 'string' ? raw.field.trim() : (cell?.attribute || '');
+    const service = typeof raw.service === 'string' ? raw.service.trim() : '';
+    const checked = raw.checked !== undefined ? raw.checked : true;
+    const unchecked = raw.unchecked !== undefined ? raw.unchecked : false;
+    return {
+      enabled: raw.enabled === true,
+      control,
+      min,
+      max: max > min ? max : min,
+      step,
+      field,
+      service,
+      checked,
+      unchecked,
+    };
+  }
+
+  _normalizeAttrSliderValue(raw, range) {
+    const min = Number(range?.min);
+    const max = Number(range?.max);
+    const step = Number(range?.step);
+    return this._normalizeNumberValue(
+      raw,
+      Number.isFinite(min) ? min : undefined,
+      Number.isFinite(max) ? max : undefined,
+      Number.isFinite(step) && step > 0 ? step : undefined,
+    );
+  }
+
+  _formatAttrDisplayValue(value, cell) {
+    if (value === undefined || value === null) return '';
+    if (Number.isFinite(Number(value))) {
+      const num = Number(value);
+      const formatted = this._formatNumberByLocale(num, cell?.precision);
+      const unit = cell?.unit ? ` ${cell.unit}` : '';
+      return `${formatted}${unit}`;
+    }
+    return String(value);
+  }
+
+  _attrEffectiveRange(cell, attrEdit) {
+    const outMin = Number(cell?.scale_out_min);
+    const outMax = Number(cell?.scale_out_max);
+    const hasOutRange = Number.isFinite(outMin) && Number.isFinite(outMax) && outMin !== outMax;
+
+    let min = Number.isFinite(attrEdit?.min) ? Number(attrEdit.min) : undefined;
+    let max = Number.isFinite(attrEdit?.max) ? Number(attrEdit.max) : undefined;
+    if (hasOutRange) {
+      min = outMin;
+      max = outMax;
+    }
+    if (!Number.isFinite(min)) min = 0;
+    if (!Number.isFinite(max) || max === min) max = min + 1;
+
+    let step = Number.isFinite(attrEdit?.step) && attrEdit.step > 0 ? Number(attrEdit.step) : undefined;
+    if (!Number.isFinite(step) || step <= 0) {
+      const span = Math.abs(max - min);
+      step = span > 0 ? Number((span / 100).toFixed(4)) || 0.01 : 0.01;
+    }
+    return { min, max, step };
+  }
+
+  _onAttrSliderPointerDown(event, cell) {
+    const key = this._attrEditKey(cell);
+    if (!key) return;
+    const val = Number(event?.target?.value);
+    this._setAttrDraft(key, {
+      display: Number.isFinite(val) ? val : undefined,
+      actual: Number.isFinite(val) ? this._rescaleOutputToInput(cell, val) : undefined,
+    });
+    if (!this._attrActivePointers) this._attrActivePointers = new Set();
+    this._attrActivePointers.add(key);
+  }
+
+  _onAttrSliderPointerUp(_event, cell) {
+    const key = this._attrEditKey(cell);
+    if (!key || !this._attrActivePointers) return;
+    this._attrActivePointers.delete(key);
+  }
+
+  _onAttrSliderInput(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    if (!key) return;
+    const raw = event.target?.value ?? '';
+    const display = raw === '' ? '' : Number(raw);
+    const actual = Number.isFinite(display) ? this._rescaleOutputToInput(cell, display) : display;
+    this._setAttrDraft(key, { display, actual });
+  }
+
+  _onAttrSliderChange(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const target = event.target;
+    if (!target) return;
+    const raw = target.value ?? '';
+    const range = this._attrEffectiveRange(cell, attrEdit);
+    const normalized = this._normalizeAttrSliderValue(raw, range);
+    const entityId = cell?.value || '';
+    const stateObj = entityId ? this.hass?.states?.[entityId] : null;
+    const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+    const attrPath = cell?.attribute || attrEdit.field || '';
+    const fallbackRaw = attrPath && stateObj ? this._resolveEntityValuePath(stateObj, attrPath, tree) : undefined;
+    if (normalized === null) {
+      this._clearAttrDraft(key);
+      const fallbackNum = Number(fallbackRaw);
+      target.value = Number.isFinite(fallbackNum) ? String(this._rescaleIfConfigured(cell, fallbackNum)) : '';
+      return;
+    }
+    const displayValue = Number(normalized);
+    const actual = this._rescaleOutputToInput(cell, displayValue);
+    target.value = String(displayValue);
+    this._setAttrDraft(key, { display: displayValue, actual });
+    this._callAttrEditService(cell, actual);
+  }
+
+  _onAttrSwitchChange(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const checked = !!event.target?.checked;
+    const valueToSend = checked ? attrEdit.checked : attrEdit.unchecked;
+    this._setAttrDraft(key, { display: checked, actual: valueToSend });
+    this._callAttrEditService(cell, valueToSend);
+  }
+
+  _callAttrEditService(cell, value) {
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled) return;
+    const serviceId = attrEdit.service || '';
+    const [domain, service] = serviceId.includes('.') ? serviceId.split('.', 2) : ['', ''];
+    const entityId = cell?.value || '';
+    const field = attrEdit.field || cell?.attribute || '';
+    if (!domain || !service || !entityId || !field) return;
+    const data = { entity_id: entityId, [field]: value };
+    try { this.hass?.callService(domain, service, data); } catch (_e) { /* noop */ }
   }
   _clampNumber(value, min, max) {
     let result = Number(value);
@@ -1997,6 +2312,25 @@ class FlexCellsCard extends LitElement {
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const domain = val?.split?.('.')?.[0];
+      const attrEdit = this._normalizeAttrEditConfig(cell);
+      if (attrEdit.enabled && stateObj && (cell?.attribute || attrEdit.field)) {
+        const display = this._formatEntityCell(cell, stateObj);
+        const cellDyn = this._evaluateDynColor(cell, type, display);
+        const { style: _thStyle } = this._buildTextStyle(cell, type, align, cellDyn);
+        const control = this._renderAttributeEditControl(cell, stateObj, attrEdit);
+        const tokens = [];
+        if (cellCssClass) tokens.push(cellCssClass);
+        const cls = tokens.join(' ');
+        if (control) {
+          return html`
+            <th class=${cls || nothing}
+                colspan=${span}
+                style=${_thStyle}>
+              ${control}
+            </th>
+          `;
+        }
+      }
       if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
         const _disp = this._formatEntityCell(cell, stateObj);
         const _dyn = this._evaluateDynColor(cell, type, _disp);
@@ -2194,6 +2528,19 @@ class FlexCellsCard extends LitElement {
     if (type === 'entity') {
       const stateObj = this.hass?.states?.[val];
       const domain = val?.split?.('.')?.[0];
+      const attrEdit = this._normalizeAttrEditConfig(cell);
+      if (attrEdit.enabled && stateObj && (cell?.attribute || attrEdit.field)) {
+        const display = this._formatEntityCell(cell, stateObj);
+        const cellDyn = this._evaluateDynColor(cell, type, display);
+        const dyn = mergeDyn(cellDyn);
+        const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
+        descriptor.style = tdStyle;
+        descriptor.content = this._renderAttributeEditControl(cell, stateObj, attrEdit);
+        if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
+          descriptor.hidden = true;
+        }
+        return descriptor;
+      }
       if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
         const display = this._formatEntityCell(cell, stateObj);
         const cellDyn = this._evaluateDynColor(cell, type, display);

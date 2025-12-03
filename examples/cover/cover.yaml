@@ -1,0 +1,249 @@
+rows:
+  - cells:
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: center
+        style:
+          text_transform: ""
+          background: var(--divider-color)
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             border-radius: 20px;
+             height: 30px;
+          }
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        datetime_format: Sypialnia
+        style:
+          font_size: 14px
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             font-weight: 450;
+          }
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: center
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        style:
+          color: var(--label-badge-grey)
+          font_size: 14px
+        dyn_color:
+          - conditions:
+              - entity: cover.roleta_w_sypialni
+                attr: ""
+                op: "="
+                val: opening
+                val2: ""
+              - entity: cover.roleta_w_sypialni
+                attr: ""
+                op: "="
+                val: closing
+                val2: ""
+            match: any
+            bg: ""
+            fg: ""
+            overwrite: entity
+            overwrite_entity: ""
+            overwrite_attr: state
+      - type: icon
+        value: mdi:arrow-up-bold-circle
+        align: center
+        style:
+          background: var(--secondary-background-color)
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+             border-radius: 10px
+          }
+        tap_action:
+          action: perform-action
+          perform_action: cover.open_cover
+          target:
+            entity_id: cover.roleta_w_sypialni
+        dyn_color:
+          - conditions:
+              - entity: cover.roleta_w_sypialni
+                attr: ""
+                op: "="
+                val: open
+                val2: ""
+              - entity: cover.roleta_w_sypialni
+                attr: current_position
+                op: "="
+                val: "100"
+                val2: ""
+            match: all
+            bg: ""
+            fg: var(--divider-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+          - conditions:
+              - entity: cover.roleta_w_sypialni
+                attr: ""
+                op: "="
+                val: opening
+                val2: ""
+            match: all
+            bg: ""
+            fg: var(--divider-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: icon
+        value: mdi:stop
+        align: center
+        style:
+          text_transform: ""
+          background: var(--secondary-background-color)
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+             border-radius: 10px;
+          }
+        tap_action:
+          action: perform-action
+          perform_action: cover.stop_cover
+          target:
+            entity_id: cover.roleta_w_sypialni
+      - type: icon
+        value: mdi:arrow-down-bold-circle
+        align: center
+        style:
+          text_transform: ""
+          background: var(--secondary-background-color)
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+             border-radius: 10px
+          }
+        tap_action:
+          action: perform-action
+          perform_action: cover.close_cover
+          target:
+            entity_id: cover.roleta_w_sypialni
+        dyn_color:
+          - conditions:
+              - entity: cover.roleta_w_sypialni
+                attr: ""
+                op: "="
+                val: closed
+                val2: ""
+              - entity: cover.roleta_w_sypialni
+                attr: ""
+                op: "="
+                val: closing
+                val2: ""
+              - entity: cover.roleta_w_sypialni
+                attr: current_position
+                op: "="
+                val: "0"
+                val2: ""
+            match: any
+            bg: ""
+            fg: var(--divider-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: left
+        style:
+          text_transform: ""
+          font_size: 12px
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: cover.set_cover_position
+          field: position
+          control: slider
+          min: 0
+          max: 100
+          step: 1
+          checked: true
+          unchecked: false
+        attribute: attributes.current_position
+        custom_css_enabled: true
+        custom_css: |-
+          td .ctrl-wrap,
+          td .ctrl-range {
+             width: 100%;
+          }
+          .ctrl-value {
+             width: 25px;
+             text-align: right;
+          }
+        show_control_value_right: true
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+    merge_columns: true
+column_count: 6
+card_padding: 5
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: true
+custom_template_html: |
+  <style>
+  .datatable {
+    border-collapse: initial !important;
+    border-spacing: 5px !important;
+  }
+  </style>
+  <fcc />
+type: custom:flex-cells-card
+column_widths:
+  - 40px
+  - auto
+  - auto
+  - 40px
+  - 40px
+  - 40px

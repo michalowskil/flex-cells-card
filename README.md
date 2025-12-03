@@ -113,15 +113,25 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
     ![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)
   - [Media Player (template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)  
 
-    ![Media Player (template)](examples/media-player-template/images/small_dark_300.png)
-    ![Media Player (template)](examples/media-player-template/images/small_light_300.png)
+    ![Media Player template](examples/media-player-template/images/small_dark_300.png)
+    ![Media Player template](examples/media-player-template/images/small_light_300.png)
   - [Batteries](https://github.com/michalowskil/flex-cells-card/blob/main/examples/batteries-table/batteries.md) - displaying the device's battery status. An example of using dynamic rules to overwrite an icon when an entity doesn't provide it correctly. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/batteries-table/batteries.md)  
 
     ![Batteries](examples/batteries-table/images/dark-charging-300.png)
     ![Batteries](examples/batteries-table/images/light-disconnect-300.png)
+  - [Slider Lights](https://github.com/michalowskil/flex-cells-card/blob/main/examples/slider-lights/slider-lights.md) - brightness control, on/off, display more-info (custom CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/slider-lights/slider-lights.md)  
+
+    ![Slider Lights](examples/slider-lights/images/dark-300.png)
+    ![Slider Lights](examples/slider-lights/images/light-300.png)
+  - [Cover](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md) - window blind control (custom css). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md)  
+
+    ![Cover](examples/cover/images/dark_open-300.png)
+    ![Cover](examples/cover/images/light_closing-300.png)
   - More examples coming soon.
 
 ## Changelog
+- v0.18.0 —
+  - Added **attribute editing using slider and switch**.
 - v0.17.0 —
   - **Added "AND/OR" logical operators** in dynamic rules.
   - Added new fields in dynamic cell rules for the "Overwrite with entity/metadata" option: Date/Time format & Text override, Entity display, Rescale.
@@ -187,9 +197,6 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 ## Screenshots
 
 ![Flex Cells Card](images/flex-cells-card-10.png)
-![Flex Cells Card](images/flex-cells-card-8.png)
-![Flex Cells Card](images/flex-cells-card-1.png)
-![Flex Cells Card](images/flex-cells-card-2.png)
 ![Flex Cells Card](images/flex-cells-card-6.png)
 
 **Main configuration view**

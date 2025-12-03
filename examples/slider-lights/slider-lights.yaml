@@ -1,0 +1,295 @@
+rows:
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: center
+        style:
+          text_transform: ""
+          background: var(--divider-color)
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             border-radius: 20px;
+             height: 30px;
+          }
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: left
+        style:
+          font_size: 14px
+          text_transform: ""
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             padding-left: 10px !important;
+          }
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        datetime_format: Sypialnia
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: brightness
+          control: slider
+          min: 0
+          max: 255
+          step: 1
+          checked: true
+          unchecked: false
+        attribute: attributes.brightness
+        scale_in_min: 0
+        scale_out_min: 0
+        scale_in_max: 255
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+        style:
+          font_size: 12px
+        custom_css_enabled: true
+        custom_css: |
+          td .ctrl-wrap,
+          td .ctrl-range {
+             width: 100%;
+          }
+          .ctrl-value {
+             width: 40px;
+          }
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_salon
+        align: center
+        style:
+          text_transform: ""
+          background: var(--divider-color)
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             border-radius: 20px;
+             height: 30px;
+          }
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.zarowka_hue_salon
+        align: left
+        style:
+          font_size: 14px
+          text_transform: ""
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             padding-left: 10px !important;
+          }
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        datetime_format: Salon
+      - type: entity
+        value: light.zarowka_hue_salon
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: brightness
+          control: slider
+          min: 0
+          max: 255
+          step: 1
+          checked: true
+          unchecked: false
+        attribute: attributes.brightness
+        scale_in_min: 0
+        scale_out_min: 0
+        scale_in_max: 255
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+        style:
+          font_size: 12px
+        custom_css_enabled: true
+        custom_css: |
+          td .ctrl-wrap,
+          td .ctrl-range {
+             width: 100%;
+          }
+          .ctrl-value {
+             width: 40px;
+          }
+  - cells:
+      - type: entity
+        value: light.led_biurko
+        align: center
+        style:
+          text_transform: ""
+          background: var(--divider-color)
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             border-radius: 20px;
+             height: 30px;
+          }
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.led_biurko
+        align: left
+        style:
+          font_size: 14px
+          text_transform: ""
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             padding-left: 10px !important;
+          }
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        datetime_format: Biuro
+      - type: entity
+        value: light.led_biurko
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: brightness
+          control: slider
+          min: 0
+          max: 255
+          step: 1
+          checked: true
+          unchecked: false
+        attribute: attributes.brightness
+        scale_in_min: 0
+        scale_out_min: 0
+        scale_in_max: 255
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+        style:
+          font_size: 12px
+        custom_css_enabled: true
+        custom_css: |
+          td .ctrl-wrap,
+          td .ctrl-range {
+             width: 100%;
+          }
+          .ctrl-value {
+             width: 40px;
+          }
+column_count: 3
+card_padding: 4
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <style>
+  .datatable {
+    border-spacing: 8px;
+    border-collapse: initial !important;
+  }
+  </style>
+
+  <fcc />
+type: custom:flex-cells-card
+column_widths:
+  - 40px
+  - auto
+  - auto

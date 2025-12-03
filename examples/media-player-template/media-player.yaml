@@ -74,15 +74,28 @@ rows:
         align: center
   - cells:
       - type: entity
-        value: input_number.spotify_volume_slider
+        value: media_player.spotify_lukasz
         style:
           min_width: 150px
           text_transform: ""
-        precision: 0
         align: center
-        use_entity_unit: true
-        show_control: true
-        show_control_value_right: true
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: media_player.volume_set
+          field: volume_level
+          control: slider
+          min: 0
+          max: 1
+          step: 1
+          checked: true
+          unchecked: false
+        attribute: volume_level
+        scale_in_min: 0
+        scale_in_max: 1
+        scale_out_min: 0
+        scale_out_max: 100
+        unit: "%"
   - cells:
       - type: icon
         value: mdi:repeat-off
