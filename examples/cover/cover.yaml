@@ -179,7 +179,7 @@ rows:
         style:
           text_transform: ""
           font_size: 12px
-        use_entity_unit: true
+        use_entity_unit: false
         attr_edit:
           enabled: true
           service: cover.set_cover_position
@@ -198,10 +198,11 @@ rows:
              width: 100%;
           }
           .ctrl-value {
-             width: 25px;
+             width: 35px;
              text-align: right;
           }
         show_control_value_right: true
+        unit: "%"
       - type: string
         value: ""
         align: right
