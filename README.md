@@ -123,7 +123,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
     ![Slider Lights](examples/slider-lights/images/dark-300.png)
     ![Slider Lights](examples/slider-lights/images/light-300.png)
-  - [Cover](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md) - window blind control (custom css). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md)  
+  - [Cover](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md) - window blind control (custom CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md)  
 
     ![Cover](examples/cover/images/dark_open-300.png)
     ![Cover](examples/cover/images/light_closing-300.png)
