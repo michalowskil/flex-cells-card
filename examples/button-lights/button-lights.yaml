@@ -1,0 +1,620 @@
+rows:
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:desk-lamp-on
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:desk-lamp
+        tap_action:
+          action: toggle
+        hold_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.zarowka_hue_sypialnia
+          data:
+            brightness_pct: 100
+        double_tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.zarowka_hue_sypialnia
+          data:
+            brightness_pct: 50
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: light.zarowka_hue_sypialnia
+                attr: state
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Lampka
+        attribute: brightness
+        scale_in_min: 0
+        scale_in_max: 255
+        scale_out_min: 0
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_salon
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:lamp
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:lamp-outline
+        tap_action:
+          action: toggle
+        double_tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          data:
+            brightness_pct: 50
+          target:
+            entity_id: light.zarowka_hue_salon
+        hold_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.zarowka_hue_salon
+          data:
+            brightness_pct: 100
+      - type: entity
+        value: light.zarowka_hue_salon
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: light.zarowka_hue_salon
+                attr: state
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Lampka
+        attribute: brightness
+        scale_in_min: 0
+        scale_in_max: 255
+        scale_out_min: 0
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+  - cells:
+      - type: entity
+        value: light.led_biurko
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:led-on
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:led-off
+        tap_action:
+          action: toggle
+        double_tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_biurko
+          data:
+            brightness_pct: 50
+        hold_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_biurko
+          data:
+            brightness_pct: 100
+      - type: entity
+        value: light.led_biurko
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: light.led_biurko
+                attr: state
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Biurko
+        attribute: brightness
+        scale_in_min: 0
+        scale_in_max: 255
+        scale_out_min: 0
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_salonie
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.oswietlenie_w_salonie
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        datetime_format: Salon
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_kuchni
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.oswietlenie_w_kuchni
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        datetime_format: Kuchnia
+        style:
+          text_transform: ""
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_przedpokoju
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.oswietlenie_w_przedpokoju
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        datetime_format: Przedpokój
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_lazience
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.oswietlenie_w_lazience
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        datetime_format: Łazienka
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_sypialni
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.oswietlenie_w_sypialni
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        datetime_format: Sypialnia
+  - cells:
+      - type: entity
+        value: light.oswietlenie_glowne_bez_lampki_i_gesi
+        align: left
+        style:
+          text_transform: ""
+          icon_size: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:lightbulb-group-off
+      - type: entity
+        value: light.oswietlenie_glowne_bez_lampki_i_gesi
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: toggle
+        datetime_format: Główne
+column_count: 2
+card_padding: 0
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <style>
+    .fcc-template-card {
+      background-color: transparent !important;
+      border: none !important;
+    }
+    .datatable {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 10px;
+    }
+    .datatable tbody { display: contents; }
+    .datatable tr {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--card-background-color);
+      border-radius: 12px;
+      border: 1px solid var(--divider-color);
+    }
+    .datatable td {
+      display: flex;
+      justify-content: center !important;
+      align-items: center !important;
+      font-size: 12px;
+    }
+    .datatable tr > td:first-child  {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 14px 0 14px !important;
+      color: #f5a623;
+      background: transparent !important;
+    }
+    .datatable tr > td:first-child::before {
+      content: "";
+      position: absolute;
+      height: 40px;
+      width: 40px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.2;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .datatable tr > td:first-child > * {
+      position: relative;
+      z-index: 1;
+    }
+    .datatable tr > td:first-child ha-icon {
+      --mdc-icon-size: 24px;
+      display: block;
+      line-height: 1;
+      color: var(--state-icon-color, currentColor) !important;
+    }
+    .datatable tr > td:first-child ha-icon svg {
+      display: block;
+    }
+    .datatable tr > td:last-child  {
+      margin-bottom: 0px;
+      width: 100%;
+      padding-top: 6px !important;
+      padding-bottom: 6px !important;
+      font-weight: 500;
+    }
+  </style>
+  <fcc />
+type: custom:flex-cells-card

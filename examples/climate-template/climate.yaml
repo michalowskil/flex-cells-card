@@ -1,0 +1,746 @@
+rows:
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: left
+        style:
+          text_transform: ""
+          icon_size: 30px
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: var(--divider-color)
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:air-conditioner
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: fan_only
+                val2: ""
+            match: all
+            bg: "#06AEC333"
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:air-conditioner
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: heat
+                val2: ""
+            match: all
+            bg: "#FF6F2233"
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:air-conditioner
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: cool
+                val2: ""
+            match: all
+            bg: "#2196F333"
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:air-conditioner
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: left
+        style:
+          text_transform: ""
+          color: "#b0b0b0"
+          font_size: ""
+        use_entity_unit: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        attribute: current_temperature
+        unit: °C
+        precision: 1
+        dyn_color: []
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: left
+        style:
+          text_transform: ""
+          font_size: 14px
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: climate.set_temperature
+          field: temperature
+          control: slider
+          min: 16
+          max: 30
+          step: 1
+          checked: true
+          unchecked: false
+        unit: °C
+        show_control_value_right: true
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: center
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: fan_only
+                val2: ""
+            match: all
+            bg: var(--divider-color)
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Fan
+            icon: mdi:fan
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: fan_only
+                val2: ""
+            match: all
+            bg: "#06AEC333"
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Fan
+            icon: mdi:fan
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_hvac_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            hvac_mode: fan_only
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: center
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: cool
+                val2: ""
+            match: all
+            bg: var(--divider-color)
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Cool
+            icon: mdi:snowflake
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: cool
+                val2: ""
+            match: all
+            bg: "#2196F333"
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Cool
+            icon: mdi:snowflake
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.samsung_ac
+          data:
+            hvac_mode: cool
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: center
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: heat
+                val2: ""
+            match: all
+            bg: var(--divider-color)
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Heat
+            icon: mdi:fire
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: heat
+                val2: ""
+            match: all
+            bg: "#FF6F2233"
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: Heat
+            icon: mdi:fire
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.samsung_ac
+          data:
+            hvac_mode: heat
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: center
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: "off"
+                val2: ""
+            match: all
+            bg: var(--divider-color)
+            fg: "#9e9e9e"
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: "Off"
+            icon: mdi:power
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: "#9E9E9E"
+            fg: white
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: "Off"
+            icon: mdi:power
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.samsung_ac
+          data:
+            hvac_mode: "off"
+  - cells:
+      - type: string
+        value: Swing
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_swing_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            swing_mode: swing
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: swing_mode
+                op: "="
+                val: swing
+                val2: ""
+            match: all
+            bg: var(--state-icon-color)
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+    dyn_row_rules: []
+  - cells:
+      - type: string
+        value: Stop
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_swing_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            swing_mode: stop
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: swing_mode
+                op: "="
+                val: stop
+                val2: ""
+            match: all
+            bg: var(--state-icon-color)
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+  - cells:
+      - type: entity
+        value: climate.samsung_ac
+        align: left
+        style:
+          text_transform: ""
+          color: "#b0b0b0"
+        use_entity_unit: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        attribute: current_humidity
+        precision: 0
+        unit: "%"
+  - cells:
+      - type: string
+        value: Quiet
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: fan_mode
+                op: "="
+                val: quiet
+                val2: ""
+            match: all
+            bg: "#d16500"
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        attribute: fan_mode
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_fan_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            fan_mode: quiet
+  - cells:
+      - type: string
+        value: Low
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: fan_mode
+                op: "="
+                val: low
+                val2: ""
+            match: all
+            bg: "#d16500"
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        attribute: fan_mode
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_fan_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            fan_mode: low
+  - cells:
+      - type: string
+        value: Med
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: fan_mode
+                op: "="
+                val: med
+                val2: ""
+            match: all
+            bg: "#d16500"
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        attribute: fan_mode
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_fan_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            fan_mode: med
+  - cells:
+      - type: string
+        value: High
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: fan_mode
+                op: "="
+                val: high
+                val2: ""
+            match: all
+            bg: "#d16500"
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        attribute: fan_mode
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_fan_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            fan_mode: high
+  - cells:
+      - type: string
+        value: Turbo
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: fan_mode
+                op: "="
+                val: turbo
+                val2: ""
+            match: all
+            bg: "#d16500"
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        attribute: fan_mode
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_fan_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            fan_mode: turbo
+  - cells:
+      - type: string
+        value: Auto
+        align: left
+        style:
+          text_transform: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        dyn_color:
+          - conditions:
+              - entity: climate.samsung_ac
+                attr: fan_mode
+                op: "="
+                val: auto
+                val2: ""
+            match: all
+            bg: "#d16500"
+            fg: var(--text-primary-color)
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        attribute: fan_mode
+        tap_action:
+          action: perform-action
+          perform_action: climate.set_fan_mode
+          target:
+            entity_id: climate.samsung_ac
+          data:
+            fan_mode: auto
+column_count: 1
+card_padding: 8
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <style>
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .col-1 {
+      flex: 0 0 50px;
+      margin-bottom: 10px;      
+    }
+    .col-2 {
+      flex: 1 1 110px;
+      min-width: 110px;
+      padding-left: 10px;
+    }
+    .col-3 {
+      flex: 1 1 150px;
+      min-width: 150px;
+    }
+    .icon-container .icon {
+      display: inline-block;
+      padding: 10px !important;
+      border-radius: 50px;
+      width: 30px;
+      height: 30px;
+    }
+    .mode {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .mode > span {
+      border: 1px solid var(--divider-color) !important;
+      border-radius: 12px;
+      padding: 5px 7px !important;
+      line-height: 1px !important;
+    }
+    .slider {
+      margin-top: 6px;
+    }
+    .slider > span,
+    .ctrl-wrap,
+    .ctrl-wrap input {
+      width: 100% !important;
+    }
+    .swing,
+    .fan-modes {
+      font-size: 12px;
+      margin-top: 5px;
+      display: flex;
+    }
+    .swing-button-left {
+      border: 1px solid grey;
+      padding: 0 10px !important;
+      border-top-left-radius: 10px;
+      border-bottom-left-radius: 10px;
+    }
+    .swing-button-right {
+      border: 1px solid grey;
+      border-left: none;
+      padding: 0 10px !important;
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;
+    }
+    .fan-modes > span {
+      border: 1px solid grey;
+      padding: 0 10px !important;
+    }
+    .fan-modes > span:not(:first-child, :last-child) {
+      border-left: none;
+      padding: 0 10px !important;
+    }
+    .fan-modes > span:first-child {
+      border-top-left-radius: 10px;
+      border-bottom-left-radius: 10px;    
+    }
+    .fan-modes > span:last-child {
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;    
+      border-left: none;
+    }
+    .buttons {
+      justify-content: space-between;
+    }
+  </style>
+
+  <div class="row">
+    <div class="col col-1">
+      <div class="icon-container">
+        <fcc class="icon" row="1" col="1" />
+      </div>
+    </div>
+    <div class="col col-2">
+      <div class="info-container">
+        <b>Living room</b>
+        <div>
+          <fcc class="current-temp" row="2" col="1" />
+          ⸱
+          <fcc class="current-temp" row="10" col="1" />
+        </div>
+      </div>
+    </div>
+    <div class="col col-3">
+      <div class="controls-container">
+        <div class="mode">
+          <fcc class="cool-button" row="5" col="1" />
+          <fcc class="fan-button" row="4" col="1" />
+          <fcc class="heat-button" row="6" col="1" />
+          <fcc class="power-button" row="7" col="1" />
+        </div>
+        <div class="slider">
+          <fcc class="target-temp" row="3" col="1" />
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row buttons">
+    <div class="swing">
+      <fcc class="swing-button-left" row="9" col="1" />
+      <fcc class="swing-button-right" row="8" col="1" />
+    </div>
+    <div class="fan-modes">
+      <fcc row="11" col="1" />
+      <fcc row="12" col="1" />
+      <fcc row="13" col="1" />
+      <fcc row="14" col="1" />
+      <fcc row="15" col="1" />
+      <fcc row="16" col="1" />
+    </div>
+  </div>
+type: custom:flex-cells-card

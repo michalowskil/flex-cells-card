@@ -58,8 +58,8 @@ class FlexCellsCard extends LitElement {
       background: var(--ha-card-background, var(--card-background-color, #fff));
       color: var(--primary-text-color);
       border-radius: var(--ha-card-border-radius, 12px);
+      overflow: hidden;
       font-size: 16px;
-      border: 1px solid var(--ha-card-border-color, var(--divider-color, #e0e0e0));
     }
     .wrap { width: 100%; border-radius: inherit; overflow: hidden; }
     .scroller { width: 100%; display: block; }
@@ -482,30 +482,37 @@ class FlexCellsCard extends LitElement {
     return null;
   }
 
-  _formatDateWithPattern(date, pattern) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
-    const locale = (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator !== 'undefined' ? navigator.language : 'en') || 'en');
-    const tokens = ['YYYY','MMMM','REL_SHORT','REL','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s'];
-    const hours24 = date.getHours();
-    const mapping = {
-      'YYYY': String(date.getFullYear()),
-      'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(date),
-      'REL_SHORT': this._formatRelativeDurationText(date, locale, { short: true }),
-      'REL': this._formatRelativeDurationText(date, locale),
-      'YY': String(date.getFullYear()).slice(-2).padStart(2, '0'),
-      'MM': String(date.getMonth() + 1).padStart(2, '0'),
-      'M': String(date.getMonth() + 1),
-      'DD': String(date.getDate()).padStart(2, '0'),
-      'D': String(date.getDate()),
-      'HH': String(hours24).padStart(2, '0'),
-      'H': String(hours24),
-      'hh': String(((hours24 % 12) || 12)).padStart(2, '0'),
-      'h': String(((hours24 % 12) || 12)),
-      'mm': String(date.getMinutes()).padStart(2, '0'),
-      'm': String(date.getMinutes()),
-      'ss': String(date.getSeconds()).padStart(2, '0'),
-      's': String(date.getSeconds()),
-    };
+  _formatDateWithPattern(date, pattern, rawValue = '') {
+    if (!pattern) return null;
+    const hasDate = (date instanceof Date) && !Number.isNaN(date.getTime());
+    const rawStr = rawValue === null || rawValue === undefined ? '' : String(rawValue);
+    const locale = hasDate
+      ? (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator !== 'undefined' ? navigator.language : 'en') || 'en')
+      : undefined;
+    const tokens = ['YYYY','MMMM','REL_SHORT','REL','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s','RAW'];
+    const mapping = { 'RAW': rawStr };
+    if (hasDate) {
+      const hours24 = date.getHours();
+      Object.assign(mapping, {
+        'YYYY': String(date.getFullYear()),
+        'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(date),
+        'REL_SHORT': this._formatRelativeDurationText(date, locale, { short: true }),
+        'REL': this._formatRelativeDurationText(date, locale),
+        'YY': String(date.getFullYear()).slice(-2).padStart(2, '0'),
+        'MM': String(date.getMonth() + 1).padStart(2, '0'),
+        'M': String(date.getMonth() + 1),
+        'DD': String(date.getDate()).padStart(2, '0'),
+        'D': String(date.getDate()),
+        'HH': String(hours24).padStart(2, '0'),
+        'H': String(hours24),
+        'hh': String(((hours24 % 12) || 12)).padStart(2, '0'),
+        'h': String(((hours24 % 12) || 12)),
+        'mm': String(date.getMinutes()).padStart(2, '0'),
+        'm': String(date.getMinutes()),
+        'ss': String(date.getSeconds()).padStart(2, '0'),
+        's': String(date.getSeconds()),
+      });
+    }
     try {
       const pat = String(pattern || '');
       let out = '';
@@ -524,8 +531,8 @@ class FlexCellsCard extends LitElement {
         }
         let matched = false;
         for (const token of tokens) {
-          if (pat.startsWith(token, i)) {
-            out += mapping[token] ?? token;
+          if (pat.startsWith(token, i) && Object.prototype.hasOwnProperty.call(mapping, token)) {
+            out += mapping[token];
             i += token.length;
             matched = true;
             break;
@@ -646,6 +653,7 @@ class FlexCellsCard extends LitElement {
   _formatCellDateValue(cell, stateObj, raw, isAttr) {
     const pattern = cell?.datetime_format;
     if (!pattern) return null;
+    const rawStr = raw === undefined || raw === null ? '' : String(raw);
     let date = null;
     if (!isAttr) {
       const entityId = String(cell?.value || '');
@@ -657,9 +665,11 @@ class FlexCellsCard extends LitElement {
       date = this._parseDateLikeValue(raw);
     }
     if (date) {
-      const formatted = this._formatDateWithPattern(date, pattern);
+      const formatted = this._formatDateWithPattern(date, pattern, rawStr);
       if (formatted !== null && formatted !== undefined) return formatted;
     }
+    const formattedRaw = this._formatDateWithPattern(null, pattern, rawStr);
+    if (formattedRaw !== null && formattedRaw !== undefined) return formattedRaw;
     return this._literalizePattern(pattern);
   }
 
@@ -2905,8 +2915,8 @@ class FlexCellsCard extends LitElement {
       const readAttrValue = (src, attr) => {
         if (!src || !attr) return null;
         const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const doubleQuoted = new RegExp(`${escaped}\\s*=\\s*"([^"]*)"`, 'i');
-        const singleQuoted = new RegExp(`${escaped}\\s*=\\s*'([^']*)'`, 'i');
+        const doubleQuoted = new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*"([^"]*)"`, 'i');
+        const singleQuoted = new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*'([^']*)'`, 'i');
         const dblMatch = src.match(doubleQuoted);
         if (dblMatch) return dblMatch[1];
         const sglMatch = src.match(singleQuoted);
@@ -2925,8 +2935,8 @@ class FlexCellsCard extends LitElement {
         rawSegments.push(before);
 
         const attrs = match[1] || '';
-        const rowMatch = attrs.match(/row\s*=\s*"(\d+)"/i);
-        const colMatch = attrs.match(/col\s*=\s*"(\d+)"/i);
+        const rowMatch = attrs.match(/row\s*=\s*["'](\d+)["']/i);
+        const colMatch = attrs.match(/col\s*=\s*["'](\d+)["']/i);
         const styleMatch =
           attrs.match(/style\s*=\s*"([^"]*)"/i) ||
           attrs.match(/style\s*=\s*'([^']*)'/i);
@@ -3107,14 +3117,14 @@ class FlexCellsCard extends LitElement {
     const extraStyle = customCssBlocks.length ? html`<style>${customCssBlocks.join('\n')}</style>` : nothing;
 
     if (!rows.length) {
-      const defaultCard = html`<div class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</div>`;
+      const defaultCard = html`<ha-card class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</ha-card>`;
       if (!customTemplateHasContent) {
         return html`${extraStyle}${defaultCard}`;
       }
       const templateCard = html`
-        <div class="card fcc-template-card" style="padding:${padVal}px;">
+        <ha-card class="card fcc-template-card" style="padding:${padVal}px;">
           ${this._renderCustomTemplate(customTemplateRaw, [], null)}
-        </div>
+        </ha-card>
       `;
       const combined = this._isInEditorPreview()
         ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
@@ -3354,9 +3364,9 @@ class FlexCellsCard extends LitElement {
       : html`<div class="wrap">${table}</div>`;
 
     const defaultCard = html`
-      <div class="card" style="padding:${padVal}px;">
+      <ha-card class="card" style="padding:${padVal}px;">
         ${tableViewport}
-      </div>
+      </ha-card>
     `;
 
     if (!customTemplateHasContent) {
@@ -3364,9 +3374,9 @@ class FlexCellsCard extends LitElement {
     }
 
     const templateCard = html`
-      <div class="card fcc-template-card" style="padding:${padVal}px;">
+      <ha-card class="card fcc-template-card" style="padding:${padVal}px;">
         ${this._renderCustomTemplate(customTemplateRaw, templateRows, tableViewport)}
-      </div>
+      </ha-card>
     `;
 
     const combined = this._isInEditorPreview()

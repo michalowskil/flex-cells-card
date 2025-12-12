@@ -146,7 +146,7 @@ const DICTS = {
       dynamic_row_title: "Dynamic Rules (row): Color & Row Hiding",
       dynamic_hint: "Evaluate rules from top to bottom, the last match wins.",
       datetime_format: "Date/Time format & Text override",
-      available_tokens: "Available tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (elapsed time), REL_SHORT (short elapsed time), [literals in brackets]",
+      available_tokens: "Available tokens: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (elapsed time), REL_SHORT (short elapsed time), [literals in brackets]",
       value: "Value"
     },
     placeholder: {
@@ -349,7 +349,7 @@ const DICTS = {
       dynamic_row_title: "Reguły dynamiczne (wiersz): kolor i ukrywanie wiersza",
       dynamic_hint: "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa.",
       datetime_format: "Format daty/czasu i nadpisanie tekstu",
-      available_tokens: "Dostępne tokeny: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (czas, który upłynął), REL_SHORT (skrót czasu), [literały w nawiasach]",
+      available_tokens: "Dostępne tokeny: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (czas, który upłynął), REL_SHORT (skrót czasu), [literały w nawiasach]",
       value: "Wartość"
     },
     placeholder: {
@@ -552,7 +552,7 @@ const DICTS = {
       dynamic_row_title: "Dynamische Regeln (Zeile): Farben und Zeilenausblenden",
       dynamic_hint: "Regeln von oben nach unten prüfen, die letzte Übereinstimmung gewinnt.",
       datetime_format: "Datums-/Zeitformat & Textüberschreibung",
-      available_tokens: "Verfügbare Tokens: YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (verstrichene Zeit), REL_SHORT (kompakte Zeit), [Literale in Klammern]",
+      available_tokens: "Verfügbare Tokens: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (verstrichene Zeit), REL_SHORT (kompakte Zeit), [Literale in Klammern]",
       value: "Wert"
     },
     placeholder: {

@@ -54,14 +54,12 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Sorting works even if the column being sorted is hidden (breakpoint).
 
 - Dynamic rules
-  - For example, if you want to change what an entity displays to a defined text, while keeping "more-info" on click, you can add a rule without an entity, with the operator set to "not equal" and an empty "value". This condition will always be met.
   - If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
 
 - Available colors
   - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
 
-- Copy & Paste / Search & Replace
-  - You don't have to perform repetitive actions in the visual editor. For example, if you want to create many similar rows, create one in the visual editor, then go to the code editor and "copy & paste" it as many times as you want, along with all its configuration. You can then return to the visual editor and change the details.
+- Search & Replace
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
 ## Templates
@@ -100,7 +98,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
     to use this cell like this:
 
     ```html
-    <div style="<fcc mode="text" row="22" col="1" />">
+    <div style="<fcc mode='text' row='1' col='1' />">
         test
     <div>
     ```
@@ -127,9 +125,24 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
     ![Cover](examples/cover/images/dark_open-300.png)
     ![Cover](examples/cover/images/light_closing-300.png)
-  - More examples coming soon.
+  - [Climate template](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md) - another example of an FCC template (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md)  
+
+    ![Climate template](examples/climate-template/images/dark-heat-300.png)
+    ![Climate template](examples/climate-template/images/light-fan-300.png)
+  - [Button lights](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md) - turning on/off lighting, setting color/brightness (custom CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md)  
+
+    ![Button lights](examples/button-lights/images/dark-300.png)
+    ![Button lights](examples/button-lights/images/light-300.png)
+  - [Input controls](https://github.com/michalowskil/flex-cells-card/blob/main/examples/input-controls/input-controls.md) - this is only a presentation of the appearance of the FCC controls. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/input-controls/input-controls.md)  
+
+    ![Input controls](examples/input-controls/images/dark-300.png)
+    ![Input controls](examples/input-controls/images/light-300.png)
 
 ## Changelog
+- v0.19.0 —
+  - Added proper ***ha-card wrapper*** and removed the custom border so the card behaves like a normal Lovelace card (e.g., looks correct inside vertical-stack-in-card). Kept the "card" class intact, so any existing CSS targeting it should still work.
+  - Added ***RAW token*** to "Date/Time format & Text override" so you can inject the unformatted value; e.g., set the format to "[light is: ]RAW" to render "light is: on".
+  - Fixed FCC template parsing to only consider "mode/as" attributes for "text" mode and accept row/column values ​​in single quotes.
 - v0.18.0 —
   - Added **attribute editing using slider and switch**.
 - v0.17.0 —
@@ -196,20 +209,10 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
 ## Screenshots
 
-![Flex Cells Card](images/flex-cells-card-10.png)
-![Flex Cells Card](images/flex-cells-card-6.png)
-
-**Main configuration view**
-
-![Flex Cells Card config](images/flex-cells-card-configuration1.png)
-
-**Row and cell configuration**
-
-![Flex Cells Card config](images/flex-cells-card-configuration2.png)
-
-**Tap & Hold Actions**
-
-![Flex Cells Card config](images/flex-cells-card-configuration3.png)
+![Flex Cells Card](images/fcc-config-1.png)
+![Flex Cells Card](images/fcc-config-2.png)
+![Flex Cells Card](images/fcc-config-3.png)
+![Flex Cells Card](images/fcc-config-4.png)
 
 ## Example YAML
 ```yaml

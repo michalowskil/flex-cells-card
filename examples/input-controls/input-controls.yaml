@@ -1,0 +1,319 @@
+rows:
+  - cells:
+      - type: string
+        value: ""
+        align: left
+        style:
+          text_transform: ""
+          color: ""
+          background: ""
+          object_fit: scale-down
+          image_width: 100px
+          image_refresh_interval: ""
+          image_height: ""
+        dyn_color: []
+      - type: string
+        value: input control
+        align: center
+      - type: string
+        value: value
+        align: center
+  - cells:
+      - type: string
+        value: number
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          color: ""
+          underline: false
+          background: var(--divider-color)
+        dyn_color: []
+        show_control: true
+      - type: entity
+        value: input_number.fcc_volume_b
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+          text_transform: ""
+        show_control: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+      - type: entity
+        value: input_number.fcc_volume_b
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+          text_transform: ""
+  - cells:
+      - type: string
+        value: number
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          color: ""
+          underline: false
+          background: var(--divider-color)
+        dyn_color: []
+        show_control: true
+      - type: entity
+        value: input_number.fcc_volume_a
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+      - type: entity
+        value: input_number.fcc_volume_a
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+          text_transform: ""
+  - cells:
+      - type: string
+        value: boolean
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          color: ""
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_boolean.wilgotnosc_powiadomienia
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+      - type: entity
+        value: input_boolean.wilgotnosc_powiadomienia
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+          background: ""
+          color: ""
+        dyn_color: []
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+  - cells:
+      - type: string
+        value: select
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_select.radio_station
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+      - type: entity
+        value: input_select.radio_station
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+  - cells:
+      - type: string
+        value: datetime
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_datetime.testowy_datetime_b
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+      - type: entity
+        value: input_datetime.testowy_datetime_b
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+  - cells:
+      - type: string
+        value: datetime
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_datetime.testowy_datetime_c
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+      - type: entity
+        value: input_datetime.testowy_datetime_c
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+  - cells:
+      - type: string
+        value: datetime
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_datetime.testowy_datetime_a
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+      - type: entity
+        value: input_datetime.testowy_datetime_a
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+          text_transform: ""
+          color: ""
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+  - cells:
+      - type: string
+        value: button
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_button.test_button_a
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+        tap_action:
+          action: perform-action
+          perform_action: input_button.press
+          target:
+            entity_id: input_button.test_button_a
+      - type: entity
+        value: input_button.test_button_a
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        dyn_color: []
+        attr_edit:
+          enabled: false
+          service: ""
+          field: last_changed
+          control: slider
+          checked: true
+          unchecked: false
+  - cells:
+      - type: string
+        value: text
+        align: left
+        style:
+          text_transform: ""
+          bold: true
+          background: var(--divider-color)
+        dyn_color: []
+      - type: entity
+        value: input_text.test_text1
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        show_control: true
+      - type: entity
+        value: input_text.test_text1
+        align: center
+        use_entity_unit: true
+        style:
+          underline: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+column_count: 3
+card_padding: 0
+overflow_x: true
+header_from_first_row: true
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 8
+  bottom: 4
+  left: 8
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+grid_options:
+  rows: auto

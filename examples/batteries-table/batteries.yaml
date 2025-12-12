@@ -77,8 +77,26 @@ rows:
                 val2: ""
               - entity: ""
                 attr: ""
-                op: <=
+                op: ">="
                 val: "100"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:battery-charging
+          - conditions:
+              - entity: binary_sensor.roleta_w_sypialni_charging_status
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+              - entity: ""
+                attr: ""
+                op: <=
+                val: "99"
                 val2: ""
             match: all
             bg: ""
@@ -249,6 +267,13 @@ rows:
             overwrite_entity: ""
             overwrite_attr: ""
             icon: mdi:battery-charging-10
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
       - type: string
         value: Window blinds
         align: left
