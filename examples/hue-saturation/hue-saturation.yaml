@@ -1,0 +1,394 @@
+rows:
+  - cells:
+      - type: entity
+        value: light.led_wyspa
+        align: center
+        style:
+          text_transform: ""
+          background: var(--divider-color)
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+          hue_path: ""
+          sat_path: ""
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             border-radius: 20px;
+             height: 30px;
+          }
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: light.led_wyspa
+        align: left
+        style:
+          font_size: 14px
+          text_transform: ""
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             padding-left: 10px !important;
+          }
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+        datetime_format: Wyspa
+      - type: entity
+        value: light.led_wyspa
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: brightness
+          control: slider
+          min: 1
+          max: 255
+          step: 1
+          checked: true
+          unchecked: false
+          hue_path: ""
+          sat_path: ""
+        attribute: attributes.brightness
+        scale_in_min: 2
+        scale_out_min: 1
+        scale_in_max: 255
+        scale_out_max: 100
+        unit: "%"
+        precision: 0
+        style:
+          font_size: 12px
+          text_transform: ""
+        custom_css_enabled: true
+        custom_css: |
+          .ctrl-value {
+             width: 40px;
+          }
+        dyn_color: []
+        show_control_value_right: false
+      - type: entity
+        value: light.led_wyspa
+        align: right
+        use_entity_unit: false
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+          hue_path: ""
+          sat_path: ""
+        attribute: brightness
+        unit: "%"
+        style:
+          font_size: 12px
+        scale_in_min: 0
+        scale_in_max: 255
+        scale_out_min: 0
+        scale_out_max: 100
+        precision: 0
+        dyn_color:
+          - conditions:
+              - entity: light.led_wyspa
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: text
+            overwrite_entity: ""
+            overwrite_attr: ""
+            text: 0 %
+    custom_css_enabled: true
+    custom_css: |
+      tr {
+         display: table-row !important;
+      }
+  - cells:
+      - type: entity
+        value: light.led_wyspa
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: hs_color
+          control: color
+          checked: true
+          unchecked: false
+          hue_path: ""
+          sat_path: ""
+        show_control_value_right: true
+        dyn_color: []
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+    merge_columns: true
+    dyn_row_rules:
+      - conditions:
+          - entity: light.led_wyspa
+            attr: ""
+            op: "="
+            val: "off"
+            val2: ""
+        match: all
+        bg: ""
+        fg: ""
+        visibility: hidden
+  - cells:
+      - type: entity
+        value: light.led_wyspa
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: hs_color
+          control: color_sat
+          min: 1
+          max: 100
+          step: 1
+          checked: true
+          unchecked: false
+          hue_path: ""
+          sat_path: ""
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+    merge_columns: true
+    dyn_row_rules:
+      - conditions:
+          - entity: light.led_wyspa
+            attr: ""
+            op: "="
+            val: "off"
+            val2: ""
+        match: all
+        bg: ""
+        fg: ""
+        visibility: hidden
+  - cells:
+      - type: icon
+        value: mdi:circle
+        align: center
+        style:
+          text_transform: ""
+          color: "#ff9800"
+          icon_size: 20px
+        tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 255
+              - 184
+              - 0
+            brightness_pct: 5
+        double_tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 255
+              - 184
+              - 0
+            brightness_pct: 50
+        hold_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 255
+              - 184
+              - 0
+            brightness_pct: 100
+      - type: icon
+        value: mdi:circle
+        align: center
+        style:
+          text_transform: ""
+          color: "#F44336"
+          icon_size: 20px
+        tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 255
+              - 0
+              - 0
+            brightness_pct: 5
+        double_tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 255
+              - 0
+              - 0
+            brightness_pct: 50
+        hold_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 255
+              - 0
+              - 0
+            brightness_pct: 100
+      - type: icon
+        value: mdi:circle
+        align: center
+        style:
+          text_transform: ""
+          color: "#2196F3"
+          icon_size: 20px
+        tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 4
+              - 0
+              - 255
+            brightness_pct: 5
+        double_tap_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 4
+              - 0
+              - 255
+            brightness_pct: 50
+        hold_action:
+          action: perform-action
+          perform_action: light.turn_on
+          target:
+            entity_id: light.led_wyspa
+          data:
+            rgb_color:
+              - 4
+              - 0
+              - 255
+            brightness_pct: 100
+      - type: string
+        value: unused hidden cell
+        align: center
+        style:
+          text_transform: ""
+          icon_size: ""
+    dyn_row_rules: []
+column_count: 4
+card_padding: 16
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <style>
+    .card {
+      padding-top: 10px !important;
+      padding-bottom: 8px !important;
+    }
+    .ctrl-wrap { display: flex; width: 100%; }
+    .ctrl-range { width: 100% !important; }
+    tr:last-child {
+      display: none;
+    }
+    .buttons {
+      text-align: center;
+    }
+    .buttons > span > span {
+      border: 1px solid var(--divider-color);
+      border-radius: 30px;
+      width: 30px;
+      height: 30px;
+      margin-left: 5px;
+      margin-right: 5px;
+      padding: 0 !important
+    }
+    .buttons ha-icon {
+      display: flex;
+    }
+    .buttons > span > span:last-child {
+      display: none !important;
+    }
+  </style>
+  <fcc />
+  <div class="buttons">
+    <fcc row="4" />
+  </div>
+type: custom:flex-cells-card
+column_widths:
+  - 40px
+  - auto
+  - auto
+  - 40px

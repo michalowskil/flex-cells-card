@@ -137,8 +137,26 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
     ![Input controls](examples/input-controls/images/dark-300.png)
     ![Input controls](examples/input-controls/images/light-300.png)
+  - [Hue and saturation](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md) - an example of using sliders to control hue and saturation. It also demonstrates how to use presets for lighting. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md)  
+
+    ![Hue saturation](examples/hue-saturation/images/dark-on-300.png)
+    ![Hue saturation](examples/hue-saturation/images/light-on-300.png)
+
+## Translations
+If you'd like to help translate the card, please do! You don't need to translate everything - even a single word is great - and it's not hard.  
+Start by opening the Crowdin project, choosing your language, and translating a few strings in any file.
+Join the project on Crowdin: [crowdin.com/project/flex-cells-card](https://crowdin.com/project/flex-cells-card/)
+
+Quick start for translators:
+- Open the Crowdin project and log in.
+- Pick your language (or request it if it's missing).
+- Translate a few strings in any file and save - partial translations are welcome.
+- Leave a comment if you're unsure about wording.
 
 ## Changelog
+- v0.20.0-beta (Pre-release) —
+  - Added **sliders for hue and saturation**.
+  - Integrating FCC with crowdin.com.
 - v0.19.0 —
   - Added proper ***ha-card wrapper*** and removed the custom border so the card behaves like a normal Lovelace card (e.g., looks correct inside vertical-stack-in-card). Kept the "card" class intact, so any existing CSS targeting it should still work.
   - Added ***RAW token*** to "Date/Time format & Text override" so you can inject the unformatted value; e.g., set the format to "[light is: ]RAW" to render "light is: on".

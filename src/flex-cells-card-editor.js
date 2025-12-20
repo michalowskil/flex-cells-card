@@ -972,20 +972,31 @@ class FlexCellsCardEditor extends LitElement {
   _getAttrEditConfig(cell){
     const raw = (cell?.attr_edit && typeof cell.attr_edit === 'object') ? cell.attr_edit : {};
     const controlRaw = typeof raw.control === 'string' ? raw.control.trim().toLowerCase() : 'slider';
-    const control = controlRaw === 'switch' ? 'switch' : 'slider';
+    const control = controlRaw === 'switch'
+      ? 'switch'
+      : (['color','color-slider','color_hs'].includes(controlRaw) ? 'color'
+        : (['color_sat','color-sat','color_saturation'].includes(controlRaw) ? 'color_sat' : 'slider'));
     const minNum = Number(raw.min);
     const maxNum = Number(raw.max);
     const stepNum = Number(raw.step);
+    const defaultField = (control === 'color' || control === 'color_sat') ? 'hs_color' : '';
+    const fieldRaw = typeof raw.field === 'string' ? raw.field : (cell?.attribute || defaultField);
+    const satFallbackNum = Number(raw.sat_fallback);
     return {
       enabled: raw.enabled === true,
       service: typeof raw.service === 'string' ? raw.service : '',
-      field: typeof raw.field === 'string' ? raw.field : (cell?.attribute || ''),
+      field: (control === 'color' || control === 'color_sat')
+        ? (this._stripIndexFromPath(fieldRaw) || 'hs_color')
+        : fieldRaw,
       control,
-      min: Number.isFinite(minNum) ? minNum : undefined,
-      max: Number.isFinite(maxNum) ? maxNum : undefined,
-      step: Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined,
+      min: control === 'color' ? undefined : (Number.isFinite(minNum) ? minNum : undefined),
+      max: control === 'color' ? undefined : (Number.isFinite(maxNum) ? maxNum : undefined),
+      step: control === 'color' ? undefined : (Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined),
       checked: raw.checked !== undefined ? raw.checked : true,
       unchecked: raw.unchecked !== undefined ? raw.unchecked : false,
+      hue_path: typeof raw.hue_path === 'string' ? raw.hue_path : '',
+      sat_path: typeof raw.sat_path === 'string' ? raw.sat_path : '',
+      sat_fallback: Number.isFinite(satFallbackNum) ? satFallbackNum : undefined,
     };
   }
   _patchAttrEdit(r,c,patch){
@@ -993,6 +1004,12 @@ class FlexCellsCardEditor extends LitElement {
     const current = this._getAttrEditConfig(cell);
     const next = { ...current, ...(patch || {}) };
     this._patchCell(r,c,{ attr_edit: next });
+  }
+  _stripIndexFromPath(path){
+    if (typeof path !== 'string') return '';
+    const trimmed = path.trim();
+    if (!trimmed) return '';
+    return trimmed.replace(/(\.|\[)\d+(\])?$/, '');
   }
   _toggleAttrEditEnabled(r,c,e){
     const enabled = !!(e?.target?.checked);
@@ -2414,11 +2431,13 @@ class FlexCellsCardEditor extends LitElement {
                                 @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'control',{ target:{ value:e.target.value }})}
                                 @closed=${(e)=>e.stopPropagation()}>
                                 <mwc-list-item value="slider">${t(this.hass,"editor.attr_edit_control_slider")}</mwc-list-item>
+                                <mwc-list-item value="color">${t(this.hass,"editor.attr_edit_control_color")}</mwc-list-item>
+                                <mwc-list-item value="color_sat">${t(this.hass,"editor.attr_edit_control_color_sat")}</mwc-list-item>
                                 <mwc-list-item value="switch">${t(this.hass,"editor.attr_edit_control_switch")}</mwc-list-item>
                               </ha-select>
                             </div>
 
-                            ${attrEditControl === 'slider' || attrEditControl === 'switch' ? html`
+                            ${attrEditControl === 'slider' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
                               <div class="cell-grid cell-wide">
                                 <label class="option full">
                                   <input type="checkbox"
@@ -2429,6 +2448,53 @@ class FlexCellsCardEditor extends LitElement {
                                 </label>
                               </div>
                             ` : nothing}
+
+                            ${attrEditControl === 'color' ? html`
+                              <div class="cell-grid cell-wide muted">${t(this.hass,"editor.attr_edit_color_hint")}</div>
+                              <div class="cols1">
+                                <ha-textfield
+                                  .label=${t(this.hass,"editor.attr_edit_color_hue_path")}
+                                  .value=${attrEdit.hue_path || ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'hue_path',e)}>
+                                </ha-textfield>
+                              </div>
+                              <div class="cols1">
+                                <ha-textfield
+                                  .label=${t(this.hass,"editor.attr_edit_color_sat_path")}
+                                  .value=${attrEdit.sat_path || ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'sat_path',e)}>
+                                </ha-textfield>
+                              </div>
+                              <div class="cols1">
+                                <ha-textfield
+                                  type="number"
+                                  .label=${t(this.hass,"editor.attr_edit_color_sat_fallback")}
+                                  .value=${attrEdit.sat_fallback ?? ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'sat_fallback',e)}>
+                                </ha-textfield>
+                              </div>
+                            ` : (attrEditControl === 'color_sat' ? html`
+                              <div class="cell-grid cell-wide muted">${t(this.hass,"editor.attr_edit_color_sat_hint")}</div>
+                              <div class="cols1">
+                                <ha-textfield
+                                  .label=${t(this.hass,"editor.attr_edit_color_hue_path")}
+                                  .value=${attrEdit.hue_path || ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'hue_path',e)}>
+                                </ha-textfield>
+                              </div>
+                              <div class="cols1">
+                                <ha-textfield
+                                  .label=${t(this.hass,"editor.attr_edit_color_sat_path")}
+                                  .value=${attrEdit.sat_path || ''}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'sat_path',e)}>
+                                </ha-textfield>
+                              </div>
+                            ` : nothing)}
 
                             ${attrEditControl === 'switch' ? html`
                               <div class="cols2">
@@ -2445,7 +2511,7 @@ class FlexCellsCardEditor extends LitElement {
                                   @input=${(e)=> this._updateAttrEditLiteral(rIdx,cIdx,'unchecked',e)}>
                                 </ha-textfield>
                               </div>
-                            ` : html`
+                            ` : (attrEditControl === 'slider' || attrEditControl === 'color_sat' ? html`
                               <div class="cols3">
                                 <ha-textfield
                                   type="number"
@@ -2469,7 +2535,7 @@ class FlexCellsCardEditor extends LitElement {
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'step',e)}>
                                 </ha-textfield>
                               </div>
-                            `}
+                            ` : html``)}
                           </div>
                         </details>
                           

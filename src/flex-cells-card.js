@@ -121,8 +121,66 @@ class FlexCellsCard extends LitElement {
       gap: 6px;
     }
     /* === Simple HA input controls === */
-    .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; }
-    .ctrl-range { width: 140px; vertical-align: middle; }
+    .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; touch-action: pan-y; }
+    .ctrl-range { width: 160px; vertical-align: middle; touch-action: pan-y !important; }
+    .ctrl-range-color {
+      width: 160px;
+      height: 12px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: linear-gradient(90deg,
+        #ff0000 0%,
+        #ffcc00 10%,
+        #ffff00 16.66%,
+        #00ff00 33.33%,
+        #00ffff 50%,
+        #0000ff 66.66%,
+        #ff00ff 83.33%,
+        #ff0000 100%);
+      border-radius: 999px;
+      outline: none;
+    }
+    .ctrl-range-color::-webkit-slider-runnable-track {
+      height: 12px;
+      background: transparent;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color,#ccc);
+    }
+    .ctrl-range-color::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+      background: #fff;
+      cursor: pointer;
+      margin-top: -4px;
+    }
+    .ctrl-range-color::-moz-range-track {
+      height: 12px;
+      background: transparent;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color,#ccc);
+    }
+    .ctrl-range-color::-moz-range-progress { background: transparent; }
+    .ctrl-range-color::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+      background: #fff;
+      cursor: pointer;
+    }
+    .ctrl-color-swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.12);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
+    }
     .ctrl-select, .ctrl-input { padding: 4px 6px; border: 1px solid var(--divider-color,#ddd); border-radius: 6px; background: var(--card-background-color,#fff); }
     .ctrl-button {
       padding: 6px 10px;
@@ -155,6 +213,15 @@ class FlexCellsCard extends LitElement {
     this._customTemplateCache = new Map();
     this._narrowMedia = null;
     this._onNarrowMediaChange = null;
+    this._onLocalesLoaded = null;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (!this._onLocalesLoaded) {
+      this._onLocalesLoaded = () => this.requestUpdate();
+    }
+    window.addEventListener('fcc-locales-loaded', this._onLocalesLoaded);
   }
 
   setConfig(config) {
@@ -193,6 +260,7 @@ class FlexCellsCard extends LitElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener('fcc-locales-loaded', this._onLocalesLoaded);
     this._teardownNarrowMediaListener();
     super.disconnectedCallback();
   }
@@ -859,6 +927,36 @@ class FlexCellsCard extends LitElement {
     return textDisplay;
   }
 
+  _resolveDynamicOverwriteContent(cell, dyn, textDecoration) {
+    if (!dyn) return null;
+    const overwrite = (dyn.overwrite || '').toLowerCase();
+    if (overwrite === 'icon') {
+      const iconName = dyn.icon != null ? String(dyn.icon) : '';
+      if (!iconName) return '';
+      return html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${iconName}"></ha-icon>`;
+    }
+    if (overwrite === 'text') {
+      if (dyn.text != null) return dyn.text;
+      if (dyn.mask != null) return dyn.mask;
+      return '';
+    }
+    if (overwrite === 'entity') {
+      const dynContent = this._renderDynamicEntityContent(cell, dyn, textDecoration);
+      if (dynContent !== null && dynContent !== undefined && dynContent !== '') return dynContent;
+      if (dyn.mask != null) return dyn.mask;
+      return '';
+    }
+    if (overwrite === 'hide') {
+      if (dyn.mask != null) return dyn.mask;
+      return '';
+    }
+    if (dyn.hide) {
+      if (dyn.mask != null) return dyn.mask;
+      return '';
+    }
+    return null;
+  }
+
   _resolveDisplayWithDynamics(baseValue, dyn, cell) {
     if (!dyn) return baseValue ?? '';
     const overwrite = (dyn.overwrite || '').toLowerCase();
@@ -1111,7 +1209,7 @@ class FlexCellsCard extends LitElement {
   _renderAttributeEditControl(cell, stateObj, attrEdit) {
     if (!attrEdit?.enabled) return null;
     const entityId = cell?.value || '';
-    const attrPath = cell?.attribute || attrEdit.field || '';
+    const attrPath = this._attrKeyPath(cell, attrEdit);
     if (!entityId || !attrPath) return null;
     const key = this._attrEditKey(cell);
     const draft = key ? this._getAttrDraft(key) : undefined;
@@ -1147,17 +1245,31 @@ class FlexCellsCard extends LitElement {
     if (!Number.isFinite(Number(controlValue))) controlValue = min;
     controlValue = Math.max(min, Math.min(max, Number(controlValue)));
     const formattedValue = this._formatAttrDisplayValue(controlValue, cell);
-
+    const satValue = attrEdit.control === 'color'
+      ? this._resolveColorSaturation(cell, attrEdit, stateObj, tree, entityId)
+      : (attrEdit.control === 'color_sat' ? Number(controlValue) : null);
+    const hue = attrEdit.control === 'color'
+      ? Number(controlValue)
+      : (attrEdit.control === 'color_sat' ? this._resolveColorHue(cell, attrEdit, stateObj, tree) : null);
+    const showColorSwatch = (attrEdit.control === 'color' || attrEdit.control === 'color_sat') && showValueRight;
+    const colorSwatch = showColorSwatch ? html`<span class="ctrl-color-swatch" title="${hue ?? ''} / ${satValue ?? ''}%" style="background: hsl(${hue}, ${satValue}%, 50%);"></span>` : nothing;
+    const rangeClass = (attrEdit.control === 'color' || attrEdit.control === 'color_sat') ? 'ctrl-range ctrl-range-color' : 'ctrl-range';
+    const satGradient = attrEdit.control === 'color_sat'
+      ? `background: linear-gradient(90deg, hsl(${hue || 0},0%,50%) 0%, hsl(${hue || 0},100%,50%) 100%);`
+      : '';
+    const rangeStyle = satGradient;
     return html`<span class="ctrl-wrap">
-      <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${step}"
+      <input class=${rangeClass} type="range" min="${min}" max="${max}" step="${step}"
         .value=${String(controlValue)}
         ?disabled=${disabled}
+        style=${rangeStyle}
         @pointerdown=${(e) => this._onAttrSliderPointerDown(e, cell)}
+        @pointermove=${(e) => this._onAttrSliderPointerMove(e, cell)}
         @pointerup=${(e) => this._onAttrSliderPointerUp(e, cell)}
         @pointercancel=${(e) => this._onAttrSliderPointerUp(e, cell)}
         @input=${(e) => this._onAttrSliderInput(e, cell)}
         @change=${(e) => this._onAttrSliderChange(e, cell)} />
-      ${showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing}
+      ${showColorSwatch ? colorSwatch : (showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing)}
     </span>`;
   }
 
@@ -1226,8 +1338,91 @@ class FlexCellsCard extends LitElement {
     const entityId = cell?.value || '';
     if (!entityId) return null;
     const attrEdit = this._normalizeAttrEditConfig(cell);
-    const attrPath = cell?.attribute || attrEdit.field || '';
+    const attrPath = this._attrKeyPath(cell, attrEdit);
     return `${entityId}||${attrPath}`;
+  }
+
+  _attrKeyPath(cell, attrEdit) {
+    if (attrEdit?.control === 'color') return this._attrHuePath(cell, attrEdit);
+    if (attrEdit?.control === 'color_sat') return this._attrSatPath(cell, attrEdit);
+    return cell?.attribute || attrEdit?.field || '';
+  }
+
+  _attrHuePath(cell, attrEdit) {
+    const isColor = attrEdit?.control === 'color' || attrEdit?.control === 'color_sat';
+    const explicit = (attrEdit?.hue_path && typeof attrEdit.hue_path === 'string')
+      ? attrEdit.hue_path
+      : '';
+    if (explicit) return explicit;
+    if (cell?.attribute) return cell.attribute;
+    const field = attrEdit?.field || '';
+    if (field) return isColor ? `${field}.0` : field;
+    return '';
+  }
+
+  _attrSatPath(cell, attrEdit) {
+    const isColor = attrEdit?.control === 'color' || attrEdit?.control === 'color_sat';
+    const explicit = (attrEdit?.sat_path && typeof attrEdit.sat_path === 'string')
+      ? attrEdit.sat_path
+      : '';
+    if (explicit) return explicit;
+    if (!isColor) return '';
+    const huePath = this._attrHuePath(cell, attrEdit);
+    if (huePath && /(\.\d+|\[\d+\])$/.test(huePath)) {
+      const match = huePath.match(/(\.|\[)(\d+)(\])?$/);
+      if (match) {
+        const [, sep, idx, closing] = match;
+        const next = Number(idx) + 1;
+        const prefix = huePath.slice(0, -match[0].length);
+        const open = sep === '[' ? '[' : '.';
+        const close = sep === '[' ? ']' : (closing || '');
+        return `${prefix}${open}${next}${close}`;
+      }
+    }
+    const field = attrEdit?.field || '';
+    return field ? `${field}.1` : '';
+  }
+
+  _snapSaturation(val) {
+    if (!Number.isFinite(val)) return val;
+    const rounded = Math.round(val * 1000) / 1000;
+    if (Math.abs(rounded - 100) <= 0.5) return 100;
+    if (Math.abs(rounded - 0) <= 0.5) return 0;
+    return rounded;
+  }
+
+  _resolveColorSaturation(cell, attrEdit, stateObj, tree, entityId) {
+    const satPathRaw = typeof attrEdit?.sat_path === 'string' ? attrEdit.sat_path.trim() : '';
+    const satPath = satPathRaw ? satPathRaw : '';
+    const satRaw = satPath && stateObj ? this._resolveEntityValuePath(stateObj, satPath, tree) : undefined;
+    const satFallback = Number.isFinite(attrEdit?.sat_fallback) ? attrEdit.sat_fallback : 100;
+    const cacheKey = entityId || '';
+    if (!this._lastSatByEntity) this._lastSatByEntity = new Map();
+    if (Number.isFinite(Number(satRaw))) {
+      const sat = this._snapSaturation(this._clampNumber(Number(satRaw), 0, 100));
+      if (cacheKey) this._lastSatByEntity.set(cacheKey, sat);
+      return sat;
+    }
+    const cached = cacheKey ? this._lastSatByEntity.get(cacheKey) : undefined;
+    if (Number.isFinite(Number(cached))) return this._snapSaturation(this._clampNumber(Number(cached), 0, 100));
+    const sat = this._snapSaturation(this._clampNumber(satFallback, 0, 100));
+    if (cacheKey) this._lastSatByEntity.set(cacheKey, sat);
+    return sat;
+  }
+
+  _resolveColorHue(cell, attrEdit, stateObj, tree) {
+    const huePath = this._attrHuePath(cell, attrEdit);
+    const hueRaw = huePath && stateObj ? this._resolveEntityValuePath(stateObj, huePath, tree) : undefined;
+    const cacheKey = cell?.value || '';
+    if (!this._lastHueByEntity) this._lastHueByEntity = new Map();
+    if (Number.isFinite(Number(hueRaw))) {
+      const hue = this._clampNumber(Number(hueRaw), 0, 360);
+      if (cacheKey) this._lastHueByEntity.set(cacheKey, hue);
+      return hue;
+    }
+    const cached = cacheKey ? this._lastHueByEntity.get(cacheKey) : undefined;
+    if (Number.isFinite(Number(cached))) return this._clampNumber(Number(cached), 0, 360);
+    return 0;
   }
 
   _parseAttrEditKey(key) {
@@ -1271,17 +1466,28 @@ class FlexCellsCard extends LitElement {
   _normalizeAttrEditConfig(cell) {
     const raw = (cell?.attr_edit && typeof cell.attr_edit === 'object') ? cell.attr_edit : {};
     const controlRaw = typeof raw.control === 'string' ? raw.control.trim().toLowerCase() : 'slider';
-    const control = controlRaw === 'switch' ? 'switch' : 'slider';
+    const control = controlRaw === 'switch'
+      ? 'switch'
+      : (['color', 'color-slider', 'color_hs'].includes(controlRaw) ? 'color'
+        : (['color_sat', 'color-sat', 'color_saturation'].includes(controlRaw) ? 'color_sat' : 'slider'));
     const minNum = Number(raw.min);
     const maxNum = Number(raw.max);
     const stepNum = Number(raw.step);
-    const min = Number.isFinite(minNum) ? minNum : undefined;
-    const max = Number.isFinite(maxNum) ? maxNum : undefined;
-    const step = Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined;
-    const field = typeof raw.field === 'string' ? raw.field.trim() : (cell?.attribute || '');
+    const min = control === 'color' ? undefined : (Number.isFinite(minNum) ? minNum : undefined);
+    const max = control === 'color' ? undefined : (Number.isFinite(maxNum) ? maxNum : undefined);
+    const step = control === 'color' ? undefined : (Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined);
+    const defaultField = (control === 'color' || control === 'color_sat') ? 'hs_color' : '';
+    const fieldRaw = typeof raw.field === 'string' ? raw.field.trim() : (cell?.attribute || defaultField);
+    const field = control === 'color'
+      ? (this._stripIndexFromPath(fieldRaw) || 'hs_color')
+      : fieldRaw;
     const service = typeof raw.service === 'string' ? raw.service.trim() : '';
     const checked = raw.checked !== undefined ? raw.checked : true;
     const unchecked = raw.unchecked !== undefined ? raw.unchecked : false;
+    const huePath = typeof raw.hue_path === 'string' ? raw.hue_path.trim() : '';
+    const satPath = typeof raw.sat_path === 'string' ? raw.sat_path.trim() : '';
+    const satFallbackNum = Number(raw.sat_fallback);
+    const sat_fallback = Number.isFinite(satFallbackNum) ? satFallbackNum : 100;
     return {
       enabled: raw.enabled === true,
       control,
@@ -1292,7 +1498,17 @@ class FlexCellsCard extends LitElement {
       service,
       checked,
       unchecked,
+      hue_path: huePath,
+      sat_path: satPath,
+      sat_fallback,
     };
+  }
+
+  _stripIndexFromPath(path) {
+    if (typeof path !== 'string') return '';
+    const trimmed = path.trim();
+    if (!trimmed) return '';
+    return trimmed.replace(/(\.|\[)\d+(\])?$/, '');
   }
 
   _normalizeAttrSliderValue(raw, range) {
@@ -1323,6 +1539,21 @@ class FlexCellsCard extends LitElement {
     const outMax = Number(cell?.scale_out_max);
     const hasOutRange = Number.isFinite(outMin) && Number.isFinite(outMax) && outMin !== outMax;
 
+    if (attrEdit?.control === 'color') {
+      return { min: 0, max: 360, step: 1 };
+    }
+    if (attrEdit?.control === 'color_sat') {
+      let min = Number.isFinite(attrEdit?.min) ? Number(attrEdit.min) : 0;
+      let max = Number.isFinite(attrEdit?.max) ? Number(attrEdit.max) : 100;
+      if (hasOutRange) {
+        min = outMin;
+        max = outMax;
+      }
+      if (!Number.isFinite(max) || max === min) max = min + 1;
+      const step = Number.isFinite(attrEdit?.step) && attrEdit.step > 0 ? Number(attrEdit.step) : 1;
+      return { min, max, step };
+    }
+
     let min = Number.isFinite(attrEdit?.min) ? Number(attrEdit.min) : undefined;
     let max = Number.isFinite(attrEdit?.max) ? Number(attrEdit.max) : undefined;
     if (hasOutRange) {
@@ -1343,19 +1574,66 @@ class FlexCellsCard extends LitElement {
   _onAttrSliderPointerDown(event, cell) {
     const key = this._attrEditKey(cell);
     if (!key) return;
-    const val = Number(event?.target?.value);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    const entityId = cell?.value || '';
+    const stateObj = entityId ? this.hass?.states?.[entityId] : null;
+    const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+    const attrPath = this._attrKeyPath(cell, attrEdit);
+    const rawState = attrPath && stateObj ? this._resolveEntityValuePath(stateObj, attrPath, tree) : undefined;
+    const stateDisplay = Number.isFinite(Number(rawState)) ? this._rescaleIfConfigured(cell, Number(rawState)) : undefined;
+    const val = Number.isFinite(stateDisplay) ? stateDisplay : Number(event?.target?.value);
     this._setAttrDraft(key, {
       display: Number.isFinite(val) ? val : undefined,
       actual: Number.isFinite(val) ? this._rescaleOutputToInput(cell, val) : undefined,
     });
     if (!this._attrActivePointers) this._attrActivePointers = new Set();
     this._attrActivePointers.add(key);
+    const guardVal = Number.isFinite(val) ? val : undefined;
+    const guard = {
+      startX: event?.clientX ?? null,
+      startY: event?.clientY ?? null,
+      startValue: Number.isFinite(stateDisplay) ? stateDisplay : guardVal,
+      allow: false,
+      blocked: false,
+    };
+    if (event?.target && guard.startValue !== undefined) {
+      event.target.value = String(guard.startValue);
+    }
+    if (!this._attrPointerGuards) this._attrPointerGuards = new Map();
+    this._attrPointerGuards.set(key, guard);
   }
 
   _onAttrSliderPointerUp(_event, cell) {
     const key = this._attrEditKey(cell);
     if (!key || !this._attrActivePointers) return;
     this._attrActivePointers.delete(key);
+    if (this._attrPointerGuards) this._attrPointerGuards.delete(key);
+  }
+
+  _onAttrSliderPointerMove(event, cell) {
+    if (!event) return;
+    const key = this._attrEditKey(cell);
+    if (!key || !this._attrPointerGuards) return;
+    const guard = this._attrPointerGuards.get(key);
+    if (!guard) return;
+    if (guard.allow) return; // już zdecydowaliśmy, że to gest suwaka
+    const x = event.clientX ?? 0;
+    const y = event.clientY ?? 0;
+    const dx = guard.startX !== null && guard.startX !== undefined ? x - guard.startX : 0;
+    const dy = guard.startY !== null && guard.startY !== undefined ? y - guard.startY : 0;
+    const threshold = 6;
+    if (Math.abs(dy) > Math.abs(dx) + threshold) {
+      guard.blocked = true;
+      guard.allow = false;
+      if (guard.startValue !== undefined && event.target) {
+        event.target.value = String(guard.startValue);
+      }
+      event.stopPropagation?.();
+      return;
+    }
+    if (Math.abs(dx) > Math.abs(dy) + threshold) {
+      guard.allow = true;
+    }
   }
 
   _onAttrSliderInput(event, cell) {
@@ -1363,6 +1641,16 @@ class FlexCellsCard extends LitElement {
     event.stopPropagation?.();
     const key = this._attrEditKey(cell);
     if (!key) return;
+    const guard = this._attrPointerGuards ? this._attrPointerGuards.get(key) : null;
+    if (guard && guard.blocked) {
+      if (guard.startValue !== undefined && event.target) {
+        event.target.value = String(guard.startValue);
+      }
+      return;
+    }
+    if (guard && !guard.allow && event.pointerType === 'touch') {
+      return;
+    }
     const raw = event.target?.value ?? '';
     const display = raw === '' ? '' : Number(raw);
     const actual = Number.isFinite(display) ? this._rescaleOutputToInput(cell, display) : display;
@@ -1373,6 +1661,14 @@ class FlexCellsCard extends LitElement {
     if (!event) return;
     event.stopPropagation?.();
     const key = this._attrEditKey(cell);
+    const guard = this._attrPointerGuards ? this._attrPointerGuards.get(key) : null;
+    if (guard && guard.blocked) {
+      if (guard.startValue !== undefined && event.target) {
+        event.target.value = String(guard.startValue);
+      }
+      this._clearAttrDraft(key);
+      return;
+    }
     const attrEdit = this._normalizeAttrEditConfig(cell);
     if (!attrEdit.enabled || !key) return;
     const target = event.target;
@@ -1383,7 +1679,7 @@ class FlexCellsCard extends LitElement {
     const entityId = cell?.value || '';
     const stateObj = entityId ? this.hass?.states?.[entityId] : null;
     const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
-    const attrPath = cell?.attribute || attrEdit.field || '';
+    const attrPath = this._attrKeyPath(cell, attrEdit);
     const fallbackRaw = attrPath && stateObj ? this._resolveEntityValuePath(stateObj, attrPath, tree) : undefined;
     if (normalized === null) {
       this._clearAttrDraft(key);
@@ -1418,7 +1714,29 @@ class FlexCellsCard extends LitElement {
     const entityId = cell?.value || '';
     const field = attrEdit.field || cell?.attribute || '';
     if (!domain || !service || !entityId || !field) return;
-    const data = { entity_id: entityId, [field]: value };
+    let valueToSend = value;
+    if (attrEdit.control === 'color') {
+      const stateObj = this.hass?.states?.[entityId];
+      const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+      const sat = this._resolveColorSaturation(cell, attrEdit, stateObj, tree, entityId);
+      const hueMin = Number.isFinite(attrEdit?.min) ? Number(attrEdit.min) : 0;
+      const hueMax = Number.isFinite(attrEdit?.max) ? Number(attrEdit.max) : 360;
+      const hue = this._clampNumber(Number(value), hueMin, hueMax);
+      valueToSend = [hue, sat];
+      if (!this._lastHueByEntity) this._lastHueByEntity = new Map();
+      if (entityId) this._lastHueByEntity.set(entityId, hue);
+    } else if (attrEdit.control === 'color_sat') {
+      const stateObj = this.hass?.states?.[entityId];
+      const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+      const hue = this._resolveColorHue(cell, attrEdit, stateObj, tree);
+      const satMin = Number.isFinite(attrEdit?.min) ? Number(attrEdit.min) : 0;
+      const satMax = Number.isFinite(attrEdit?.max) ? Number(attrEdit.max) : 100;
+      const sat = this._snapSaturation(this._clampNumber(Number(value), satMin, satMax));
+      valueToSend = [hue, sat];
+      if (!this._lastSatByEntity) this._lastSatByEntity = new Map();
+      if (entityId) this._lastSatByEntity.set(entityId, sat);
+    }
+    const data = { entity_id: entityId, [field]: valueToSend };
     try { this.hass?.callService(domain, service, data); } catch (_e) { /* noop */ }
   }
   _clampNumber(value, min, max) {
@@ -2326,12 +2644,15 @@ class FlexCellsCard extends LitElement {
       if (attrEdit.enabled && stateObj && (cell?.attribute || attrEdit.field)) {
         const display = this._formatEntityCell(cell, stateObj);
         const cellDyn = this._evaluateDynColor(cell, type, display);
-        const { style: _thStyle } = this._buildTextStyle(cell, type, align, cellDyn);
-        const control = this._renderAttributeEditControl(cell, stateObj, attrEdit);
+        const { style: _thStyle, textDecoration: _textDecoration } = this._buildTextStyle(cell, type, align, cellDyn);
+        const dynContent = this._resolveDynamicOverwriteContent(cell, cellDyn, _textDecoration);
+        const control = dynContent !== null && dynContent !== undefined
+          ? dynContent
+          : this._renderAttributeEditControl(cell, stateObj, attrEdit);
         const tokens = [];
         if (cellCssClass) tokens.push(cellCssClass);
         const cls = tokens.join(' ');
-        if (control) {
+        if (control !== null && control !== undefined) {
           return html`
             <th class=${cls || nothing}
                 colspan=${span}
@@ -2344,7 +2665,8 @@ class FlexCellsCard extends LitElement {
       if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
         const _disp = this._formatEntityCell(cell, stateObj);
         const _dyn = this._evaluateDynColor(cell, type, _disp);
-        const { style: _thStyle } = this._buildTextStyle(cell, type, align, _dyn);
+        const { style: _thStyle, textDecoration: _textDecoration } = this._buildTextStyle(cell, type, align, _dyn);
+        const dynContent = this._resolveDynamicOverwriteContent(cell, _dyn, _textDecoration);
         const controlClasses = [];
         if (cellCssClass) controlClasses.push(cellCssClass);
         const controlClassAttr = controlClasses.join(' ');
@@ -2352,7 +2674,9 @@ class FlexCellsCard extends LitElement {
           <th class=${controlClassAttr || nothing}
               colspan=${span}
               style=${_thStyle}>
-            ${this._renderEntityControl(cell, stateObj, val)}
+            ${dynContent !== null && dynContent !== undefined
+              ? dynContent
+              : this._renderEntityControl(cell, stateObj, val)}
           </th>
         `;
       }
@@ -2543,9 +2867,12 @@ class FlexCellsCard extends LitElement {
         const display = this._formatEntityCell(cell, stateObj);
         const cellDyn = this._evaluateDynColor(cell, type, display);
         const dyn = mergeDyn(cellDyn);
-        const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
+        const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
         descriptor.style = tdStyle;
-        descriptor.content = this._renderAttributeEditControl(cell, stateObj, attrEdit);
+        const dynContent = this._resolveDynamicOverwriteContent(cell, dyn, textDecoration);
+        descriptor.content = dynContent !== null && dynContent !== undefined
+          ? dynContent
+          : this._renderAttributeEditControl(cell, stateObj, attrEdit);
         if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
           descriptor.hidden = true;
         }
@@ -2555,9 +2882,15 @@ class FlexCellsCard extends LitElement {
         const display = this._formatEntityCell(cell, stateObj);
         const cellDyn = this._evaluateDynColor(cell, type, display);
         const dyn = mergeDyn(cellDyn);
-        const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
+        const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
         descriptor.style = tdStyle;
-        descriptor.content = this._renderEntityControl(cell, stateObj, val);
+        const dynContent = this._resolveDynamicOverwriteContent(cell, dyn, textDecoration);
+        descriptor.content = dynContent !== null && dynContent !== undefined
+          ? dynContent
+          : this._renderEntityControl(cell, stateObj, val);
+        if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
+          descriptor.hidden = true;
+        }
         return descriptor;
       }
 
