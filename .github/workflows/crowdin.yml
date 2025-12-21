@@ -14,6 +14,8 @@ jobs:
       - name: Sync with Crowdin
         uses: crowdin/github-action@v2
         with:
+          upload_sources: true
+          upload_sources_args: --delete-obsolete
           upload_translations: true
           download_translations: true
           skip_untranslated_strings: true

@@ -48,8 +48,9 @@ export function t(hass, key) {
 
   const parts = key.split('.');
   const val = lookup(DICTS[lang], parts);
-  if (val !== undefined) return val;
+  if (val !== undefined && val !== '') return val;
 
   const fallbackVal = lookup(DICTS[fallback], parts);
-  return fallbackVal ?? key;
+  if (fallbackVal !== undefined && fallbackVal !== '') return fallbackVal;
+  return key;
 }
