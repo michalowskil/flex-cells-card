@@ -143,15 +143,14 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
     ![Hue saturation](examples/hue-saturation/images/light-on-300.png)
 
 ## Translations
-If you'd like to help translate the card, please do! You don't need to translate everything - even a single word is great - and it's not hard.  
-Start by opening the Crowdin project, choosing your language, and translating a few strings in any file.
-Join the project on Crowdin: [crowdin.com/project/flex-cells-card](https://crowdin.com/project/flex-cells-card/)
+If you'd like to help translate a card or documentation, or improve an existing translation, please do so! You don't have to translate everything - just one word will do - and it's not difficult.
 
 Quick start for translators:
-- Open the Crowdin project and log in.
+- [Open the Crowdin project](https://crowdin.com/project/flex-cells-card/) and log in.
 - Pick your language (or request it if it's missing).
 - Translate a few strings in any file and save - partial translations are welcome.
 - Leave a comment if you're unsure about wording.
+- Finally, **apply the "Unsaved Translations" filter to each edited file, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
 
 ## Changelog
 - v0.20.0-beta (Pre-release) —
