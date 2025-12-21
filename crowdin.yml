@@ -8,9 +8,3 @@ files:
   - source: /src/localize/lang/en.json
     translation: /src/localize/lang/%two_letters_code%.json
     type: json
-
-  # Dokumentacja
-  - source: /README.md
-    translation: /docs/%two_letters_code%/README.md
-  - source: /examples/**/*.md
-    translation: /docs/%two_letters_code%/examples/%original_path%/%original_file_name%
