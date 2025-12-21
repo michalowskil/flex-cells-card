@@ -108,12 +108,12 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
     ```
 - The appearance and rules assigned to cells/rows should work in templates.
 
-## Examples
+## Przykłady
 
-- [Temperature/Humidity](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
+- [Temperatura/Wilgotność](https://github.com/michalowskil/flex-cells-card/blob/main/docs/pl/examples/temperature-humidity-table/temperature-humidity.md) - prosty przykład z tabelą podzieloną a trzy grupy, sortowanie według kolumny temperatury działa niezależnie w każdej grupie. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)
 
-  ![Temperature/Humidity](examples/temperature-humidity-table/images/dark_300.png)
-  ![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)
+  ![Temperatura/Wilgotność](../../examples/temperature-humidity-table/images/dark_300.png)
+  ![Temperatura/Wilgotność](../../examples/temperature-humidity-table/images/light_300.png)
 - [Media Player (template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)
 
   ![Media Player template](examples/media-player-template/images/small_dark_300.png)
@@ -149,9 +149,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
 ## Translations
 
-If you'd like to help translate the card, please do! You don't need to translate everything - even a single word is great - and it's not hard.  
-Start by opening the Crowdin project, choosing your language, and translating a few strings in any file.
-Join the project on Crowdin: [crowdin.com/project/flex-cells-card](https://crowdin.com/project/flex-cells-card/)
+If you'd like to help translate the card, please do! You don't need to translate everything - even a single word is great - and it's not hard.
 
 Quick start for translators:
 
@@ -159,6 +157,7 @@ Quick start for translators:
 - Pick your language (or request it if it's missing).
 - Translate a few strings in any file and save - partial translations are welcome.
 - Leave a comment if you're unsure about wording.
+- Finally, **apply the "Unsaved Translations" filter to each edited file, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
 
 ## Changelog
 
