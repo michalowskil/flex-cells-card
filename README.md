@@ -143,7 +143,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
     ![Hue saturation](examples/hue-saturation/images/light-on-300.png)
 
 ## Translations
-If you'd like to help translate a card or documentation, or improve an existing translation, please do so! You don't have to translate everything - just one word will do - and it's not difficult.
+If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one word will do - and it's not difficult.
 
 Quick start for translators:
 - [Open the Crowdin project](https://crowdin.com/project/flex-cells-card/) and log in.

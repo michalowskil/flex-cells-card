@@ -10,7 +10,7 @@ files:
     type: json
 
   # Dokumentacja
-  - source: /README.md
-    translation: /docs/%two_letters_code%/README.md
-  - source: /examples/**/*.md
-    translation: /docs/%two_letters_code%/%original_path%/%original_file_name%
+  # - source: /README.md
+  #   translation: /docs/%two_letters_code%/README.md
+  # - source: /examples/**/*.md
+  #   translation: /docs/%two_letters_code%/%original_path%/%original_file_name%
