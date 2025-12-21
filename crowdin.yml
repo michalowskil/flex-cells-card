@@ -13,4 +13,4 @@ files:
   - source: /README.md
     translation: /docs/%two_letters_code%/README.md
   - source: /examples/**/*.md
-    translation: /docs/%two_letters_code%/examples/%original_path%/%original_file_name%
+    translation: /docs/%two_letters_code%/%original_path%/%original_file_name%
