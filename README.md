@@ -143,14 +143,13 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
     ![Hue saturation](examples/hue-saturation/images/light-on-300.png)
 
 ## Translations
-If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one word will do - and it's not difficult.
+If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one string will do - and it's not difficult.
 
 Quick start for translators:
 - [Open the Crowdin project](https://crowdin.com/project/flex-cells-card/) and log in.
-- Pick your language (or request it if it's missing).
-- Translate a few strings in any file and save - partial translations are welcome.
-- Leave a comment if you're unsure about wording.
-- Finally, **apply the "Unsaved Translations" filter to each edited file, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
+- Pick your language (or request it if it's missing - note that the ```Request New Language``` button **doesn't work**, so you have to let me know via [forum](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780) or [GitHub](https://github.com/michalowskil)).
+- Translate a few strings in any language and save - partial translations are welcome.
+- Finally, **apply the "Unsaved Translations" filter to each edited language, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
 
 ## Changelog
 - v0.20.0-beta (Pre-release) —
