@@ -149,10 +149,10 @@ Quick start for translators:
 - [Open the Crowdin project](https://crowdin.com/project/flex-cells-card/) and log in.
 - Pick your language (or request it if it's missing - note that the ```Request New Language``` button **doesn't work**, so you have to let me know via [forum](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780) or [GitHub](https://github.com/michalowskil)).
 - Translate a few strings in any language and save - partial translations are welcome.
-- Finally, **apply the "Unsaved Translations" filter to each edited language, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
+- Finally, **apply the ```Unsaved Translations``` filter to each edited language, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
 
 ## Changelog
-- v0.20.0-beta (Pre-release) —
+- v0.20.0 —
   - Added **sliders for hue and saturation**.
   - Integrating FCC with crowdin.com.
 - v0.19.0 —
