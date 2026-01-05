@@ -151,7 +151,45 @@ Quick start for translators:
 - Translate a few strings in any language and save - partial translations are welcome.
 - Finally, **apply the ```Unsaved Translations``` filter to each edited language, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
 
+## Auto-entities
+Experimental feature! I do not plan to evolve it to parity with full FCC. With auto-entities you lose:
+- per-row features (separators, `merge_columns`, `dyn_row_rules`, custom row CSS/classes, row-level actions),
+- mixed/multi-row layouts (e.g., custom headers, separators between groups),
+- the FCC visual editor (you see the auto-entities editor; the row template is YAML-only).
+
+FCC accepts an `entities` array (e.g., from [`auto-entities`](https://github.com/thomasloven/lovelace-auto-entities)). If `entities` is present, FCC builds rows from it; classic `rows` keep working as before. Control the generated table with `entity_row_template` (optional `header` and `cells`). Tokens: `@entity`, `@friendly_name`, `@name`, `@state`, `@attr:<attribute>`, `@icon`.
+
+Example with auto-entities:
+```yaml
+type: custom:auto-entities
+card_param: entities
+card:
+  type: custom:flex-cells-card
+  entity_row_template:
+    header:
+      - type: string
+        value: Icon
+      - type: string
+        value: Name
+      - type: string
+        value: State
+    cells:
+      - type: entity
+        value: "@entity"
+        entity_display: icon
+      - type: string
+        value: "@friendly_name"
+      - type: entity
+        value: "@entity"
+  column_count: 3
+filter:
+  include:
+    - domain: light
+```
+
 ## Changelog
+- v0.21.0 (pre-release) —
+  - Added experimental `entities` support (auto-entities/monster-card style) with `entity_row_template` and token substitution; legacy `rows` remain unchanged.
 - v0.20.0 —
   - Added **sliders for hue and saturation**.
   - Integrating FCC with crowdin.com.

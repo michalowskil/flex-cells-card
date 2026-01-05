@@ -26,6 +26,20 @@ const computeGroupDomain = (stateObj) => { const entityIds = (stateObj?.attribut
 
 const isUnavailableState = (state) => state === UNAVAILABLE || state === UNKNOWN;
 
+const DEFAULT_AUTO_ENTITY_TEMPLATE = {
+  header: [],
+  cells: [
+    { type: 'entity', value: '@entity', entity_display: 'icon', align: 'center' },
+    { type: 'string', value: '@friendly_name', align: 'left' },
+    { type: 'entity', value: '@entity', use_entity_unit: true },
+  ],
+};
+
+const deepClone = (obj) => {
+  try { return structuredClone(obj); } catch (_e) { /* fallback */ }
+  return obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
+};
+
 const stateActive = (stateObj, state) => { const domain = computeDomain(stateObj.entity_id); const compareState = state !== undefined ? state : stateObj?.state; if (['button','event','input_button','scene'].includes(domain)) return compareState !== UNAVAILABLE; if (isUnavailableState(compareState)) return false; if (compareState === OFF && domain !== 'alert') return false; switch (domain) { case 'alarm_control_panel': return compareState !== 'disarmed'; case 'alert': return compareState !== 'idle'; case 'cover': return compareState !== 'closed'; case 'device_tracker': case 'person': return compareState !== 'not_home'; case 'lawn_mower': return ['mowing','error'].includes(compareState); case 'lock': return compareState !== 'locked'; case 'media_player': return compareState !== 'standby'; case 'vacuum': return !['idle','docked','paused'].includes(compareState); case 'valve': return compareState !== 'closed'; case 'plant': return compareState === 'problem'; case 'group': return ['on','home','open','locked','problem'].includes(compareState); case 'timer': return compareState === 'active'; case 'camera': return compareState === 'streaming'; default: return true; } };
 
 const domainColorProperties = (domain, deviceClass, state, active) => { const properties = []; const stateKey = slugify(state, '_'); const activeKey = active ? 'active' : 'inactive'; if (deviceClass) properties.push('--state-' + domain + '-' + deviceClass + '-' + stateKey + '-color'); properties.push('--state-' + domain + '-' + stateKey + '-color'); properties.push('--state-' + domain + '-' + activeKey + '-color'); properties.push('--state-' + activeKey + '-color'); return properties; };
@@ -226,11 +240,19 @@ class FlexCellsCard extends LitElement {
 
   setConfig(config) {
     this._customTemplateCache = new Map();
+    const templateColCount = (() => {
+      const tplCells = config?.entity_row_template?.cells;
+      if (Array.isArray(tplCells) && tplCells.length) return tplCells.length;
+      if (Array.isArray(DEFAULT_AUTO_ENTITY_TEMPLATE.cells) && DEFAULT_AUTO_ENTITY_TEMPLATE.cells.length) return DEFAULT_AUTO_ENTITY_TEMPLATE.cells.length;
+      return 1;
+    })();
     const fallbackColCount = (() => {
-      if (!Array.isArray(config.rows)) return 1;
-      for (const row of config.rows) {
-        if (Array.isArray(row?.cells) && row.cells.length) return row.cells.length;
+      if (Array.isArray(config.rows)) {
+        for (const row of config.rows) {
+          if (Array.isArray(row?.cells) && row.cells.length) return row.cells.length;
+        }
       }
+      if (Array.isArray(config.entities) && config.entities.length) return templateColCount;
       return 1;
     })();
 
@@ -263,6 +285,131 @@ class FlexCellsCard extends LitElement {
     window.removeEventListener('fcc-locales-loaded', this._onLocalesLoaded);
     this._teardownNarrowMediaListener();
     super.disconnectedCallback();
+  }
+
+  _normalizeAutoEntity(entry) {
+    if (!entry) return null;
+    if (typeof entry === 'string') return { entity: entry };
+    if (typeof entry === 'object' && entry.entity) return { ...entry, entity: entry.entity };
+    return null;
+  }
+
+  _resolveAutoEntityMeta(entry) {
+    const normalized = this._normalizeAutoEntity(entry);
+    if (!normalized?.entity) return null;
+    const stateObj = this.hass?.states?.[normalized.entity];
+    const attrs = { ...(stateObj?.attributes || {}), ...(normalized.attributes || {}) };
+    const friendlyName = normalized.name ?? attrs.friendly_name ?? normalized.entity;
+    const icon = normalized.icon ?? attrs.icon ?? '';
+    const state = normalized.state ?? stateObj?.state ?? '';
+    return {
+      entity: normalized.entity,
+      friendly_name: friendlyName,
+      name: friendlyName,
+      icon,
+      state,
+      attributes: attrs,
+    };
+  }
+
+  _normalizeEntityTemplate(rawTemplate) {
+    const tpl = (rawTemplate && typeof rawTemplate === 'object') ? rawTemplate : {};
+    const rawCells = Array.isArray(tpl.cells) && tpl.cells.length ? tpl.cells : DEFAULT_AUTO_ENTITY_TEMPLATE.cells;
+    const cells = rawCells.map((cell) => {
+      const clone = deepClone(cell) || {};
+      if (!clone.type) clone.type = 'string';
+      if (!clone.align) {
+        const wantsCenter = clone.type === 'icon' || (clone.type === 'entity' && clone.entity_display === 'icon');
+        clone.align = wantsCenter ? 'center' : 'left';
+      }
+      return clone;
+    });
+    const colCount = cells.length || 1;
+    const header = Array.isArray(tpl.header) ? tpl.header.slice(0, colCount) : [];
+    const normalizedHeader = header.map((cell) => {
+      const clone = deepClone(cell) || { type: 'string', value: '' };
+      if (!clone.type) clone.type = 'string';
+      if (clone.value === undefined) clone.value = '';
+      return clone;
+    });
+    while (normalizedHeader.length && normalizedHeader.length < colCount) {
+      normalizedHeader.push({ type: 'string', value: '' });
+    }
+    return { header: normalizedHeader, cells, colCount };
+  }
+
+  _applyTemplateTokens(value, meta) {
+    if (value === null || value === undefined) return value;
+    if (typeof value !== 'string') return value;
+    const attrs = meta?.attributes || {};
+    const replaceAttr = (match, attr) => {
+      const v = attrs[attr];
+      if (v === undefined || v === null) return '';
+      if (typeof v === 'object') return JSON.stringify(v);
+      return String(v);
+    };
+    let out = value.replace(/@attr:([a-zA-Z0-9_]+)/g, replaceAttr);
+    out = out.replace(/@friendly_name/g, meta?.friendly_name ?? meta?.name ?? '');
+    out = out.replace(/@name/g, meta?.name ?? meta?.friendly_name ?? '');
+    out = out.replace(/@entity/g, meta?.entity ?? '');
+    out = out.replace(/@state/g, meta?.state ?? '');
+    out = out.replace(/@icon/g, meta?.icon ?? '');
+    return out;
+  }
+
+  _applyTokensToAction(actionCfg, meta) {
+    if (!actionCfg || typeof actionCfg !== 'object') return actionCfg;
+    const next = deepClone(actionCfg) || {};
+    if (next.entity) next.entity = this._applyTemplateTokens(next.entity, meta);
+    if (next.navigation_path) next.navigation_path = this._applyTemplateTokens(next.navigation_path, meta);
+    if (next.url_path) next.url_path = this._applyTemplateTokens(next.url_path, meta);
+    if (next.service) next.service = this._applyTemplateTokens(next.service, meta);
+    if (next.data && typeof next.data === 'object') {
+      const dataClone = deepClone(next.data);
+      Object.keys(dataClone || {}).forEach((key) => {
+        dataClone[key] = this._applyTemplateTokens(dataClone[key], meta);
+      });
+      next.data = dataClone;
+    }
+    if (next.target && typeof next.target === 'object') {
+      const tgtClone = { ...next.target };
+      if (tgtClone.entity_id) tgtClone.entity_id = this._applyTemplateTokens(tgtClone.entity_id, meta);
+      next.target = tgtClone;
+    }
+    if (next.perform_action && typeof next.perform_action === 'object') {
+      next.perform_action = this._applyTokensToAction(next.perform_action, meta);
+    }
+    return next;
+  }
+
+  _materializeTemplateCell(cell, meta) {
+    const clone = deepClone(cell) || { type: 'string', value: '' };
+    clone.value = this._applyTemplateTokens(clone.value, meta);
+    if (clone.attribute !== undefined) clone.attribute = this._applyTemplateTokens(clone.attribute, meta);
+    if (clone.entity !== undefined) clone.entity = this._applyTemplateTokens(clone.entity, meta);
+    if (clone.text !== undefined) clone.text = this._applyTemplateTokens(clone.text, meta);
+    if (clone.tap_action) clone.tap_action = this._applyTokensToAction(clone.tap_action, meta);
+    if (clone.hold_action) clone.hold_action = this._applyTokensToAction(clone.hold_action, meta);
+    if (clone.double_tap_action) clone.double_tap_action = this._applyTokensToAction(clone.double_tap_action, meta);
+    return clone;
+  }
+
+  _buildRowsFromEntities(cfg) {
+    const entities = Array.isArray(cfg.entities) ? cfg.entities : [];
+    if (!entities.length) return null;
+    const tpl = this._normalizeEntityTemplate(cfg.entity_row_template);
+    const rows = [];
+    const hasHeader = tpl.header.length > 0;
+    if (hasHeader) {
+      rows.push({ cells: tpl.header });
+    }
+    for (const ent of entities) {
+      const meta = this._resolveAutoEntityMeta(ent);
+      if (!meta?.entity) continue;
+      const rowCells = tpl.cells.map((cell) => this._materializeTemplateCell(cell, meta));
+      rows.push({ cells: rowCells });
+    }
+    return { rows, colCount: tpl.colCount || 1, hasHeader };
   }
 
   _normalizeHideColumns(raw, colCount) {
@@ -3440,8 +3587,16 @@ class FlexCellsCard extends LitElement {
 
   render() {
     const cfg = this.config || {};
-    const rows = Array.isArray(cfg.rows) ? cfg.rows : [];
-    const colCount = cfg.column_count ?? 1;
+    const autoEntities = this._buildRowsFromEntities(cfg);
+    const rows = (autoEntities?.rows && autoEntities.rows.length)
+      ? autoEntities.rows
+      : (Array.isArray(cfg.rows) ? cfg.rows : []);
+    const colCount = (() => {
+      const explicit = Number.isInteger(cfg.column_count) && cfg.column_count > 0 ? cfg.column_count : null;
+      if (explicit) return explicit;
+      if (autoEntities?.colCount) return autoEntities.colCount;
+      return cfg.column_count ?? 1;
+    })();
     const padVal = this._resolveCardPadding();
     const customTemplateEnabled = !!cfg.custom_template_enabled;
     const customTemplateRaw = typeof cfg.custom_template_html === 'string' ? cfg.custom_template_html : '';
@@ -3465,7 +3620,8 @@ class FlexCellsCard extends LitElement {
       return html`${extraStyle}${combined}`;
     }
 
-    const headerIndex = cfg.header_from_first_row
+    const headerFromFirstRow = autoEntities?.hasHeader ? true : !!cfg.header_from_first_row;
+    const headerIndex = headerFromFirstRow
       ? rows.findIndex((row) => (row?.type || '') !== 'separator')
       : -1;
     const headerRow = headerIndex >= 0 ? rows[headerIndex] : null;
