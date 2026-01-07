@@ -190,6 +190,7 @@ filter:
 ## Changelog
 - v0.21.0 (pre-release) —
   - Added experimental `entities` support (auto-entities/monster-card style) with `entity_row_template` and token substitution; legacy `rows` remain unchanged.
+  - Added Italian translation, thanks to [echopage1964](https://github.com/echopage1964).
 - v0.20.0 —
   - Added **sliders for hue and saturation**.
   - Integrating FCC with crowdin.com.
