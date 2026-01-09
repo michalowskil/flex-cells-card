@@ -5,7 +5,7 @@
 
 # Flex Cells Card
 
-A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, **attributes**, or **input controls** in flexible cell layouts — fully configurable from a **visual editor**, so **no documentation is required** to get started.
+A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, **attributes**, or **input controls** in flexible cell layouts — fully configurable from a **visual editor** (EN/PL/IT/DE), so **no documentation is required** to get started.
 
 If you like this card, please consider giving it a ⭐ on GitHub: [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
 
@@ -152,12 +152,12 @@ Quick start for translators:
 - Finally, **apply the ```Unsaved Translations``` filter to each edited language, and if anything displays there, save it. Any unsaved translations will not be included in the project!**
 
 ## Auto-entities
-Experimental feature! I do not plan to evolve it to parity with full FCC. With auto-entities you lose:
+Experimental feature! I do not plan to evolve it to parity with full FCC. With [auto-entities](https://github.com/thomasloven/lovelace-auto-entities) you lose:
 - per-row features (separators, `merge_columns`, `dyn_row_rules`, custom row CSS/classes, row-level actions),
 - mixed/multi-row layouts (e.g., custom headers, separators between groups),
-- the FCC visual editor (you see the auto-entities editor; the row template is YAML-only).
+- the FCC visual editor (you see the [auto-entities](https://github.com/thomasloven/lovelace-auto-entities) editor; the row template is YAML-only).
 
-FCC accepts an `entities` array (e.g., from [`auto-entities`](https://github.com/thomasloven/lovelace-auto-entities)). If `entities` is present, FCC builds rows from it; classic `rows` keep working as before. Control the generated table with `entity_row_template` (optional `header` and `cells`). Tokens: `@entity`, `@friendly_name`, `@name`, `@state`, `@attr:<attribute>`, `@icon`.
+FCC accepts an `entities` array (e.g., from [auto-entities](https://github.com/thomasloven/lovelace-auto-entities)). If `entities` is present, FCC builds rows from it; classic `rows` keep working as before. Control the generated table with `entity_row_template` (optional `header` and `cells`). Tokens: `@entity`, `@friendly_name`, `@name`, `@state`, `@attr:<attribute>`, `@icon`.
 
 Example with auto-entities:
 ```yaml
@@ -188,7 +188,7 @@ filter:
 ```
 
 ## Changelog
-- v0.21.0 (pre-release) —
+- v0.21.0 —
   - Added experimental `entities` support (auto-entities/monster-card style) with `entity_row_template` and token substitution; legacy `rows` remain unchanged.
   - Added **Italian translation**, thanks to [echopage1964](https://github.com/echopage1964).
 - v0.20.0 —
