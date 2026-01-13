@@ -23,14 +23,15 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 
 ## Installation
 
-### HACS – Custom repository
+Choose one installation method, via [HACS](https://www.hacs.xyz/docs/use/download/download/) or manually.
 
-1. HACS → ⋮ → **Custom repositories** → add:
-   `https://github.com/michalowskil/flex-cells-card` (Type: **Dashboard**) or just click the button below to do the same:  
-   [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=michalowskil&repository=flex-cells-card&category=plugin)
-2. Install **Flex Cells Card**.
-3. Resource is added automatically as `/hacsfiles/flex-cells-card/flex-cells-card.js`.
-4. Reload browser cache or refresh resources in HA if needed.
+### HACS
+
+1. In HACS use the search bar and type **Flex Cells Card**.
+2. Install the card.
+3. The resource is added automatically as `/hacsfiles/flex-cells-card/flex-cells-card.js`.
+4. Reload browser cache or refresh resources in Home Assistant if needed.
+5. If you previously added this repo as a custom repository, you can remove that entry now.
 
 ### Manual
 
