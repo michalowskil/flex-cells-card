@@ -58,7 +58,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
 
 - Available colors
-  - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at this link https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts
+  - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at [this link](https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts).
 
 - Search & Replace
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
@@ -142,6 +142,10 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 
     ![Hue saturation](examples/hue-saturation/images/dark-on-300.png)
     ![Hue saturation](examples/hue-saturation/images/light-on-300.png)
+  - [Sports table](https://github.com/michalowskil/flex-cells-card/blob/main/examples/sports-table/sports-table.md) - tracking sports data using auto-entities and TeamTracker. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/sports-table/sports-table.md)  
+
+    ![Sports table](examples/sports-table/images/dark-300.png)
+    ![Sports table](examples/sports-table/images/light-300.png)
 
 ## Translations
 If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one string will do - and it's not difficult.

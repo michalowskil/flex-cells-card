@@ -1,0 +1,50 @@
+type: custom:auto-entities
+card_param: entities
+filter:
+  include:
+    - options: {}
+      entity_id: sensor.team_tracker_*
+  exclude:
+    - options: {}
+      domain: update
+    - options: {}
+      state: NOT_FOUND
+sort:
+  method: attribute
+  attribute: date
+  reverse: false
+card:
+  type: custom:flex-cells-card
+  zebra: true
+  column_count: 5
+  card_padding: 0
+  cell_padding:
+    top: 4
+    right: 6
+    bottom: 4
+    left: 6
+  entity_row_template:
+    header:
+      - type: string
+        value: Liga
+      - type: string
+        value: Mecz
+      - type: string
+        value: Data
+      - type: string
+        value: Status
+      - type: string
+        value: Wynik
+    cells:
+      - type: string
+        value: "@attr:league"
+      - type: string
+        value: "@attr:event_name"
+      - type: entity
+        value: "@entity"
+        attribute: date
+        datetime_format: DD MMMM H:mm
+      - type: string
+        value: "@state"
+      - type: string
+        value: "@attr:team_score - @attr:opponent_score"
