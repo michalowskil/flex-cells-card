@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { t } from './localize/localize.js';
 import './flex-cells-card-editor.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { live } from 'lit/directives/live.js';
 
 const SORT_LOCALE_OPTS = { numeric: true, sensitivity: 'base' };
 
@@ -496,6 +497,7 @@ class FlexCellsCard extends LitElement {
       const hassStates = this.hass?.states || {};
       let mutated = false;
       for (const [entityId, draft] of [...this._numberControlDrafts.entries()]) {
+        if (this._activeNumberInputs && this._activeNumberInputs.has(entityId)) continue;
         const stateObj = hassStates[entityId];
         if (!stateObj) {
           this._numberControlDrafts.delete(entityId);
@@ -1248,6 +1250,7 @@ class FlexCellsCard extends LitElement {
           stepForCalc = 1;
         }
       }
+      const integerStep = Number.isFinite(stepForCalc) && Number.isInteger(stepForCalc);
       const modeRaw = typeof attrs.mode === 'string' ? attrs.mode.trim().toLowerCase() : '';
       const effectiveMode = modeRaw === 'box' ? 'box' : 'slider';
       const draft = this._getNumberDraft(entityId);
@@ -1259,10 +1262,19 @@ class FlexCellsCard extends LitElement {
       }
       controlValue = this._clampNumber(controlValue, min, max);
       if (effectiveMode === 'box') {
-        const inputValue = draft !== undefined && draft !== null ? draft : (stateObj?.state ?? '');
+        const inputValueRaw = draft !== undefined && draft !== null ? draft : (stateObj?.state ?? '');
+        let inputValue = String(inputValueRaw);
+        if (integerStep && inputValue && inputValue.includes('.')) {
+          const num = Number(inputValue);
+          if (Number.isFinite(num) && Number.isInteger(Math.round(num))) {
+            inputValue = String(Math.round(num));
+          }
+        }
         return html`<span class="ctrl-wrap">
           <input class="ctrl-input" type="number" min="${min}" max="${max}" step="${stepAttr}"
-            .value=${String(inputValue)}
+            .value=${live(String(inputValue))}
+            @focus=${() => this._onNumberFocus(entityId)}
+            @blur=${() => this._onNumberBlur(entityId)}
             @input=${(e) => this._onNumberInput(e, entityId)}
             @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />
         </span>`;
@@ -1274,6 +1286,8 @@ class FlexCellsCard extends LitElement {
       return html`<span class="ctrl-wrap">
         <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${stepAttr}"
           .value=${String(controlValue)}
+          @focus=${() => this._onNumberFocus(entityId)}
+          @blur=${() => this._onNumberBlur(entityId)}
           @input=${(e) => this._onNumberInput(e, entityId)}
           @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />
         ${showValue ? html`<span class="ctrl-value">${this._formatEntityCell(cell, displayState)}</span>` : nothing}
@@ -1439,6 +1453,15 @@ class FlexCellsCard extends LitElement {
     const target = event.target;
     if (!target) return;
     this._setNumberDraft(entityId, target.value ?? '');
+  }
+  _onNumberFocus(entityId) {
+    if (!entityId) return;
+    if (!this._activeNumberInputs) this._activeNumberInputs = new Set();
+    this._activeNumberInputs.add(entityId);
+  }
+  _onNumberBlur(entityId) {
+    if (!entityId || !this._activeNumberInputs) return;
+    this._activeNumberInputs.delete(entityId);
   }
   _onNumberChange(event, entityId, min, max, step) {
     if (!event || !entityId) return;
@@ -2078,7 +2101,7 @@ class FlexCellsCard extends LitElement {
   }
 
 
-  _formatEntityCell(cell, stateObj) {
+  _formatEntityCell(cell, stateObj, localized = false) {
     const isAttr = !!cell?.attribute;
     let source;
 
@@ -2109,7 +2132,20 @@ class FlexCellsCard extends LitElement {
         num = this._rescaleIfConfigured(cell, num);
         textValue = this._formatNumberByLocale(num, cell?.precision);
       } else {
-        textValue = (typeof source === 'object') ? JSON.stringify(source) : String(source);
+        const rawText = (typeof source === 'object') ? JSON.stringify(source) : String(source);
+        if (localized) {
+          if (isAttr && this.hass?.formatEntityAttributeValue) {
+            const formatted = this.hass.formatEntityAttributeValue(stateObj, cell?.attribute, source);
+            textValue = formatted ?? rawText;
+          } else if (!isAttr && this.hass?.formatEntityState) {
+            const formatted = this.hass.formatEntityState(stateObj);
+            textValue = formatted ?? rawText;
+          } else {
+            textValue = rawText;
+          }
+        } else {
+          textValue = rawText;
+        }
       }
     }
 
@@ -2377,8 +2413,10 @@ class FlexCellsCard extends LitElement {
     const st = cell?.style || {};
     const parts = [];
     const visuals = stateObj ? this._computeStateIconVisuals(stateObj) : null;
+    let hasColor = false;
     const applyColor = (value) => {
       if (!value) return;
+      hasColor = true;
       parts.push('color:' + value);
       parts.push('--state-icon-color:' + value);
       parts.push('--icon-color:' + value);
@@ -2391,6 +2429,10 @@ class FlexCellsCard extends LitElement {
       applyColor(styleColor);
     } else if (visuals?.color) {
       applyColor(visuals.color);
+    }
+    // For entity icons without a state-specific color, fall back to HA defaults (paper/state icon or HA blue)
+    if (!hasColor && stateObj) {
+      applyColor('var(--paper-item-icon-color, var(--state-icon-color, #44739e))');
     }
     if (visuals?.filter) {
       parts.push('filter:' + visuals.filter);
@@ -2414,9 +2456,6 @@ class FlexCellsCard extends LitElement {
     if (hvacAction && CLIMATE_HVAC_ACTION_TO_MODE[hvacAction]) {
       const hvacColor = stateColorCss(stateObj, CLIMATE_HVAC_ACTION_TO_MODE[hvacAction]);
       if (hvacColor) color = hvacColor;
-    }
-    if (!color && stateActive(stateObj)) {
-      color = 'var(--state-icon-active-color, var(--primary-color))';
     }
     const filter = stateColorBrightness(stateObj) || '';
     return { color, filter };
@@ -2789,8 +2828,9 @@ class FlexCellsCard extends LitElement {
       const domain = val?.split?.('.')?.[0];
       const attrEdit = this._normalizeAttrEditConfig(cell);
       if (attrEdit.enabled && stateObj && (cell?.attribute || attrEdit.field)) {
-        const display = this._formatEntityCell(cell, stateObj);
-        const cellDyn = this._evaluateDynColor(cell, type, display);
+        const displayRaw = this._formatEntityCell(cell, stateObj, false);
+        const display = this._formatEntityCell(cell, stateObj, true);
+        const cellDyn = this._evaluateDynColor(cell, type, displayRaw);
         const { style: _thStyle, textDecoration: _textDecoration } = this._buildTextStyle(cell, type, align, cellDyn);
         const dynContent = this._resolveDynamicOverwriteContent(cell, cellDyn, _textDecoration);
         const control = dynContent !== null && dynContent !== undefined
@@ -2810,8 +2850,9 @@ class FlexCellsCard extends LitElement {
         }
       }
       if (cell?.show_control && stateObj && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
-        const _disp = this._formatEntityCell(cell, stateObj);
-        const _dyn = this._evaluateDynColor(cell, type, _disp);
+        const _dispRaw = this._formatEntityCell(cell, stateObj, false);
+        const _disp = this._formatEntityCell(cell, stateObj, true);
+        const _dyn = this._evaluateDynColor(cell, type, _dispRaw);
         const { style: _thStyle, textDecoration: _textDecoration } = this._buildTextStyle(cell, type, align, _dyn);
         const dynContent = this._resolveDynamicOverwriteContent(cell, _dyn, _textDecoration);
         const controlClasses = [];
@@ -2827,8 +2868,9 @@ class FlexCellsCard extends LitElement {
           </th>
         `;
       }
-      const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
-      const dyn = this._evaluateDynColor(cell, type, display);
+      const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj, false) : 'n/a';
+      const display = stateObj ? this._formatEntityCell(cell, stateObj, true) : 'n/a';
+      const dyn = this._evaluateDynColor(cell, type, displayRaw);
       const baseMode = this._getEntityDisplayMode(cell);
       const dynMode = dyn && dyn.overwrite === 'entity'
         ? this._normalizeDynamicEntityDisplay(dyn.overwrite_entity_display)
@@ -3026,8 +3068,9 @@ class FlexCellsCard extends LitElement {
         return descriptor;
       }
       if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
-        const display = this._formatEntityCell(cell, stateObj);
-        const cellDyn = this._evaluateDynColor(cell, type, display);
+        const displayRaw = this._formatEntityCell(cell, stateObj, false);
+        const display = this._formatEntityCell(cell, stateObj, true);
+        const cellDyn = this._evaluateDynColor(cell, type, displayRaw);
         const dyn = mergeDyn(cellDyn);
         const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
         descriptor.style = tdStyle;
@@ -3041,8 +3084,9 @@ class FlexCellsCard extends LitElement {
         return descriptor;
       }
 
-      const display = stateObj ? this._formatEntityCell(cell, stateObj) : 'n/a';
-      const cellDyn = this._evaluateDynColor(cell, type, display);
+      const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj, false) : 'n/a';
+      const display = stateObj ? this._formatEntityCell(cell, stateObj, true) : 'n/a';
+      const cellDyn = this._evaluateDynColor(cell, type, displayRaw);
       const dyn = mergeDyn(cellDyn);
       const baseMode = this._getEntityDisplayMode(cell);
       const dynMode = dyn && dyn.overwrite === 'entity'
@@ -3358,10 +3402,10 @@ class FlexCellsCard extends LitElement {
       const entityId = this._stringifyTemplateValue(cell?.value);
       if (!entityId) return '';
       const stateObj = this.hass?.states?.[entityId];
-      const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj) : '';
-      const display = this._stringifyTemplateValue(displayRaw);
-      const dyn = this._evaluateDynColor(cell, type, display);
-      const shown = this._resolveDisplayWithDynamics(display, dyn, cell);
+      const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj, false) : '';
+      const displayLocalized = stateObj ? this._formatEntityCell(cell, stateObj, true) : '';
+      const dyn = this._evaluateDynColor(cell, type, displayRaw);
+      const shown = this._resolveDisplayWithDynamics(displayLocalized, dyn, cell);
       return this._stringifyTemplateValue(shown);
     }
     const base = this._stringifyTemplateValue(cell?.value);

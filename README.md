@@ -193,6 +193,10 @@ filter:
 ```
 
 ## Changelog
+- v0.22.0 (pre-release) —
+  - Entity states now show the same translated labels as built-in HA cards (no more raw "on/off"), while dynamic rules still use the original raw value so your conditions keep working.
+  - Fixed entity icon color defaulting to Home Assistant icon color when no state-specific color was provided.
+  - Fixed number inputs (box mode) so they stay stable while you type and only send changes after you finish or use the arrows, matching default HA cards; for whole-number steps the displayed value no longer shows a trailing ".0".
 - v0.21.0 —
   - Added experimental `entities` support (auto-entities/monster-card style) with `entity_row_template` and token substitution; legacy `rows` remain unchanged.
   - Added **Italian translation**, thanks to [echopage1964](https://github.com/echopage1964).
