@@ -1076,13 +1076,34 @@ class FlexCellsCard extends LitElement {
     return textDisplay;
   }
 
+  _renderIconWithOptionalText(iconName, dyn, cell, textDecoration = null, stateObj = undefined) {
+    const hasIcon = iconName !== undefined && iconName !== null && iconName !== '';
+    const iconTemplate = hasIcon
+      ? html`<ha-icon style=${this._buildIconStyle(cell, dyn, stateObj)} icon="${iconName}"></ha-icon>`
+      : null;
+    const rawText = dyn?.icon_text;
+    const textValue = rawText !== undefined && rawText !== null ? String(rawText) : '';
+    const hasText = textValue !== '';
+    if (!iconTemplate && !hasText) return '';
+
+    const decoStyle = textDecoration && textDecoration !== 'none' ? `text-decoration:${textDecoration}` : '';
+    const textSpan = hasText
+      ? (decoStyle
+        ? html`<span class="celltext" style=${decoStyle}>${textValue}</span>`
+        : html`<span class="celltext">${textValue}</span>`)
+      : null;
+
+    if (iconTemplate && textSpan) return html`<span class="fc-entity-icon-text">${iconTemplate}${textSpan}</span>`;
+    if (iconTemplate) return iconTemplate;
+    return textSpan || '';
+  }
+
   _resolveDynamicOverwriteContent(cell, dyn, textDecoration) {
     if (!dyn) return null;
     const overwrite = (dyn.overwrite || '').toLowerCase();
     if (overwrite === 'icon') {
       const iconName = dyn.icon != null ? String(dyn.icon) : '';
-      if (!iconName) return '';
-      return html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${iconName}"></ha-icon>`;
+      return this._renderIconWithOptionalText(iconName, dyn, cell, textDecoration);
     }
     if (overwrite === 'text') {
       if (dyn.text != null) return dyn.text;
@@ -1109,7 +1130,10 @@ class FlexCellsCard extends LitElement {
   _resolveDisplayWithDynamics(baseValue, dyn, cell) {
     if (!dyn) return baseValue ?? '';
     const overwrite = (dyn.overwrite || '').toLowerCase();
-    if (overwrite === 'icon') return dyn.icon != null ? String(dyn.icon) : '';
+    if (overwrite === 'icon') {
+      if (dyn.icon_text !== undefined && dyn.icon_text !== null && dyn.icon_text !== '') return String(dyn.icon_text);
+      return dyn.icon != null ? String(dyn.icon) : '';
+    }
     if (overwrite === 'text') {
       if (dyn.text != null) return String(dyn.text);
       if (dyn.mask != null) return String(dyn.mask);
@@ -2333,6 +2357,8 @@ class FlexCellsCard extends LitElement {
           res.hide = true;
           res.overwrite = 'icon';
           res.icon = r.icon || '';
+          if (r.icon_text !== undefined) res.icon_text = r.icon_text;
+          if (r.icon_color !== undefined) res.icon_color = r.icon_color;
         } else if (ow === 'entity') {
           res.hide = true;
           res.overwrite = 'entity';
@@ -2421,9 +2447,12 @@ class FlexCellsCard extends LitElement {
       parts.push('--state-icon-color:' + value);
       parts.push('--icon-color:' + value);
     };
+    const iconOverrideColor = dyn?.icon_color;
     const dynColor = dyn?.fg;
     const styleColor = st.color;
-    if (dynColor) {
+    if (iconOverrideColor) {
+      applyColor(iconOverrideColor);
+    } else if (dynColor) {
       applyColor(dynColor);
     } else if (styleColor) {
       applyColor(styleColor);
@@ -2518,8 +2547,8 @@ class FlexCellsCard extends LitElement {
     const overwrite = (dyn?.overwrite || "").toLowerCase();
 
     if (overwrite === "icon") {
-      const iconTemplate = this._renderEntityIconTemplate(cell, stateObj, dyn);
-      return iconTemplate || "";
+      const iconName = dyn?.icon != null ? String(dyn.icon) : "";
+      return this._renderIconWithOptionalText(iconName, dyn, cell, textDecoration, stateObj);
     }
     if (overwrite === "text") {
       return dyn?.text ?? dyn?.mask ?? "";
@@ -2780,12 +2809,12 @@ class FlexCellsCard extends LitElement {
     if (type === 'icon') {
       const display = val;
       const dyn = this._evaluateDynColor(cell, type, display);
-      const { style: thStyle } = this._buildTextStyle(cell, type, align, dyn);
+      const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
       let content;
       if (dyn && dyn.overwrite === 'icon') {
-        content = dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '';
+        content = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
       } else if (dyn && dyn.overwrite === 'entity') {
         const dynContent = this._renderDynamicEntityContent(cell, dyn);
         content = (dynContent !== null && dynContent !== undefined && dynContent !== '')
@@ -2929,11 +2958,11 @@ class FlexCellsCard extends LitElement {
 
     const display = val ?? '';
     const dyn = this._evaluateDynColor(cell, type, display);
-    const { style: thStyle } = this._buildTextStyle(cell, type, align, dyn);
+    const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     let shown;
     if (dyn && dyn.overwrite === 'icon') {
-      shown = html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>`;
+      shown = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
     } else if (dyn && dyn.overwrite === 'entity') {
       const dynContent = this._renderDynamicEntityContent(cell, dyn);
       shown = (dynContent !== null && dynContent !== undefined && dynContent !== '') ? dynContent : (dyn?.mask || '');
@@ -3008,12 +3037,12 @@ class FlexCellsCard extends LitElement {
       const display = val;
       const cellDyn = this._evaluateDynColor(cell, type, display);
       const dyn = mergeDyn(cellDyn);
-      const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
+      const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
       let content;
       if (dyn && dyn.overwrite === 'icon') {
-        content = dyn.icon ? html`<ha-icon style=${iconStyle} icon="${dyn.icon}"></ha-icon>` : '';
+        content = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
       } else if (dyn && dyn.overwrite === 'entity') {
         const dynContent = this._renderDynamicEntityContent(cell, dyn);
         content = (dynContent !== null && dynContent !== undefined && dynContent !== '')
@@ -3135,11 +3164,11 @@ class FlexCellsCard extends LitElement {
     const display = val ?? '';
     const cellDyn = this._evaluateDynColor(cell, type, display);
     const dyn = mergeDyn(cellDyn);
-    const { style: tdStyle } = this._buildTextStyle(cell, type, align, dyn);
+    const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     let shown;
     if (dyn && dyn.overwrite === 'icon') {
-      shown = html`<ha-icon style=${this._buildIconStyle(cell, dyn)} icon="${dyn.icon || ''}"></ha-icon>`;
+      shown = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
     } else if (dyn && dyn.overwrite === 'entity') {
       const dynContent = this._renderDynamicEntityContent(cell, dyn);
       shown = (dynContent !== null && dynContent !== undefined && dynContent !== '') ? dynContent : (dyn?.mask || '');

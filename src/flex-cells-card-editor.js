@@ -1948,8 +1948,8 @@ class FlexCellsCardEditor extends LitElement {
     setTimeout(() => cleanup(), 60000);
   }
 
-  // Picker dla reguł dynamicznego kolorowania (bg/fg) – płynny i zakotwiczony przy przycisku
-  _onRuleColorPicker(ev, rIdx, cIdx, ruleIdx, key /* 'bg' | 'fg' */) {
+  // Picker dla reguł dynamicznego kolorowania (bg/fg/icon_color) – płynny i zakotwiczony przy przycisku
+  _onRuleColorPicker(ev, rIdx, cIdx, ruleIdx, key /* 'bg' | 'fg' | 'icon_color' */) {
     ev.stopPropagation();
 
     const isCellRule = Number.isInteger(cIdx);
@@ -3112,6 +3112,27 @@ class FlexCellsCardEditor extends LitElement {
                                     @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon: e.target.value })}>
                                   </ha-textfield>
                                 `}
+                              </div>
+                              <div class="cols1">
+                                <ha-textfield class="mask-input"
+                                  .label=${t(this.hass, 'dynamic.icon_optional_text')}
+                                  .value=${rule.icon_text || ''}
+                                  @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon_text: e.target.value })}>
+                                </ha-textfield>
+                              </div>
+                              <div class="cols1">
+                                <div class="inline">
+                                  <ha-textfield
+                                    .label=${t(this.hass, 'dynamic.icon_color')}
+                                    .value=${rule.icon_color || ''}
+                                    .placeholder=${"#ff5722 | red | var(--color)"}
+                                    @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon_color: e.target.value })}>
+                                  </ha-textfield>
+                                  <button class="toggle" title="Palette"
+                                    @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, cIdx, ridx, 'icon_color')}>
+                                    <ha-icon icon="mdi:palette"></ha-icon>
+                                  </button>
+                                </div>
                               </div>
                             ` : html`` }
 

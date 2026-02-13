@@ -185,7 +185,9 @@
     "visibility_label": "Visibilità",
     "visibility_visible": "Visibile",
     "visibility_hidden": "Nascosto",
-    "text": "Testo"
+    "text": "Testo",
+    "icon_optional_text": "Testo opzionale",
+    "icon_color": "Colore icona"
   },
   "align": {
     "left": "sinistra",
