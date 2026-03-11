@@ -25,6 +25,8 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 
 Choose one installation method, via [HACS](https://www.hacs.xyz/docs/use/download/download/) or manually.
 
+> Compatibility: Flex Cells Card **v0.23.0+** requires **Home Assistant Core ≥ 2026.2** (MD3 frontend). On older cores the visual editor dropdowns will not work; use an earlier FCC release if you must stay on an older HA version.
+
 ### HACS
 
 1. In HACS use the search bar and type **Flex Cells Card**.
@@ -193,6 +195,10 @@ filter:
 ```
 
 ## Changelog
+- v0.23.0 —
+  - Updated visual editor dropdowns to the new MD3 `ha-select` API (uses `.options`).
+  - Fixes broken select menus on the latest Home Assistant Core.
+  - **Requires Home Assistant Core ≥ 2026.2 (MD3 frontend); older cores are not supported by this editor version.**
 - v0.22.0 —
   - Added optional **text field and icon color picker for dynamic "Overwrite with icon" rules** (both optional).
   - **Entity states now show the same translated labels as built-in HA cards** (no more raw "on/off"), while dynamic rules still use the original raw value so your conditions keep working.

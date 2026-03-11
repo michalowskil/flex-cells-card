@@ -938,8 +938,11 @@ class FlexCellsCardEditor extends LitElement {
     this._patchCell(r,c,patch);
   }
 
-  _cellValueChanged(r,c,e){ this._patchCell(r,c,{ value:e.target.value }); }
-  _cellAlignChanged(r,c,e){ this._patchCell(r,c,{ align:e.target.value }); }
+_cellValueChanged(r,c,e){ this._patchCell(r,c,{ value:e.target.value }); }
+_cellAlignChanged(r,c,e){
+  const value = e?.detail?.value ?? e?.target?.value;
+  this._patchCell(r,c,{ align:value });
+}
   _cellUseEntityUnitChanged(r,c,e){
     const checked = !!e.target.checked;
     const patch = { use_entity_unit: checked };
@@ -956,12 +959,16 @@ class FlexCellsCardEditor extends LitElement {
     this._patchCell(r,c,{ attribute: v ? v : undefined });
   }
   _cellEntityDisplayChanged(r,c,e){
-    const raw = e?.target?.value;
+    const raw = e?.detail?.value ?? e?.target?.value;
     const value = (typeof raw === 'string' && raw.trim()) ? raw.trim() : 'value';
     const entityDisplay = value === 'value' ? undefined : value;
     this._patchCell(r,c,{ entity_display: entityDisplay });
   }
-  _cellPrecisionChanged(r,c,e){ const v=e.target.value; const precision=v===''?undefined:parseInt(v); this._patchCell(r,c,{ precision }); }
+  _cellPrecisionChanged(r,c,e){
+    const v = e?.detail?.value ?? e?.target?.value;
+    const precision=v===''?undefined:parseInt(v);
+    this._patchCell(r,c,{ precision });
+  }
   _cellScaleChanged(r,c,key,e){
     const raw = (e.target.value ?? '').trim();
     const val = raw === '' ? undefined : Number(String(raw).replace(',', '.'));
@@ -1011,14 +1018,15 @@ class FlexCellsCardEditor extends LitElement {
     if (!trimmed) return '';
     return trimmed.replace(/(\.|\[)\d+(\])?$/, '');
   }
-  _toggleAttrEditEnabled(r,c,e){
-    const enabled = !!(e?.target?.checked);
-    this._patchAttrEdit(r,c,{ enabled });
-  }
-  _updateAttrEditText(r,c,key,e){
-    const val = (e?.target?.value ?? '').trim();
-    this._patchAttrEdit(r,c,{ [key]: val });
-  }
+_toggleAttrEditEnabled(r,c,e){
+  const enabled = !!(e?.target?.checked);
+  this._patchAttrEdit(r,c,{ enabled });
+}
+_updateAttrEditText(r,c,key,e){
+  const raw = e?.detail?.value ?? e?.target?.value ?? '';
+  const val = (typeof raw === 'string' ? raw : String(raw)).trim();
+  this._patchAttrEdit(r,c,{ [key]: val });
+}
   _updateAttrEditNumber(r,c,key,e){
     const raw = (e?.target?.value ?? '').trim();
     if (raw === '') {
@@ -1046,8 +1054,11 @@ class FlexCellsCardEditor extends LitElement {
     const num = Number(raw);
     return Number.isFinite(num);
   }
-  _styleToggle(r,c,key,e){ this._patchCellStyle(r,c,{ [key]: !!e.target.checked }); }
-  _styleValue(r,c,key,e){ this._patchCellStyle(r,c,{ [key]: e.target.value }); }
+_styleToggle(r,c,key,e){ this._patchCellStyle(r,c,{ [key]: !!e.target.checked }); }
+_styleValue(r,c,key,e){
+  const value = e?.detail?.value ?? e?.target?.value;
+  this._patchCellStyle(r,c,{ [key]: value });
+}
 
   _ruleTitle(idx) {
     const lang = (this.hass?.locale?.language || 'en').toLowerCase();
@@ -1149,7 +1160,7 @@ class FlexCellsCardEditor extends LitElement {
     this._setCellRules(r,c,rules);
   }
   _updateRuleEntityDisplay(r,c,idx,e){
-    const raw = e?.target?.value;
+    const raw = e?.detail?.value ?? e?.target?.value;
     const value = (typeof raw === 'string' && raw.trim()) ? raw.trim() : 'value';
     const overwrite_entity_display = value === 'value' ? undefined : value;
     this._updateRule(r,c,idx,{ overwrite_entity_display });
@@ -1569,11 +1580,13 @@ class FlexCellsCardEditor extends LitElement {
               .value=${sep.style || defaults.style}
               naturalMenuWidth
               fixedMenuPosition
-              @selected=${(e)=>this._updateSeparator(rIdx,{ style: e.target.value || defaults.style })}
+              .options=${[
+                { value: "solid", label: t(this.hass,"editor.separator_style_solid") },
+                { value: "dashed", label: t(this.hass,"editor.separator_style_dashed") },
+                { value: "dotted", label: t(this.hass,"editor.separator_style_dotted") },
+              ]}
+              @selected=${(e)=>this._updateSeparator(rIdx,{ style: e.detail?.value || e.target?.value || defaults.style })}
               @closed=${(e)=>e.stopPropagation()}>
-              <mwc-list-item value="solid">${t(this.hass,"editor.separator_style_solid")}</mwc-list-item>
-              <mwc-list-item value="dashed">${t(this.hass,"editor.separator_style_dashed")}</mwc-list-item>
-              <mwc-list-item value="dotted">${t(this.hass,"editor.separator_style_dotted")}</mwc-list-item>
             </ha-select>
           </div>
           <div>
@@ -1606,12 +1619,14 @@ class FlexCellsCardEditor extends LitElement {
               .value=${sep.align || defaults.align}
               naturalMenuWidth
               fixedMenuPosition
-              @selected=${(e)=>this._updateSeparator(rIdx,{ align: e.target.value || defaults.align })}
+              .options=${[
+                { value: "stretch", label: t(this.hass,"editor.separator_align_full") },
+                { value: "center", label: t(this.hass,"editor.separator_align_center") },
+                { value: "left", label: t(this.hass,"editor.separator_align_left") },
+                { value: "right", label: t(this.hass,"editor.separator_align_right") },
+              ]}
+              @selected=${(e)=>this._updateSeparator(rIdx,{ align: e.detail?.value || e.target?.value || defaults.align })}
               @closed=${(e)=>e.stopPropagation()}>
-              <mwc-list-item value="stretch">${t(this.hass,"editor.separator_align_full")}</mwc-list-item>
-              <mwc-list-item value="center">${t(this.hass,"editor.separator_align_center")}</mwc-list-item>
-              <mwc-list-item value="left">${t(this.hass,"editor.separator_align_left")}</mwc-list-item>
-              <mwc-list-item value="right">${t(this.hass,"editor.separator_align_right")}</mwc-list-item>
             </ha-select>
           </div>
         </div>
@@ -1788,7 +1803,10 @@ class FlexCellsCardEditor extends LitElement {
     const value = e?.detail?.value ?? e?.target?.value ?? '';
     this._patchCell(rIdx, cIdx, { type: 'entity', value });
   }
-  _onTypeSelect(rIdx, cIdx, e) { this._cellTypeChanged(rIdx, cIdx, { target: { value: e.target.value } }); }
+  _onTypeSelect(rIdx, cIdx, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    this._cellTypeChanged(rIdx, cIdx, { target: { value } });
+  }
 
   // === Actions (Tap/Hold/Double) ===
 
@@ -2275,11 +2293,13 @@ class FlexCellsCardEditor extends LitElement {
                           .value=${cell.type || 'string'}
                           naturalMenuWidth
                           fixedMenuPosition
+                          .options=${[
+                            { value: "entity", label: t(this.hass,"editor.entity_label") },
+                            { value: "string", label: t(this.hass,"editor.string_label") },
+                            { value: "icon", label: t(this.hass,"editor.icon_label") },
+                          ]}
                           @selected=${(e)=>this._onTypeSelect(rIdx, cIdx, e)}
                           @closed=${(e)=>e.stopPropagation()}>
-                          <mwc-list-item value="entity">${t(this.hass,"editor.entity_label")}</mwc-list-item>
-                          <mwc-list-item value="string">${t(this.hass,"editor.string_label")}</mwc-list-item>
-                          <mwc-list-item value="icon">${t(this.hass,"editor.icon_label")}</mwc-list-item>
                         </ha-select>
                       </div>
 
@@ -2331,11 +2351,13 @@ class FlexCellsCardEditor extends LitElement {
                             .value=${cell.entity_display || "value"}
                             naturalMenuWidth
                             fixedMenuPosition
+                            .options=${[
+                              { value: "value", label: t(this.hass,"editor.entity_display_option_value") },
+                              { value: "icon", label: t(this.hass,"editor.entity_display_option_icon") },
+                              { value: "icon_value", label: t(this.hass,"editor.entity_display_option_icon_value") },
+                            ]}
                             @selected=${(e)=>this._cellEntityDisplayChanged(rIdx,cIdx,e)}
                             @closed=${(e)=>e.stopPropagation()}>
-                            <mwc-list-item value="value">${t(this.hass,"editor.entity_display_option_value")}</mwc-list-item>
-                            <mwc-list-item value="icon">${t(this.hass,"editor.entity_display_option_icon")}</mwc-list-item>
-                            <mwc-list-item value="icon_value">${t(this.hass,"editor.entity_display_option_icon_value")}</mwc-list-item>
                           </ha-select>
                         </div>
 
@@ -2422,20 +2444,22 @@ class FlexCellsCardEditor extends LitElement {
                             </div>
 
                             <div class="cell-grid cell-wide">
-                              <ha-select
-                                .label=${t(this.hass,"editor.attr_edit_control_type")}
-                                .value=${attrEditControl}
-                                ?disabled=${!attrEditEnabled}
-                                naturalMenuWidth
-                                fixedMenuPosition
-                                @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'control',{ target:{ value:e.target.value }})}
-                                @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value="slider">${t(this.hass,"editor.attr_edit_control_slider")}</mwc-list-item>
-                                <mwc-list-item value="color">${t(this.hass,"editor.attr_edit_control_color")}</mwc-list-item>
-                                <mwc-list-item value="color_sat">${t(this.hass,"editor.attr_edit_control_color_sat")}</mwc-list-item>
-                                <mwc-list-item value="switch">${t(this.hass,"editor.attr_edit_control_switch")}</mwc-list-item>
-                              </ha-select>
-                            </div>
+                            <ha-select
+                              .label=${t(this.hass,"editor.attr_edit_control_type")}
+                              .value=${attrEditControl}
+                              ?disabled=${!attrEditEnabled}
+                              naturalMenuWidth
+                              fixedMenuPosition
+                              .options=${[
+                                { value: "slider", label: t(this.hass,"editor.attr_edit_control_slider") },
+                                { value: "color", label: t(this.hass,"editor.attr_edit_control_color") },
+                                { value: "color_sat", label: t(this.hass,"editor.attr_edit_control_color_sat") },
+                                { value: "switch", label: t(this.hass,"editor.attr_edit_control_switch") },
+                              ]}
+                              @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'control',e)}
+                              @closed=${(e)=>e.stopPropagation()}>
+                            </ha-select>
+                          </div>
 
                             ${attrEditControl === 'slider' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
                               <div class="cell-grid cell-wide">
@@ -2611,11 +2635,13 @@ class FlexCellsCardEditor extends LitElement {
                         <ha-select
                           .label=${t(this.hass, "editor.align")}
                           .value=${cell.align || 'right'}
-                          @selected=${(e) => this._cellAlignChanged(rIdx, cIdx, {target:{value:e.target.value}})}
+                          .options=${[
+                            { value: "left", label: t(this.hass,"align.left") },
+                            { value: "center", label: t(this.hass,"align.center") },
+                            { value: "right", label: t(this.hass,"align.right") },
+                          ]}
+                          @selected=${(e) => this._cellAlignChanged(rIdx, cIdx, e)}
                           @closed=${(e)=>e.stopPropagation()}>
-                          <mwc-list-item value="left">${t(this.hass,"align.left")}</mwc-list-item>
-                          <mwc-list-item value="center">${t(this.hass,"align.center")}</mwc-list-item>
-                          <mwc-list-item value="right">${t(this.hass,"align.right")}</mwc-list-item>
                         </ha-select>
                       </div>
 
@@ -2625,12 +2651,14 @@ class FlexCellsCardEditor extends LitElement {
                           <ha-select
                             .label=${t(this.hass,"editor.text_transform")}
                             .value=${st.text_transform || ''}
-                            @selected=${(e)=>this._styleValue(rIdx,cIdx,'text_transform',{target:{value:e.target.value}})}
+                            .options=${[
+                              { value: "" , label: "" },
+                              { value: "uppercase", label: "uppercase" },
+                              { value: "lowercase", label: "lowercase" },
+                              { value: "capitalize", label: "capitalize" },
+                            ]}
+                            @selected=${(e)=>this._styleValue(rIdx,cIdx,'text_transform',e)}
                             @closed=${(e)=>e.stopPropagation()}>
-                            <mwc-list-item value=""></mwc-list-item>
-                            <mwc-list-item value="uppercase">uppercase</mwc-list-item>
-                            <mwc-list-item value="lowercase">lowercase</mwc-list-item>
-                            <mwc-list-item value="capitalize">capitalize</mwc-list-item>
                           </ha-select>
                         </div>
                       ` : ''}
@@ -2661,12 +2689,14 @@ class FlexCellsCardEditor extends LitElement {
                             <ha-select
                               .label=${t(this.hass,"editor.precision")}
                               .value=${(cell.precision ?? '').toString()}
-                              @selected=${(e)=>this._cellPrecisionChanged(rIdx,cIdx,{target:{value:e.target.value}})}
+                              .options=${[
+                                { value: "", label: "" },
+                                { value: "2", label: t(this.hass,"precision.two") },
+                                { value: "1", label: t(this.hass,"precision.one") },
+                                { value: "0", label: t(this.hass,"precision.int") },
+                              ]}
+                              @selected=${(e)=>this._cellPrecisionChanged(rIdx,cIdx,e)}
                               @closed=${(e)=>e.stopPropagation()}>
-                              <mwc-list-item value=""></mwc-list-item>
-                              <mwc-list-item value="2">${t(this.hass,"precision.two")}</mwc-list-item>
-                              <mwc-list-item value="1">${t(this.hass,"precision.one")}</mwc-list-item>
-                              <mwc-list-item value="0">${t(this.hass,"precision.int")}</mwc-list-item>
                             </ha-select>
                           </div>
                         ` : ''}
@@ -2871,12 +2901,14 @@ class FlexCellsCardEditor extends LitElement {
                               <ha-select
                                 .label=${t(this.hass, 'dynamic.match')}
                                 .value=${match}
-                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ match: e.target.value })}
-                                @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value="all">${t(this.hass,'dynamic.match_all')}</mwc-list-item>
-                                <mwc-list-item value="any">${t(this.hass,'dynamic.match_any')}</mwc-list-item>
-                              </ha-select>
-                            </div>
+                                .options=${[
+                                  { value: "all", label: t(this.hass,'dynamic.match_all') },
+                                  { value: "any", label: t(this.hass,'dynamic.match_any') },
+                                ]}
+                              @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ match: e.detail?.value ?? e.target?.value })}
+                              @closed=${(e)=>e.stopPropagation()}>
+                            </ha-select>
+                          </div>
 
                             ${conditions.map((cond, condIdx) => html`
                               <div class="option group full" style="margin:6px 0; padding:10px; border:1px dashed var(--divider-color,#ddd);">
@@ -2907,17 +2939,19 @@ class FlexCellsCardEditor extends LitElement {
                                   <ha-select
                                     .label=${t(this.hass, 'dynamic.operator')}
                                     .value=${cond.op || '='}
-                                    @selected=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ op: e.target.value })}
+                                    .options=${[
+                                      { value: ">", label: ">" },
+                                      { value: ">=", label: "≥" },
+                                      { value: "<", label: "<" },
+                                      { value: "<=", label: "≤" },
+                                      { value: "=", label: "=" },
+                                      { value: "!=", label: "≠" },
+                                      { value: "between", label: t(this.hass,'dynamic.op_between') },
+                                      { value: "contains", label: t(this.hass,'dynamic.op_contains') },
+                                      { value: "not_contains", label: t(this.hass,'dynamic.op_not_contains') },
+                                    ]}
+                                    @selected=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ op: e.detail?.value ?? e.target?.value })}
                                     @closed=${(e)=>e.stopPropagation()}>
-                                    <mwc-list-item value=">">&gt;</mwc-list-item>
-                                    <mwc-list-item value=">=">&ge;</mwc-list-item>
-                                    <mwc-list-item value="<">&lt;</mwc-list-item>
-                                    <mwc-list-item value="<=">&le;</mwc-list-item>
-                                    <mwc-list-item value="=">=</mwc-list-item>
-                                    <mwc-list-item value="!=">≠</mwc-list-item>
-                                    <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
-                                    <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
-                                    <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
                                   </ha-select>
 
                                   ${ cond && cond.op === 'between' ? html`
@@ -2990,13 +3024,15 @@ class FlexCellsCardEditor extends LitElement {
                               <ha-select
                                 .label=${t(this.hass, 'dynamic.overwrite_label')}
                                 .value=${rule.overwrite || ''}
-                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite: e.target.value })}
+                                .options=${[
+                                  { value: "", label: "" },
+                                  { value: "hide", label: t(this.hass, 'dynamic.overwrite_hide') },
+                                  { value: "entity", label: t(this.hass, 'dynamic.overwrite_entity_metadata') },
+                                  { value: "text", label: t(this.hass, 'dynamic.overwrite_text') },
+                                  { value: "icon", label: t(this.hass, 'dynamic.overwrite_icon') },
+                                ]}
+                                @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite: e.detail?.value ?? e.target?.value })}
                                 @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value=""></mwc-list-item>
-                                <mwc-list-item value="hide">${t(this.hass, 'dynamic.overwrite_hide')}</mwc-list-item>
-                                <mwc-list-item value="entity">${t(this.hass, 'dynamic.overwrite_entity_metadata')}</mwc-list-item>
-                                <mwc-list-item value="text">${t(this.hass, 'dynamic.overwrite_text')}</mwc-list-item>
-                                <mwc-list-item value="icon">${t(this.hass, 'dynamic.overwrite_icon')}</mwc-list-item>
                               </ha-select>
                             </div>
 
@@ -3041,11 +3077,13 @@ class FlexCellsCardEditor extends LitElement {
                                   .value=${rule.overwrite_entity_display || 'value'}
                                   naturalMenuWidth
                                   fixedMenuPosition
+                                  .options=${[
+                                    { value: "value", label: t(this.hass,"editor.entity_display_option_value") },
+                                    { value: "icon", label: t(this.hass,"editor.entity_display_option_icon") },
+                                    { value: "icon_value", label: t(this.hass,"editor.entity_display_option_icon_value") },
+                                  ]}
                                   @selected=${(e)=>this._updateRuleEntityDisplay(rIdx,cIdx,ridx,e)}
                                   @closed=${(e)=>e.stopPropagation()}>
-                                  <mwc-list-item value="value">${t(this.hass,"editor.entity_display_option_value")}</mwc-list-item>
-                                  <mwc-list-item value="icon">${t(this.hass,"editor.entity_display_option_icon")}</mwc-list-item>
-                                  <mwc-list-item value="icon_value">${t(this.hass,"editor.entity_display_option_icon_value")}</mwc-list-item>
                                 </ha-select>
                               </div>
                               <div class="cols1">
@@ -3172,10 +3210,12 @@ class FlexCellsCardEditor extends LitElement {
                               <ha-select
                                 .label=${t(this.hass, 'dynamic.match')}
                                 .value=${match}
-                                @selected=${(e)=>this._updateRowRule(rIdx,ridx,{ match: e.target.value })}
+                                .options=${[
+                                  { value: "all", label: t(this.hass,'dynamic.match_all') },
+                                  { value: "any", label: t(this.hass,'dynamic.match_any') },
+                                ]}
+                                @selected=${(e)=>this._updateRowRule(rIdx,ridx,{ match: e.detail?.value ?? e.target?.value })}
                                 @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value="all">${t(this.hass,'dynamic.match_all')}</mwc-list-item>
-                                <mwc-list-item value="any">${t(this.hass,'dynamic.match_any')}</mwc-list-item>
                               </ha-select>
                             </div>
 
@@ -3208,17 +3248,19 @@ class FlexCellsCardEditor extends LitElement {
                                   <ha-select
                                     .label=${t(this.hass, 'dynamic.operator')}
                                     .value=${cond?.op || '='}
-                                    @selected=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ op: e.target.value })}
+                                    .options=${[
+                                      { value: ">", label: ">" },
+                                      { value: ">=", label: "≥" },
+                                      { value: "<", label: "<" },
+                                      { value: "<=", label: "≤" },
+                                      { value: "=", label: "=" },
+                                      { value: "!=", label: "≠" },
+                                      { value: "between", label: t(this.hass,'dynamic.op_between') },
+                                      { value: "contains", label: t(this.hass,'dynamic.op_contains') },
+                                      { value: "not_contains", label: t(this.hass,'dynamic.op_not_contains') },
+                                    ]}
+                                    @selected=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ op: e.detail?.value ?? e.target?.value })}
                                     @closed=${(e)=>e.stopPropagation()}>
-                                    <mwc-list-item value=">">&gt;</mwc-list-item>
-                                    <mwc-list-item value=">=">&ge;</mwc-list-item>
-                                    <mwc-list-item value="<">&lt;</mwc-list-item>
-                                    <mwc-list-item value="<=">&le;</mwc-list-item>
-                                    <mwc-list-item value="=">=</mwc-list-item>
-                                    <mwc-list-item value="!=">≠</mwc-list-item>
-                                    <mwc-list-item value="between">${t(this.hass,'dynamic.op_between')}</mwc-list-item>
-                                    <mwc-list-item value="contains">${t(this.hass,'dynamic.op_contains')}</mwc-list-item>
-                                    <mwc-list-item value="not_contains">${t(this.hass,'dynamic.op_not_contains')}</mwc-list-item>
                                   </ha-select>
 
                                   ${ cond && cond.op === 'between' ? html`
@@ -3289,11 +3331,13 @@ class FlexCellsCardEditor extends LitElement {
                               <ha-select
                                 .label=${t(this.hass, 'dynamic.visibility_label')}
                                 .value=${rule?.visibility || ''}
-                                @selected=${(e)=>this._updateRowRule(rIdx,ridx,{ visibility: e.target.value || undefined })}
+                                .options=${[
+                                  { value: "", label: "" },
+                                  { value: "visible", label: t(this.hass, 'dynamic.visibility_visible') },
+                                  { value: "hidden", label: t(this.hass, 'dynamic.visibility_hidden') },
+                                ]}
+                                @selected=${(e)=>this._updateRowRule(rIdx,ridx,{ visibility: (e.detail?.value ?? e.target?.value) || undefined })}
                                 @closed=${(e)=>e.stopPropagation()}>
-                                <mwc-list-item value=""></mwc-list-item>
-                                <mwc-list-item value="visible">${t(this.hass, 'dynamic.visibility_visible')}</mwc-list-item>
-                                <mwc-list-item value="hidden">${t(this.hass, 'dynamic.visibility_hidden')}</mwc-list-item>
                               </ha-select>
                             </div>
 
