@@ -140,6 +140,8 @@
     "double_tap_action": "Akcja po dwukliku",
     "advanced": "Akcje dotknięcia i przytrzymania (komórka)",
     "custom_css": "Własny CSS",
+    "cell_custom_template": "Własny szablon komórki",
+    "cell_custom_template_hint": "Wpisz dowolny HTML tylko dla tej komórki. Użyj np. <fcc row=\"1\" col=\"2\" /> aby wstawić inną komórkę (as=\"text\" zwróci sam tekst). Odznacz, aby wrócić do standardowego widoku.",
     "actions_hint": "Jeśli ustawisz jakąkolwiek akcję, domyślne 'more-info' dla encji zostanie wyłączone.",
     "scale_title": "Przeskalowanie",
     "scale_in_min": "Wejście min",

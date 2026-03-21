@@ -378,6 +378,18 @@ class FlexCellsCardEditor extends LitElement {
     this._patchCell(r, c, { custom_css: value });
   }
 
+  _toggleCellCustomTemplate(r, c, e) {
+    const enabled = !!(e?.target?.checked);
+    const patch = { custom_template_enabled: enabled };
+    if (!enabled) patch.custom_template_html = undefined;
+    this._patchCell(r, c, patch);
+  }
+
+  _updateCellCustomTemplate(r, c, e) {
+    const value = e?.target?.value ?? '';
+    this._patchCell(r, c, { custom_template_html: value });
+  }
+
 
   constructor() {
     super();
@@ -2273,6 +2285,10 @@ _styleValue(r,c,key,e){
                       typeof cell.custom_css === 'string' && cell.custom_css.trim()
                         ? cell.custom_css
                         : this._defaultCellCss();
+                    const cellCustomTemplateEnabled = !!cell.custom_template_enabled;
+                    const cellCustomTemplateValue = typeof cell.custom_template_html === 'string'
+                      ? cell.custom_template_html
+                      : '';
                     const attrEdit = this._getAttrEditConfig(cell);
                     const attrEditEnabled = attrEdit.enabled === true;
                     const attrEditControl = attrEdit.control || 'slider';
@@ -2828,6 +2844,27 @@ _styleValue(r,c,key,e){
                           </ha-textfield>
                         </div>
                       ` : ''}
+
+                        <div class="cell-grid cell-wide" style="margin-top:8px;">
+                          <div class="option full option-stack">
+                            <label>
+                              <input type="checkbox"
+                                     .checked=${cellCustomTemplateEnabled}
+                                     @change=${(e)=>this._toggleCellCustomTemplate(rIdx, cIdx, e)} />
+                              <span class="label">${t(this.hass,'editor.cell_custom_template')}</span>
+                            </label>
+                            ${cellCustomTemplateEnabled ? html`
+                              <textarea
+                                class="text-input"
+                                rows="5"
+                                style="font-family:monospace; min-height:120px;"
+                                .value=${cellCustomTemplateValue}
+                                @input=${(e)=>this._updateCellCustomTemplate(rIdx, cIdx, e)}>
+                              </textarea>
+                              <div class="muted">${t(this.hass,'editor.cell_custom_template_hint')}</div>
+                            ` : nothing}
+                          </div>
+                        </div>
 
                         <div class="cell-grid cell-wide" style="margin-top:8px;">
                           <div class="option full option-stack">

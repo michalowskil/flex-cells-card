@@ -66,46 +66,119 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
 ## Templates
-  - Templates, in addition to standard HTML tags, support their own tag:  
-    `<fcc row="3" col="5" />` - inserts the selected cell  
-    `<fcc row="3" />` - inserts the selected row  
-    `<fcc />` - inserts the entire table, which looks the same as without templates. This allows you to write custom CSS for the entire table:
-    
-    ```html
-    <style>
-      ...
-    </style>
-    <fcc />
-    ```
-  - If you want a non-fcc-table element to be dynamic (for example, `<div>`), you can use the `mode="text"` attribute (alias `as="text"`) for a text-type cell. For example, you can set a dynamic rule like this:
+### Card-level (global) template
+- Templates, in addition to standard HTML tags, support their own tag:  
+  `<fcc row="3" col="5" />` - insert a specific cell.  
+  `<fcc row="3" />` - insert a specific row.  
+  `<fcc />` - insert the full table exactly as FCC would render it (handy for wrapping with your own CSS):
 
-    ```yaml
-    - cells:
-        - type: string
-          value: "display: none;"
-          align: left
-          style:
-            text_transform: ""
-          dyn_color:
-            - entity: light.hue_bulb
-              attr: ""
-              op: "="
-              val: "on"
-              bg: ""
-              fg: ""
-              overwrite: text
-              overwrite_entity: ""
-              overwrite_attr: ""
-              text: "display: flex;"
-    ```
-    to use this cell like this:
+  ```html
+  <style>
+    /* custom styles for the whole table */
+  </style>
+  <fcc />
+  ```
 
-    ```html
-    <div style="<fcc mode='text' row='1' col='1' />">
-        test
-    <div>
-    ```
-  - The appearance and rules assigned to cells/rows should work in templates.
+- If you want a non-fcc-table element to be dynamic (for example, a `<div>`), you can use the `mode="text"` attribute (alias `as="text"`) for a text-type cell. For example, you can set a dynamic rule like this:
+
+  ```yaml
+  - cells:
+      - type: string
+        value: "display: none;"
+        align: left
+        style:
+          text_transform: ""
+        dyn_color:
+          - entity: light.hue_bulb
+            attr: ""
+            op: "="
+            val: "on"
+            overwrite: text
+            text: "display: flex;"
+  ```
+
+  ```html
+  <div style="<fcc mode='text' row='1' col='1' />">
+    test
+  </div>
+  ```
+
+### Per-cell templates
+- Each cell can render its own HTML when `custom_template_enabled: true`.  
+- The same `<fcc>` tag works inside a cell template; `row`/`col` numbering follows your YAML order (not the current sort order).  
+- Use `mode="text"` (or `as="text"`) when you only want the plain text value of a cell (e.g., for `<img src="...">`).
+- Custom CSS, dynamic rules, and actions defined on the referenced cells are preserved.
+
+Example (two cells embedding each other and reusing an entity picture):
+
+![Flex Cells Card](images/per-cell-templates.png)
+
+```yaml
+rows:
+  - cells:
+      - type: entity
+        value: media_player.lg_webos_smart_tv
+        align: center
+        custom_template_enabled: true
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+        custom_template_html: |-
+          this is <span style="color: red">cell</span> 1
+          <br/>
+          <fcc row="1" col="1" />
+          <br />
+          entity_picture as image:
+          <br />
+          <img src="<fcc row='1' col='1' as='text' />" />
+        attribute: entity_picture
+        style:
+          background: "#f7ff85"
+      - type: string
+        value: aaaaaaaaa
+        align: center
+        style:
+          background: "#b8fff3"
+        custom_template_enabled: true
+        custom_template_html: |-
+          this is cell 2 with<br />content coming from cell 1
+          <br/>
+          <fcc row="1" col="1" />
+          <br/>
+          cell 2 content: <fcc row="1" col="2" />
+          <br />
+          This comes from row 2 col 2:
+          <br />
+          <fcc row="2" col="2" style="width: 100px; text-align: center; border: 1px dashed red;" />
+  - cells:
+      - type: string
+        value: bbbbbbbbbbb
+        align: left
+        style:
+          background: "#c2d4ff"
+      - type: icon
+        value: mdi:airplane
+        align: right
+        style:
+          background: "#85ff93"
+    dyn_row_rules: []
+column_count: 2
+card_padding: ""
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+```
 
 ## Examples
   - [Temperature/Humidity](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md) - a simple table divided into three groups, with sorting by the temperature column performed independently in each group. Here you'll find the simplest example of a dynamic rule that changes color to red when the temperature exceeds a specified value. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/temperature-humidity-table/temperature-humidity.md)  
@@ -195,6 +268,8 @@ filter:
 ```
 
 ## Changelog
+- v0.24.0-beta.1 (pre-release) —
+  - Added **custom HTML templates for each cell**. You can embed the same or different FCC cells using `<fcc row="x" col="y" />` while preserving actions, dynamic rules, and custom CSS. This allows you to place more than one element in a single cell.
 - v0.23.0 —
   - Updated visual editor dropdowns to the new MD3 `ha-select` API (uses `.options`).
   - Fixes broken select menus on the latest Home Assistant Core.

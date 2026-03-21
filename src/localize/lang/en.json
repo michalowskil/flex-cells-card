@@ -140,6 +140,8 @@
     "double_tap_action": "Double-tap action",
     "advanced": "Tap & Hold Actions (cell)",
     "custom_css": "Custom CSS",
+    "cell_custom_template": "Custom cell template",
+    "cell_custom_template_hint": "Use custom HTML just for this cell. Insert any table cell with <fcc row=\"1\" col=\"2\" /> (use as=\"text\" for plain text). Leave unchecked to keep the default rendering.",
     "actions_hint": "If any action is set, the default 'more-info' for an entity will be disabled.",
     "scale_title": "Rescale",
     "scale_in_min": "Input min",

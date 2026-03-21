@@ -140,6 +140,8 @@
     "double_tap_action": "Doppeltippen-Aktion",
     "advanced": "Tippen & Halten Aktionen (Zelle)",
     "custom_css": "Benutzerdefiniertes CSS",
+    "cell_custom_template": "Benutzerdefinierte Zellvorlage",
+    "cell_custom_template_hint": "Eigenes HTML nur für diese Zelle. Füge andere Zellen mit <fcc row=\"1\" col=\"2\" /> ein (as=\"text\" für Klartext). Deaktivieren, um die Standarddarstellung zu behalten.",
     "actions_hint": "Wenn eine Aktion gesetzt ist, wird das Standard-\"more-info\" für die Entität deaktiviert.",
     "scale_title": "Skalieren",
     "scale_in_min": "Eingabe min",

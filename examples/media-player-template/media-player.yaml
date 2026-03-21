@@ -462,7 +462,6 @@ custom_template_html: |-
     .shuffle .info{
       opacity: 0.55;
       font-size: 12px;
-      width: 67px;
       display: inline-block;
     }
   </style>

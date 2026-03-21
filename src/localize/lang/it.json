@@ -140,6 +140,8 @@
     "double_tap_action": "Azione doppio tocco",
     "advanced": "Azioni tocco e pressione (cella)",
     "custom_css": "CSS personalizzato",
+    "cell_custom_template": "Template personalizzato per la cella",
+    "cell_custom_template_hint": "HTML personalizzato solo per questa cella. Inserisci altre celle con <fcc row=\"1\" col=\"2\" /> (usa as=\"text\" per il testo puro). Disattiva per tornare al rendering predefinito.",
     "actions_hint": "Se è impostata un'azione, l'azione predefinita 'more-info' dell'entità verrà disabilitata.",
     "scale_title": "Ridimensionamento",
     "scale_in_min": "Ingresso minimo",

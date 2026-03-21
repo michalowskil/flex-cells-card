@@ -2998,7 +2998,7 @@ class FlexCellsCard extends LitElement {
     return html`<th class=${defaultClassAttr || nothing} colspan=${span} style=${thStyle}>${shown}</th>`;
   }
 
-  _describeBodyCell(cell, rowDyn = null, colSpan = 1) {
+  _describeBodyCell(cell, rowDyn = null, colSpan = 1, templateCtx = null) {
     const numericSpan = Number(colSpan);
     const span = Number.isFinite(numericSpan) && numericSpan > 1 ? numericSpan : 1;
     const type = cell?.type || 'string';
@@ -3031,6 +3031,30 @@ class FlexCellsCard extends LitElement {
       align,
       type,
       hidden: false,
+    };
+
+    const applyCellTemplate = (desc) => {
+      if (!desc || !templateCtx) return desc;
+      if (!cell?.custom_template_enabled) return desc;
+      const tpl = typeof cell?.custom_template_html === 'string' ? cell.custom_template_html : '';
+      if (!tpl.trim()) return desc;
+      const tplRows = templateCtx.templateRows || [];
+      const rowNumber = templateCtx.rowNumber || null;
+      const colNumber = templateCtx.colNumber || null;
+      const blockedCell = (rowNumber !== null && rowNumber !== undefined && colNumber !== null && colNumber !== undefined)
+        ? { row: rowNumber, col: colNumber }
+        : null;
+      const textFallback = this._renderTemplateCellText(tplRows, rowNumber, colNumber);
+      const rendered = this._renderCustomTemplate(tpl, tplRows, null, {
+        blockedCell,
+        blockedCellFallback: desc.content,
+        blockedCellTextFallback: textFallback,
+        embed: true,
+      });
+      if (rendered !== null && rendered !== undefined) {
+        return { ...desc, content: rendered };
+      }
+      return desc;
     };
 
     if (type === 'icon') {
@@ -3074,7 +3098,7 @@ class FlexCellsCard extends LitElement {
         descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
       }
 
-      return descriptor;
+      return applyCellTemplate(descriptor);
     }
 
     if (type === 'entity') {
@@ -3094,7 +3118,7 @@ class FlexCellsCard extends LitElement {
         if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
           descriptor.hidden = true;
         }
-        return descriptor;
+        return applyCellTemplate(descriptor);
       }
       if (cell?.show_control && stateObj && !cell?.attribute && (domain === 'input_boolean' || domain === 'switch' || domain === 'input_number' || domain === 'number' || domain === 'input_select' || domain === 'select' || domain === 'input_button' || domain === 'button' || domain === 'input_datetime' || domain === 'datetime' || domain === 'date' || domain === 'time' || domain === 'input_text' || domain === 'text')) {
         const displayRaw = this._formatEntityCell(cell, stateObj, false);
@@ -3110,7 +3134,7 @@ class FlexCellsCard extends LitElement {
         if (dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')) {
           descriptor.hidden = true;
         }
-        return descriptor;
+        return applyCellTemplate(descriptor);
       }
 
       const displayRaw = stateObj ? this._formatEntityCell(cell, stateObj, false) : 'n/a';
@@ -3158,7 +3182,7 @@ class FlexCellsCard extends LitElement {
         descriptor.onKeydown = (e) => this._onEntityKeydown(e, val);
       }
 
-      return descriptor;
+      return applyCellTemplate(descriptor);
     }
 
     const display = val ?? '';
@@ -3198,11 +3222,11 @@ class FlexCellsCard extends LitElement {
       descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
     }
 
-    return descriptor;
+    return applyCellTemplate(descriptor);
   }
 
-  _renderBodyCell(cell, rowDyn = null, colSpan = 1, rowIndex = null, cellIndex = null) {
-    const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
+  _renderBodyCell(cell, rowDyn = null, colSpan = 1, rowIndex = null, cellIndex = null, templateCtx = null) {
+    const descriptor = this._describeBodyCell(cell, rowDyn, colSpan, templateCtx);
     if (!descriptor) return html``;
     const {
       colSpan: span,
@@ -3250,8 +3274,8 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
-  _renderStandaloneCell(cell, rowDyn = null, colSpan = 1, extraStyle = '', extraClass = '', originTag = 'td', rowMeta = null) {
-    const descriptor = this._describeBodyCell(cell, rowDyn, colSpan);
+  _renderStandaloneCell(cell, rowDyn = null, colSpan = 1, extraStyle = '', extraClass = '', originTag = 'td', rowMeta = null, opts = {}, templateCtx = null) {
+    const descriptor = this._describeBodyCell(cell, rowDyn, colSpan, templateCtx);
     if (!descriptor) return html``;
     if (descriptor.hidden) return html``;
     const {
@@ -3280,23 +3304,33 @@ class FlexCellsCard extends LitElement {
     }
     const alignment = typeof align === 'string' ? align : 'left';
     const styleSegments = [];
+    const embed = !!opts.embed;
     if (style) {
       const cleaned = style.replace(/text-align:[^;]+;?/gi, '');
       if (cleaned.trim()) styleSegments.push(cleaned.trim().replace(/;$/, ''));
     }
-    styleSegments.push('display:inline-flex');
-    styleSegments.push('align-items:center');
-    if (alignment === 'right') {
-      styleSegments.push('justify-content:flex-end');
-      styleSegments.push('text-align:right');
-    } else if (alignment === 'center') {
-      styleSegments.push('justify-content:center');
-      styleSegments.push('text-align:center');
+    if (embed) {
+      styleSegments.push('display:inline-block');
+      if (alignment === 'right') styleSegments.push('text-align:right');
+      else if (alignment === 'center') styleSegments.push('text-align:center');
+      else styleSegments.push('text-align:left');
+      styleSegments.push('white-space:normal');
+      styleSegments.push('vertical-align:top');
     } else {
-      styleSegments.push('justify-content:flex-start');
-      styleSegments.push('text-align:left');
+      styleSegments.push('display:inline-flex');
+      styleSegments.push('align-items:center');
+      if (alignment === 'right') {
+        styleSegments.push('justify-content:flex-end');
+        styleSegments.push('text-align:right');
+      } else if (alignment === 'center') {
+        styleSegments.push('justify-content:center');
+        styleSegments.push('text-align:center');
+      } else {
+        styleSegments.push('justify-content:flex-start');
+        styleSegments.push('text-align:left');
+      }
+      styleSegments.push('white-space:nowrap');
     }
-    styleSegments.push('white-space:nowrap');
     if (extraStyle && typeof extraStyle === 'string') {
       const appended = extraStyle.trim().replace(/;+$/, '');
       if (appended) styleSegments.push(appended);
@@ -3331,7 +3365,7 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
-  _renderTemplateRow(templateRows, rowNumber, inlineStyle = '', extraClass = '') {
+  _renderTemplateRow(templateRows, rowNumber, inlineStyle = '', extraClass = '', opts = {}) {
     if (!Number.isInteger(rowNumber) || rowNumber <= 0) return html``;
     const entry = templateRows[rowNumber - 1];
     if (!entry || entry.hidden) return html``;
@@ -3341,6 +3375,7 @@ class FlexCellsCard extends LitElement {
       rowClass: entry.rowClass,
       zebraClass: entry.zebraClass,
     };
+    const templateCtxBase = { templateRows, rowNumber };
     const classes = ['fcc-template-row'];
     if (entry.rowClass) classes.push(entry.rowClass);
     if (entry.zebraClass) classes.push(entry.zebraClass);
@@ -3365,11 +3400,31 @@ class FlexCellsCard extends LitElement {
     if (entry.mergeColumns) {
       const cell = entry.cells[0] ?? { type: 'string', value: '', align: originTag === 'th' ? 'left' : 'right' };
       const combinedClass = entry.rowIndex != null ? this._cellCssClass(entry.rowIndex, 0) : '';
-      cellsContent = this._renderStandaloneCell(cell, entry.rowDyn, entry.colSpan, '', combinedClass, originTag, rowMeta);
+      cellsContent = this._renderStandaloneCell(
+        cell,
+        entry.rowDyn,
+        entry.colSpan,
+        '',
+        combinedClass,
+        originTag,
+        rowMeta,
+        opts,
+        { ...templateCtxBase, colNumber: 1 },
+      );
     } else {
       cellsContent = entry.cells.map((cell, idx) => {
         const combinedClass = entry.rowIndex != null ? this._cellCssClass(entry.rowIndex, idx) : '';
-        return this._renderStandaloneCell(cell, entry.rowDyn, 1, '', combinedClass, originTag, rowMeta);
+        return this._renderStandaloneCell(
+          cell,
+          entry.rowDyn,
+          1,
+          '',
+          combinedClass,
+          originTag,
+          rowMeta,
+          opts,
+          { ...templateCtxBase, colNumber: idx + 1 },
+        );
       });
     }
 
@@ -3384,10 +3439,10 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
-  _renderTemplateCell(templateRows, rowNumber, colNumber, inlineStyle = '', extraClass = '') {
+  _renderTemplateCell(templateRows, rowNumber, colNumber, inlineStyle = '', extraClass = '', opts = {}) {
     if (!Number.isInteger(rowNumber) || rowNumber <= 0) return html``;
     if (!Number.isInteger(colNumber) || colNumber <= 0) {
-      return this._renderTemplateRow(templateRows, rowNumber, inlineStyle, extraClass);
+      return this._renderTemplateRow(templateRows, rowNumber, inlineStyle, extraClass, opts);
     }
     const entry = templateRows[rowNumber - 1];
     if (!entry || entry.hidden) return html``;
@@ -3397,6 +3452,7 @@ class FlexCellsCard extends LitElement {
       rowClass: entry.rowClass,
       zebraClass: entry.zebraClass,
     };
+    const templateCtxBase = { templateRows, rowNumber };
     const originTag = entry.originTag || 'td';
     if (entry.mergeColumns) {
       if (colNumber !== 1) return html``;
@@ -3405,7 +3461,17 @@ class FlexCellsCard extends LitElement {
         .filter((cls) => !!cls)
         .join(' ')
         .trim();
-      return this._renderStandaloneCell(cell, entry.rowDyn, entry.colSpan, inlineStyle, combinedClass, originTag, rowMeta);
+      return this._renderStandaloneCell(
+        cell,
+        entry.rowDyn,
+        entry.colSpan,
+        inlineStyle,
+        combinedClass,
+        originTag,
+        rowMeta,
+        opts,
+        { ...templateCtxBase, colNumber: 1 },
+      );
     }
     const idx = colNumber - 1;
     if (idx < 0 || idx >= entry.cells.length) return html``;
@@ -3414,7 +3480,17 @@ class FlexCellsCard extends LitElement {
       .filter((cls) => !!cls)
       .join(' ')
       .trim();
-    return this._renderStandaloneCell(cell, entry.rowDyn, 1, inlineStyle, combinedClass, originTag, rowMeta);
+    return this._renderStandaloneCell(
+      cell,
+      entry.rowDyn,
+      1,
+      inlineStyle,
+      combinedClass,
+      originTag,
+      rowMeta,
+      opts,
+      { ...templateCtxBase, colNumber },
+    );
   }
 
   _stringifyTemplateValue(value) {
@@ -3459,9 +3535,12 @@ class FlexCellsCard extends LitElement {
     return this._extractTemplateCellText(cell);
   }
 
-  _renderCustomTemplate(templateHtml, templateRows, tableContent = null) {
+  _renderCustomTemplate(templateHtml, templateRows, tableContent = null, opts = {}) {
     const raw = typeof templateHtml === 'string' ? templateHtml : '';
     if (!raw) return html``;
+    const blockedCell = opts?.blockedCell || null;
+    const blockedCellFallback = opts?.blockedCellFallback;
+    const blockedCellTextFallback = opts?.blockedCellTextFallback;
     if (!this._customTemplateCache) this._customTemplateCache = new Map();
     let cached = this._customTemplateCache.get(raw);
     if (!cached) {
@@ -3550,10 +3629,24 @@ class FlexCellsCard extends LitElement {
         return html`<span class=${cls || nothing} style=${sty || nothing}>${content}</span>`;
       }
       const { rowNumber, colNumber, styleValue, classValue, outputMode } = slot;
+      const isBlocked = !!blockedCell
+        && rowNumber !== null && rowNumber !== undefined
+        && colNumber !== null && colNumber !== undefined
+        && rowNumber === blockedCell?.row
+        && colNumber === blockedCell?.col;
+      if (isBlocked) {
+        if ((outputMode || '') === 'text') {
+          if (blockedCellTextFallback !== undefined) return blockedCellTextFallback;
+          if (blockedCellFallback !== undefined) return blockedCellFallback;
+          return '';
+        }
+        if (blockedCellFallback !== undefined) return blockedCellFallback;
+        return '';
+      }
       if ((outputMode || '') === 'text') {
         return this._renderTemplateCellText(templateRows, rowNumber, colNumber);
       }
-      return this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue, classValue);
+        return this._renderTemplateCell(templateRows, rowNumber, colNumber, styleValue, classValue, opts);
     });
     return html(cached.templateStrings, ...values);
   }
@@ -3744,15 +3837,19 @@ class FlexCellsCard extends LitElement {
     const sortColumns = zeroBasedSortColumns.filter((idx, pos, arr) => arr.indexOf(idx) === pos);
     const sortDesc = !!cfg.sort_desc;
     const sortActive = sortColumns.length > 0;
-    const rowsForBody = sortActive
-      ? this._sortBodyRows(bodyRows, sortColumns, sortDesc)
-      : bodyRows;
-
-    let zebraCounter = 0;
     const zebraIgnoreSeparators = !!cfg.zebra_ignore_separators;
     const hideSortSeparators = sortActive && !!cfg.hide_separators_on_sort;
-    const templateRows = [];
-    let templateRowOrder = 0;
+
+    // --- template rows in ORIGINAL order (used by <fcc row="x" col="y" />) ---
+    const templateRowsSource = [];
+    const baseRowOrderMap = new Map();
+    let templateRowOrderSource = 0;
+    let zebraCounterSource = 0;
+
+    const pushTemplateRow = (rowEntry) => {
+      templateRowsSource.push(rowEntry);
+      if (rowEntry?.row) baseRowOrderMap.set(rowEntry.row, rowEntry.rowOrder);
+    };
 
     if (hasHeader && headerRow) {
       const headerCells = Array.isArray(headerRow?.cells) ? headerRow.cells : [];
@@ -3763,12 +3860,12 @@ class FlexCellsCard extends LitElement {
         const withBold = cell.style?.bold === undefined
           ? { ...cell, style: { ...(cell.style || {}), bold: true } }
           : cell;
-        templateRows.push({
+        pushTemplateRow({
           row: headerRow,
           rowIndex: headerRowIndex,
           rowClass: headerRowClass,
           zebraClass: '',
-          rowOrder: ++templateRowOrder,
+          rowOrder: ++templateRowOrderSource,
           rowDyn: null,
           mergeColumns: true,
           cells: [withBold],
@@ -3782,12 +3879,12 @@ class FlexCellsCard extends LitElement {
             ? { ...cell, style: { ...(cell.style || {}), bold: true } }
             : cell;
         });
-        templateRows.push({
+        pushTemplateRow({
           row: headerRow,
           rowIndex: headerRowIndex,
           rowClass: headerRowClass,
           zebraClass: '',
-          rowOrder: ++templateRowOrder,
+          rowOrder: ++templateRowOrderSource,
           rowDyn: null,
           mergeColumns: false,
           cells: filled,
@@ -3797,7 +3894,64 @@ class FlexCellsCard extends LitElement {
       }
     }
 
-    const bodyContent = rowsForBody.map((row) => {
+    rows.forEach((row, idx) => {
+      if (hasHeader && idx === headerIndex) return;
+      const rowDyn = this._evaluateRowRules(row);
+      const isSeparator = (row?.type || '') === 'separator';
+      if (isSeparator) {
+        if (cfg.zebra && !zebraIgnoreSeparators) zebraCounterSource += 1;
+        return;
+      }
+      if (cfg.zebra) zebraCounterSource += 1;
+      const zebraClass = (cfg.zebra && zebraCounterSource % 2 === 0) ? 'fc-zebra-alt' : '';
+      const rowIndexForCss = idx >= 0 ? idx : null;
+      const rowCssClass = rowIndexForCss !== null ? this._rowCssClass(rowIndexForCss) : '';
+      const cells = Array.isArray(row?.cells) ? row.cells : [];
+      const hidden = rowDyn?.visibility === 'hidden';
+      if (row?.merge_columns) {
+        const cell = cells[0] ?? { type: 'string', value: '', align: 'right' };
+        pushTemplateRow({
+          row,
+          rowIndex: rowIndexForCss,
+          rowClass: rowCssClass,
+          zebraClass,
+          rowOrder: ++templateRowOrderSource,
+          rowDyn,
+          mergeColumns: true,
+          cells: [cell],
+          colSpan: Math.max(1, effectiveVisibleCount),
+          originTag: 'td',
+          hidden,
+        });
+      } else {
+        const filled = Array.from({ length: colCount }, (_, i) => cells[i] ?? { type: 'string', value: '', align: 'right' });
+        pushTemplateRow({
+          row,
+          rowIndex: rowIndexForCss,
+          rowClass: rowCssClass,
+          zebraClass,
+          rowOrder: ++templateRowOrderSource,
+          rowDyn,
+          mergeColumns: false,
+          cells: filled,
+          colSpan: 1,
+          originTag: 'td',
+          hidden,
+        });
+      }
+    });
+
+    const rowsForBody = sortActive
+      ? this._sortBodyRows(bodyRows, sortColumns, sortDesc)
+      : bodyRows;
+
+    let zebraCounter = 0;
+    const templateRows = []; // keep for backwards compatibility, still mirrors display order
+    let templateRowOrder = 0;
+
+    const bodyRenderMeta = [];
+
+    rowsForBody.forEach((row) => {
       const isSeparator = (row?.type || '') === 'separator';
       if (isSeparator) {
         if (cfg.zebra && !zebraIgnoreSeparators) {
@@ -3814,69 +3968,70 @@ class FlexCellsCard extends LitElement {
               },
             }
           : row;
-        return this._renderSeparatorRow(separatorRow, effectiveVisibleCount);
+        bodyRenderMeta.push({ type: 'separator', row: separatorRow });
+        return;
       }
+
       const rowDyn = this._evaluateRowRules(row);
-      if (rowDyn?.visibility === 'hidden') {
-        const safeRowIndex = rows.indexOf(row);
-        const rowIndexForCss = safeRowIndex >= 0 ? safeRowIndex : null;
-        const rowCssClass = rowIndexForCss !== null ? this._rowCssClass(rowIndexForCss) : '';
-        templateRows.push({
-          row,
-          rowIndex: rowIndexForCss,
-          rowClass: rowCssClass,
-          zebraClass: '',
-          rowOrder: ++templateRowOrder,
-          rowDyn,
-          mergeColumns: false,
-          cells: Array.isArray(row?.cells) ? row.cells : [],
-          colSpan: 1,
-          originTag: 'td',
-          hidden: true,
-        });
-        return html``;
-      }
-      if (cfg.zebra) {
+      const hiddenByRule = rowDyn?.visibility === 'hidden';
+      if (cfg.zebra && !hiddenByRule) {
         zebraCounter += 1;
       }
-      const zebraClass = (cfg.zebra && zebraCounter % 2 === 0) ? 'fc-zebra-alt' : '';
+      const zebraClass = (!hiddenByRule && cfg.zebra && zebraCounter % 2 === 0) ? 'fc-zebra-alt' : '';
       const safeRowIndex = rows.indexOf(row);
       const rowIndexForCss = safeRowIndex >= 0 ? safeRowIndex : null;
       const rowCssClass = rowIndexForCss !== null ? this._rowCssClass(rowIndexForCss) : '';
-      const rowClassAttr = [zebraClass, rowCssClass].filter(Boolean).join(' ');
       const cells = Array.isArray(row?.cells) ? row.cells : [];
-      if (row?.merge_columns) {
-        const cell = cells[0] ?? { type: 'string', value: '', align: 'right' };
-        templateRows.push({
-          row,
-          rowIndex: rowIndexForCss,
-          rowClass: rowCssClass,
-          zebraClass,
-          rowOrder: ++templateRowOrder,
-          rowDyn,
-          mergeColumns: true,
-          cells: [cell],
-          colSpan: Math.max(1, effectiveVisibleCount),
-          originTag: 'td',
-        });
-        return html`<tr class=${rowClassAttr || nothing}>${this._renderBodyCell(cell, rowDyn, Math.max(1, effectiveVisibleCount), rowIndexForCss, firstVisibleColumnIndex)}</tr>`;
-      }
-      const filled = Array.from({ length: colCount }, (_, i) => cells[i] ?? { type: 'string', value: '', align: 'right' });
+      const filled = row?.merge_columns
+        ? [cells[0] ?? { type: 'string', value: '', align: 'right' }]
+        : Array.from({ length: colCount }, (_, i) => cells[i] ?? { type: 'string', value: '', align: 'right' });
+      const rowOrder = ++templateRowOrder;
+
       templateRows.push({
         row,
         rowIndex: rowIndexForCss,
         rowClass: rowCssClass,
         zebraClass,
-        rowOrder: ++templateRowOrder,
+        rowOrder,
         rowDyn,
-        mergeColumns: false,
+        mergeColumns: !!row?.merge_columns,
         cells: filled,
-        colSpan: 1,
+        colSpan: row?.merge_columns ? Math.max(1, effectiveVisibleCount) : 1,
         originTag: 'td',
+        hidden: hiddenByRule,
       });
-      const rowCells = filled.map((cell, cellIdx) => {
+
+      bodyRenderMeta.push({
+        type: 'row',
+        row,
+        rowIndexForCss,
+        rowCssClass,
+        zebraClass,
+        rowDyn,
+        mergeColumns: !!row?.merge_columns,
+        cells: filled,
+        rowOrder,
+        hidden: hiddenByRule,
+      });
+    });
+
+    const bodyContent = bodyRenderMeta.map((meta) => {
+      if (meta.type === 'separator') {
+        return this._renderSeparatorRow(meta.row, effectiveVisibleCount);
+      }
+      if (meta.hidden) return html``;
+      const rowClassAttr = [meta.zebraClass, meta.rowCssClass].filter(Boolean).join(' ');
+      if (meta.mergeColumns) {
+        const cell = meta.cells[0] ?? { type: 'string', value: '', align: 'right' };
+        const baseRowNumber = baseRowOrderMap.get(meta.row) || meta.rowOrder || 1;
+        const ctx = { templateRows: templateRowsSource, rowNumber: baseRowNumber, colNumber: 1 };
+        return html`<tr class=${rowClassAttr || nothing}>${this._renderBodyCell(cell, meta.rowDyn, Math.max(1, effectiveVisibleCount), meta.rowIndexForCss, firstVisibleColumnIndex, ctx)}</tr>`;
+      }
+      const rowCells = meta.cells.map((cell, cellIdx) => {
         if (hiddenColumnSet.has(cellIdx)) return nothing;
-        return this._renderBodyCell(cell, rowDyn, 1, rowIndexForCss, cellIdx);
+        const baseRowNumber = baseRowOrderMap.get(meta.row) || meta.rowOrder || 1;
+        const ctx = { templateRows: templateRowsSource, rowNumber: baseRowNumber, colNumber: cellIdx + 1 };
+        return this._renderBodyCell(cell, meta.rowDyn, 1, meta.rowIndexForCss, cellIdx, ctx);
       });
       return html`<tr class=${rowClassAttr || nothing}>${rowCells}</tr>`;
     });
@@ -3937,7 +4092,7 @@ class FlexCellsCard extends LitElement {
 
     const templateCard = html`
       <ha-card class="card fcc-template-card" style="padding:${padVal}px;">
-        ${this._renderCustomTemplate(customTemplateRaw, templateRows, tableViewport)}
+        ${this._renderCustomTemplate(customTemplateRaw, templateRowsSource, tableViewport)}
       </ha-card>
     `;
 
