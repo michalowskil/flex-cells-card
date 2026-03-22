@@ -229,6 +229,9 @@ class FlexCellsCard extends LitElement {
     this._narrowMedia = null;
     this._onNarrowMediaChange = null;
     this._onLocalesLoaded = null;
+    this._ghostClickUntil = 0;
+    this._onGlobalClickCapture = this._onGlobalClickCapture.bind(this);
+    this._ghostClickClearTid = null;
   }
 
   connectedCallback() {
@@ -285,6 +288,9 @@ class FlexCellsCard extends LitElement {
   disconnectedCallback() {
     window.removeEventListener('fcc-locales-loaded', this._onLocalesLoaded);
     this._teardownNarrowMediaListener();
+    // don't tear down ghost guard if a navigation suppression window is active;
+    // it will auto-clean after its timeout.
+    if (!this._ghostClickUntil) this._teardownGhostClickGuard();
     super.disconnectedCallback();
   }
 
@@ -2676,6 +2682,18 @@ class FlexCellsCard extends LitElement {
     const a = actionCfg?.action;
     if (!a || a === 'none') return;
 
+    const markGhostClick = () => {
+      const now = Date.now();
+      this._ghostClickUntil = Math.max(this._ghostClickUntil || 0, now + 700);
+      this._setupGhostClickGuard();
+      if (this._ghostClickClearTid) clearTimeout(this._ghostClickClearTid);
+      this._ghostClickClearTid = window.setTimeout(() => {
+        this._ghostClickUntil = 0;
+        this._teardownGhostClickGuard();
+        this._ghostClickClearTid = null;
+      }, 750);
+    };
+
     const actionEntity = actionCfg.entity || entityId;
     const target = this._ensureTarget(actionCfg.target, actionEntity);
     const payload = actionCfg.data || actionCfg.service_data || undefined;
@@ -2702,12 +2720,14 @@ class FlexCellsCard extends LitElement {
         } catch {
           window.location.assign(path);
         }
+        markGhostClick();
         break;
       }
       case 'url': {
         const url = actionCfg.url_path || '/';
         const t = actionCfg.new_tab ? '_blank' : '_self';
         window.open(url, t);
+        markGhostClick();
         break;
       }
       default:
@@ -2750,6 +2770,7 @@ class FlexCellsCard extends LitElement {
 
   _onCellPointerUp(e, cell, entityId) {
     e.stopPropagation();
+    try { e.preventDefault(); } catch (_) { }
     const el = e.currentTarget;
     if (el.__holdFired) { this._cancelTimers(el); return; }
     this._cancelTimers(el);
@@ -2791,6 +2812,31 @@ class FlexCellsCard extends LitElement {
       this._runAction(tap, entityId);
     } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
       this._openMoreInfo(entityId);
+    }
+  }
+
+  // ---- ghost click guard ----
+  _setupGhostClickGuard() {
+    if (this._ghostClickGuardAttached) return;
+    try {
+      window.addEventListener('click', this._onGlobalClickCapture, true);
+      this._ghostClickGuardAttached = true;
+    } catch (_) { /* noop */ }
+  }
+  _teardownGhostClickGuard() {
+    if (!this._ghostClickGuardAttached) return;
+    try { window.removeEventListener('click', this._onGlobalClickCapture, true); } catch (_) { /* noop */ }
+    this._ghostClickGuardAttached = false;
+  }
+  _onGlobalClickCapture(ev) {
+    if (!this._ghostClickUntil) return;
+    const now = Date.now();
+    if (now <= this._ghostClickUntil) {
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+      try { ev.preventDefault(); } catch (_) { }
+    } else {
+      this._ghostClickUntil = 0;
     }
   }
 

@@ -1,4 +1,4 @@
-[![Forum](https://img.shields.io/badge/dynamic/json?style=flat&label=Forum&color=41BDF5&logo=homeassistant&logoColor=white&suffix=%20posts&url=https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780.json&query=$.posts_count)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780)
+﻿[![Forum](https://img.shields.io/badge/dynamic/json?style=flat&label=Forum&color=41BDF5&logo=homeassistant&logoColor=white&suffix=%20posts&url=https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780.json&query=$.posts_count)](https://community.home-assistant.io/t/new-lovelace-card-flex-cells-card/919780)
 [![GitHub Discussions](https://img.shields.io/github/discussions/michalowskil/flex-cells-card?logo=github&logoColor=white&label=Discussions)](https://github.com/michalowskil/flex-cells-card/discussions)
 [![Downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/total?label=Downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases)
 [![Latest release downloads](https://img.shields.io/github/downloads/michalowskil/flex-cells-card/latest/total?label=Latest%20downloads&logo=github)](https://github.com/michalowskil/flex-cells-card/releases/latest)
@@ -268,8 +268,9 @@ filter:
 ```
 
 ## Changelog
-- v0.24.0-beta.1 (pre-release) —
+- v0.24.0-beta.2 (pre-release) —
   - Added **custom HTML templates for each cell**. You can embed the same or different FCC cells using `<fcc row="x" col="y" />` while preserving actions, dynamic rules, and custom CSS. This allows you to place more than one element in a single cell.
+  - Prevents ghost clicks on mobile after `navigate`/`url` actions by suppressing the first synthetic click for a short window.
 - v0.23.0 —
   - Updated visual editor dropdowns to the new MD3 `ha-select` API (uses `.options`).
   - Fixes broken select menus on the latest Home Assistant Core.
