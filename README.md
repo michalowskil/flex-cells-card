@@ -185,7 +185,11 @@ type: custom:flex-cells-card
   
     ![Temperature/Humidity](examples/temperature-humidity-table/images/dark_300.png)
     ![Temperature/Humidity](examples/temperature-humidity-table/images/light_300.png)
-  - [Media Player (template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)  
+  - [Multifunction card (cell templates)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cell-templates/cell-templates.md) - this example shows how cell templates can be used. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cell-templates/cell-templates.md)  
+  
+    ![Multifunction card](examples/cell-templates/images/dark_300.png)
+    ![Multifunction card](examples/cell-templates/images/light_300.png)
+  - [Media Player (global template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md) - FCC template example (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/media-player-template/media-player.md)  
 
     ![Media Player template](examples/media-player-template/images/small_dark_300.png)
     ![Media Player template](examples/media-player-template/images/small_light_300.png)
@@ -193,19 +197,19 @@ type: custom:flex-cells-card
 
     ![Batteries](examples/batteries-table/images/dark-charging-300.png)
     ![Batteries](examples/batteries-table/images/light-disconnect-300.png)
-  - [Slider Lights](https://github.com/michalowskil/flex-cells-card/blob/main/examples/slider-lights/slider-lights.md) - brightness control, on/off, display more-info (custom CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/slider-lights/slider-lights.md)  
+  - [Slider Lights (custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/slider-lights/slider-lights.md) - brightness control, on/off, display more-info. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/slider-lights/slider-lights.md)  
 
     ![Slider Lights](examples/slider-lights/images/dark-300.png)
     ![Slider Lights](examples/slider-lights/images/light-300.png)
-  - [Cover](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md) - window blind control (custom CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md)  
+  - [Cover (custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md) - window blind control. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/cover/cover.md)  
 
     ![Cover](examples/cover/images/dark_open-300.png)
     ![Cover](examples/cover/images/light_closing-300.png)
-  - [Climate template](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md) - another example of an FCC template (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md)  
+  - [Climate (global template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md) - another example of an FCC template (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md)  
 
     ![Climate template](examples/climate-template/images/dark-heat-300.png)
     ![Climate template](examples/climate-template/images/light-fan-300.png)
-  - [Button lights](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md) - turning on/off lighting, setting color/brightness (custom CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md)  
+  - [Button lights (custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md) - turning on/off lighting, setting color/brightness. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md)  
 
     ![Button lights](examples/button-lights/images/dark-300.png)
     ![Button lights](examples/button-lights/images/light-300.png)
@@ -213,7 +217,7 @@ type: custom:flex-cells-card
 
     ![Input controls](examples/input-controls/images/dark-300.png)
     ![Input controls](examples/input-controls/images/light-300.png)
-  - [Hue and saturation](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md) - an example of using sliders to control hue and saturation. It also demonstrates how to use presets for lighting. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md)  
+  - [Hue and saturation (simple global template & custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md) - an example of using sliders to control hue and saturation. It also demonstrates how to use presets for lighting. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md)  
 
     ![Hue saturation](examples/hue-saturation/images/dark-on-300.png)
     ![Hue saturation](examples/hue-saturation/images/light-on-300.png)
@@ -268,9 +272,10 @@ filter:
 ```
 
 ## Changelog
-- v0.24.0-beta.2 (pre-release) —
+- v0.24.0-beta.3 (pre-release) —
   - Added **custom HTML templates for each cell**. You can embed the same or different FCC cells using `<fcc row="x" col="y" />` while preserving actions, dynamic rules, and custom CSS. This allows you to place more than one element in a single cell.
-  - Prevents ghost clicks on mobile after `navigate`/`url` actions by suppressing the first synthetic click for a short window.
+  - Fixed **row/col recalculation for `<fcc>` tags** (and sort column numbers) when rows/columns are reordered or deleted in the visual editor.
+  - Fixed ghost clicks on mobile after `navigate`/`url` actions by suppressing the first synthetic click for a short window.
 - v0.23.0 —
   - Updated visual editor dropdowns to the new MD3 `ha-select` API (uses `.options`).
   - Fixes broken select menus on the latest Home Assistant Core.

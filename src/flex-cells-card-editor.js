@@ -772,9 +772,128 @@ class FlexCellsCardEditor extends LitElement {
       return oldIndex;
     }
   }
+  __buildIndexMap(length, from, to){
+    if (!Number.isInteger(length) || length <= 0) return null;
+    const map = new Map();
+    for (let i = 0; i < length; i += 1) {
+      map.set(i, this.__mapIndexAfterMove(i, from, to));
+    }
+    return map;
+  }
+  __buildIndexMapAfterDelete(length, removedIdx){
+    if (!Number.isInteger(length) || length <= 0 || removedIdx < 0 || removedIdx >= length) return null;
+    const map = new Map();
+    const maxIndexAfter = Math.max(0, length - 2); // last valid index after removal
+    for (let i = 0; i < length; i += 1) {
+      let mapped;
+      if (i <= removedIdx) {
+        mapped = removedIdx === length - 1 ? Math.min(i, maxIndexAfter) : i;
+      } else {
+        mapped = i - 1;
+      }
+      map.set(i, mapped);
+    }
+    return map;
+  }
+  __templateRowOrderList(rows){
+    const out = [];
+    let order = 0;
+    (rows || []).forEach((r) => {
+      const isSeparator = (r?.type || '') === 'separator';
+      if (isSeparator) return;
+      order += 1;
+      out.push({ row: r, order });
+    });
+    return out;
+  }
+  __buildRowOrderMap(beforeRows, afterRows){
+    const before = this.__templateRowOrderList(beforeRows);
+    const after = this.__templateRowOrderList(afterRows);
+    const map = new Map();
+    before.forEach((entry) => {
+      const found = after.find((a) => a.row === entry.row);
+      if (!found) return;
+      map.set(entry.order - 1, found.order - 1); // store zero-based
+    });
+    return map;
+  }
+  __updateFccTemplateHtml(raw, rowMap, colMap){
+    const hasRowMap = rowMap instanceof Map && rowMap.size > 0;
+    const hasColMap = colMap instanceof Map && colMap.size > 0;
+    if (typeof raw !== 'string' || (!hasRowMap && !hasColMap)) return raw;
+    const tagRegex = /<fcc\b[^>]*\/>/gi;
+    return raw.replace(tagRegex, (full) => {
+      const match = full.match(/<fcc\b([^>]*)\/>/i);
+      if (!match) return full;
+      const attrs = match[1] || '';
+      let newAttrs = attrs;
+      if (hasRowMap) {
+        newAttrs = newAttrs.replace(/(\brow\s*=\s*)(['"])(\d+)(\2)/i, (m, prefix, quote, numStr) => {
+          const oldNum = parseInt(numStr, 10);
+          if (!Number.isFinite(oldNum)) return m;
+          const mapped = rowMap.get(oldNum - 1);
+          if (mapped === undefined) return m;
+          const next = mapped + 1;
+          return next === oldNum ? m : `${prefix}${quote}${next}${quote}`;
+        });
+      }
+      if (hasColMap) {
+        newAttrs = newAttrs.replace(/(\bcol\s*=\s*)(['"])(\d+)(\2)/i, (m, prefix, quote, numStr) => {
+          const oldNum = parseInt(numStr, 10);
+          if (!Number.isFinite(oldNum)) return m;
+          const mapped = colMap.get(oldNum - 1);
+          if (mapped === undefined) return m;
+          const next = mapped + 1;
+          return next === oldNum ? m : `${prefix}${quote}${next}${quote}`;
+        });
+      }
+      if (newAttrs === attrs) return full;
+      return full.replace(attrs, newAttrs);
+    });
+  }
+  __updateFccTemplatesAfterMove({ rows, fullCells, rowMap, colMap }){
+    const hasRowMap = rowMap instanceof Map && rowMap.size > 0;
+    const hasColMap = colMap instanceof Map && colMap.size > 0;
+    if (!hasRowMap && !hasColMap) {
+      return { rows, fullCells, customTemplateHtml: this.config?.custom_template_html };
+    }
+    const updateHtml = (value) => this.__updateFccTemplateHtml(value, rowMap, colMap);
+    let customTemplateHtml = this.config?.custom_template_html;
+    const updatedCardTpl = updateHtml(customTemplateHtml);
+    if (updatedCardTpl !== customTemplateHtml) customTemplateHtml = updatedCardTpl;
+
+    const updatedRows = Array.isArray(rows) ? rows.map((row) => {
+      const cells = Array.isArray(row?.cells) ? row.cells : null;
+      let rowChanged = false;
+      const newCells = cells ? cells.map((cell) => {
+        if (!cell || typeof cell.custom_template_html !== 'string') return cell;
+        const updated = updateHtml(cell.custom_template_html);
+        if (updated === cell.custom_template_html) return cell;
+        rowChanged = true;
+        return { ...cell, custom_template_html: updated };
+      }) : cells;
+      return rowChanged ? { ...row, cells: newCells } : row;
+    }) : rows;
+
+    const updatedFull = Array.isArray(fullCells) ? fullCells.map((rowArr) => {
+      if (!Array.isArray(rowArr)) return rowArr;
+      let changed = false;
+      const mapped = rowArr.map((cell) => {
+        if (!cell || typeof cell.custom_template_html !== 'string') return cell;
+        const updated = updateHtml(cell.custom_template_html);
+        if (updated === cell.custom_template_html) return cell;
+        changed = true;
+        return { ...cell, custom_template_html: updated };
+      });
+      return changed ? mapped : rowArr;
+    }) : fullCells;
+
+    return { rows: updatedRows, fullCells: updatedFull, customTemplateHtml };
+  }
   __reorderColumn(from, to){
     const count = this.config.column_count || 1;
     if (from === null || to === null || from < 0 || to < 0 || from >= count || to >= count || from === to) return;
+    const colMap = this.__buildIndexMap(count, from, to);
     const rows = (this.config.rows || []).map(r=>{
       const cells=[...(r.cells||[])];
       const [m]=cells.splice(from,1);
@@ -792,8 +911,17 @@ class FlexCellsCardEditor extends LitElement {
     if (Array.isArray(hide) && hide.length){
       hide = hide.map(v => this.__mapIndexAfterMove(v-1, from, to) + 1).filter((v,i,self)=> self.indexOf(v)===i).sort((a,b)=>a-b);
     }
+    let sortCols = this.config.sort_columns;
+    if (Array.isArray(sortCols) && sortCols.length){
+      sortCols = sortCols
+        .map((v)=> this.__mapIndexAfterMove((v||0)-1, from, to) + 1)
+        .filter((v)=> Number.isInteger(v) && v>=1 && v<=count)
+        .filter((v, idx, arr)=> arr.indexOf(v)===idx);
+    }
     const tabs = {}; rows.forEach((_, ri) => { const cur=this._activeTabs[ri]||0; tabs[ri] = this.__mapIndexAfterMove(cur, from, to); });
-    this.config = { ...this.config, rows, column_widths: widths, hide_on_narrow: hide };
+    const updated = this.__updateFccTemplatesAfterMove({ rows, fullCells: this._fullCells, rowMap: null, colMap });
+    this._fullCells = updated.fullCells;
+    this.config = { ...this.config, rows: updated.rows, column_widths: widths, hide_on_narrow: hide, custom_template_html: updated.customTemplateHtml, sort_columns: sortCols };
     this._activeTabs = tabs;
     this._fireConfigChanged();
   }
@@ -801,6 +929,7 @@ class FlexCellsCardEditor extends LitElement {
   _deleteColumn(idx){
     const count=this.config.column_count||1; if(count<=1) return;
     const newCount=count-1;
+    const colMap = this.__buildIndexMapAfterDelete(count, idx);
     const rows=(this.config.rows||[]).map(r=>{
       const cells=[...r.cells]; cells.splice(idx,1);
       while(cells.length<newCount) cells.push({ type:'string', value:'', align:'right' });
@@ -813,8 +942,22 @@ class FlexCellsCardEditor extends LitElement {
     if(Array.isArray(hide)&&hide.length){
       hide=hide.filter(v=>v!==idx+1).map(v=> v>idx+1 ? v-1 : v).filter((v,i,self)=> self.indexOf(v)===i).sort((a,b)=>a-b);
     }
+    let sortCols = this.config.sort_columns;
+    if (Array.isArray(sortCols) && sortCols.length){
+      sortCols = sortCols
+        .map((v)=>{
+          const zero = (v||0)-1;
+          if (zero < 0 || zero >= count) return null;
+          const mapped = colMap?.get(zero);
+          return (mapped !== undefined && mapped !== null) ? mapped + 1 : null;
+        })
+        .filter((v)=> Number.isInteger(v) && v>=1 && v<=newCount)
+        .filter((v, idx, arr)=> arr.indexOf(v)===idx);
+    }
     const tabs={}; rows.forEach((_,ri)=>{ const cur=this._activeTabs[ri]||0; tabs[ri]=Math.min(cur, newCount-1); });
-    this.config={...this.config, rows, column_count:newCount, column_widths: widths, hide_on_narrow: hide};
+    const updated = this.__updateFccTemplatesAfterMove({ rows, fullCells: this._fullCells, rowMap: null, colMap });
+    this._fullCells = updated.fullCells;
+    this.config={...this.config, rows: updated.rows, column_count:newCount, column_widths: widths, hide_on_narrow: hide, sort_columns: sortCols, custom_template_html: updated.customTemplateHtml};
     this._activeTabs=tabs; this._fireConfigChanged();
   }
   _onColDragStart(i, e){ this._colDragFrom = i; this._colDragOver = i; this._colDragActive = true; try { e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', String(i)); } catch {} this.requestUpdate(); }
@@ -860,6 +1003,7 @@ class FlexCellsCardEditor extends LitElement {
   __reorderRows(from,to){
     if(from===null||to===null||from===to) return;
     const rows=[...(this.config.rows||[])];
+    const beforeRows = rows.slice();
     const collapsed=Array.from(this._collapsed||[]);
     const tabsArr=rows.map((_,ix)=>this._activeTabs[ix]||0);
     const move=(arr,a,b)=>{ const x=arr.splice(a,1)[0]; arr.splice(b,0,x); };
@@ -868,8 +1012,11 @@ class FlexCellsCardEditor extends LitElement {
       const move2=(arr,a,b)=>{ const x=arr.splice(a,1)[0]; arr.splice(b,0,x); };
       move2(this._fullCells, from, to);
     }
+    const rowMap = this.__buildRowOrderMap(beforeRows, rows);
     const newTabs={}; rows.forEach((_,ix)=>newTabs[ix]=Math.min(tabsArr[ix],(this.config.column_count||1)-1));
-    this.config={...this.config, rows}; this._collapsed=collapsed; this._activeTabs=newTabs; this._fireConfigChanged();
+    const updated = this.__updateFccTemplatesAfterMove({ rows, fullCells: this._fullCells, rowMap, colMap: null });
+    this._fullCells = updated.fullCells;
+    this.config={...this.config, rows: updated.rows, custom_template_html: updated.customTemplateHtml}; this._collapsed=collapsed; this._activeTabs=newTabs; this._fireConfigChanged();
   }
   _onDragStart(i,e){ this._dragIndex=i; this._dragOverIndex=i; e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', String(i)); }catch{} this.requestUpdate(); }
   _onDragOver(i,e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; this._dragOverIndex=i; this.requestUpdate(); }
@@ -3560,8 +3707,12 @@ _styleValue(r,c,key,e){
   _removeRow(idx) {
     const rows = [...(this.config.rows || [])];
     if (idx < 0 || idx >= rows.length) return;
+    const beforeRows = rows.slice();
     rows.splice(idx, 1);
-    this.config = { ...this.config, rows };
+    const rowMap = this.__buildRowOrderMap(beforeRows, rows);
+    const updated = this.__updateFccTemplatesAfterMove({ rows, fullCells: this._fullCells, rowMap, colMap: null });
+    this._fullCells = updated.fullCells;
+    this.config = { ...this.config, rows: updated.rows, custom_template_html: updated.customTemplateHtml };
     if (Array.isArray(this._fullCells) && this._fullCells.length) {
       const a = [...this._fullCells]; a.splice(idx, 1); this._fullCells = a;
     }

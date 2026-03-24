@@ -1,0 +1,877 @@
+rows:
+  - cells:
+      - type: entity
+        value: light.oswietlenie_glowne_bez_lampki
+        align: center
+        style:
+          font_size: ""
+          icon_size: ""
+          color: ""
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+      - type: icon
+        value: mdi:texture-box
+        align: left
+        style:
+          font_size: ""
+          icon_size: ""
+          color: var(--primary-text-color)
+        use_entity_unit: true
+      - type: icon
+        value: mdi:roller-shade
+        align: center
+        use_entity_unit: true
+        style:
+          font_size: ""
+          icon_size: ""
+          color: var(--primary-text-color)
+      - type: icon
+        value: mdi:run-fast
+        align: center
+        style:
+          font_size: ""
+          icon_size: ""
+          color: var(--primary-text-color)
+        use_entity_unit: true
+      - type: icon
+        value: mdi:temperature-celsius
+        align: center
+        style:
+          font_size: ""
+          icon_size: ""
+          color: var(--primary-text-color)
+        use_entity_unit: true
+      - type: icon
+        value: mdi:water-percent
+        align: center
+        style:
+          font_size: ""
+          icon_size: ""
+          color: var(--primary-text-color)
+        use_entity_unit: true
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_salonie
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:sofa-outline
+      - type: string
+        value: Living room
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: navigate
+          navigation_path: /config/areas/area/salon
+        custom_template_enabled: false
+      - type: string
+        value: ""
+        align: center
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_salonie_occupancy
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle-outline
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle
+        style:
+          font_size: ""
+          icon_size: 10px
+        custom_template_enabled: true
+        custom_template_html: |-
+          <fcc row="2" col="4" /><br/>
+          <span style="font-size: 10px;">
+            <fcc row="12" col="2"  as="text" />
+          </span>
+      - type: entity
+        value: sensor.atc_salon_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+      - type: entity
+        value: sensor.atc_salon_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_kuchni
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:fridge-outline
+      - type: string
+        value: Kitchen
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: navigate
+          navigation_path: /config/areas/area/kuchnia
+        custom_template_enabled: false
+      - type: string
+        value: ""
+        align: center
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_kuchni_occupancy
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle-outline
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle
+        style:
+          font_size: ""
+          icon_size: 10px
+        custom_template_enabled: true
+        custom_template_html: |-
+          <fcc row="3" col="4" /><br/>
+          <span style="font-size: 10px;">
+            <fcc row="12" col="3"  as="text" />
+          </span>
+      - type: entity
+        value: sensor.atc_kuchnia_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+      - type: entity
+        value: sensor.atc_kuchnia_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_lazience
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:shower-head
+        tap_action:
+          action: toggle
+      - type: string
+        value: Bathroom
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: navigate
+          navigation_path: /config/areas/area/lazienka
+      - type: string
+        value: ""
+        align: center
+      - type: entity
+        value: binary_sensor.czujnik_obecnosci_w_lazience_occupancy
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle-outline
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle
+        style:
+          font_size: ""
+          icon_size: 10px
+        custom_template_enabled: true
+        custom_template_html: |-
+          <fcc row="4" col="4" /><br/>
+          <span style="font-size: 10px;">
+            <fcc row="12" col="4"  as="text" />
+          </span>
+      - type: entity
+        value: sensor.kabina_prysznicowa_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+      - type: entity
+        value: sensor.kabina_prysznicowa_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_sypialni
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:bed-outline
+      - type: string
+        value: Bedroom
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: navigate
+          navigation_path: /config/areas/area/sypialnia
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: center
+        entity_display: icon
+        tap_action:
+          action: toggle
+        use_entity_unit: true
+        custom_css_enabled: false
+        custom_css: |
+          th, td {
+             background-color: yellow;
+             border: 2px dashed red;
+          }
+        custom_template_enabled: true
+        custom_template_html: |
+          <span style="font-size: 10px; text-transform: capitalize;">
+            <fcc row="11" col="4" as="text" />
+            <fcc row="11" col="3" as="text" />
+          </span>
+          <br/>
+          <fcc row="5" col="3" /><br/>
+          <span style="font-size: 10px;">
+            <fcc row="11" col="2" as="text" />
+          </span>
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_sypialni_occupancy
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle-outline
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle
+        style:
+          font_size: ""
+          icon_size: 10px
+        custom_template_enabled: true
+        custom_template_html: |-
+          <fcc row="5" col="4" /><br/>
+          <span style="font-size: 10px;">
+            <fcc row="12" col="5"  as="text" />
+          </span>
+      - type: entity
+        value: sensor.atc_sypialnia_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+      - type: entity
+        value: sensor.atc_sypialnia_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+    custom_css_enabled: false
+    custom_css: |
+      tr {
+         background-color: yellow;
+         border: 2px dashed red;
+      }
+  - cells:
+      - type: entity
+        value: light.oswietlenie_w_przedpokoju
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:shoe-print
+      - type: string
+        value: Hall
+        align: left
+        style:
+          text_transform: ""
+        tap_action:
+          action: navigate
+          navigation_path: /config/areas/area/przedpokoj
+      - type: string
+        value: ""
+        align: center
+      - type: entity
+        value: binary_sensor.czujnik_obecnosci_w_przedpokoju_occupancy
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "!="
+                val: ""
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle-outline
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:checkbox-blank-circle
+        style:
+          font_size: ""
+          icon_size: 10px
+        custom_template_enabled: true
+        custom_template_html: |-
+          <fcc row="6" col="4" /><br/>
+          <span style="font-size: 10px;">
+            <fcc row="12" col="6"  as="text" />
+          </span>
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+  - type: separator
+    separator:
+      color: "#d0d7de"
+      background: ""
+      style: dashed
+      thickness: 1.5
+      length: 100%
+      align: stretch
+      opacity: 1
+      margin_top: 0
+      margin_bottom: 0
+    cells: []
+  - cells:
+      - type: entity
+        value: weather.forecast_dom
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        attr_edit:
+          enabled: false
+          service: ""
+          field: ""
+          control: slider
+          checked: true
+          unchecked: false
+          hue_path: ""
+          sat_path: ""
+        entity_display: icon
+      - type: entity
+        value: weather.forecast_dom
+        align: left
+        style:
+          text_transform: ""
+        use_entity_unit: true
+        custom_template_enabled: true
+        custom_template_html: |
+          <span style="width: 1px; display: block;">
+            Forecast (<fcc row="7" col="2" /> <fcc row="7" col="4" as="text" />)
+          </span>
+          <span style="font-size: 10px;">
+            <fcc row="7" col="3" as="text" />
+          </span>
+      - type: entity
+        value: weather.forecast_dom
+        align: center
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+        custom_css_enabled: false
+        custom_css: ""
+        style:
+          underline: false
+        custom_template_enabled: true
+        custom_template_html: |-
+          <span style="display: none;">
+            <fcc row="7" col="3" />
+          </span>
+      - type: entity
+        value: weather.forecast_dom
+        align: center
+        use_entity_unit: false
+        style:
+          font_size: ""
+          icon_size: 10px
+        attribute: cloud_coverage
+        unit: "%"
+        custom_css_enabled: false
+        custom_css: |
+          th, td {
+             background-color: yellow;
+             border: 2px dashed red;
+          }
+        custom_template_enabled: true
+        custom_template_html: |-
+          <span style="display: none;">
+            <fcc row="7" col="3" />
+          </span>
+      - type: entity
+        value: weather.forecast_dom
+        align: right
+        use_entity_unit: false
+        precision: 1
+        attribute: attributes.temperature
+      - type: entity
+        value: weather.forecast_dom
+        align: right
+        use_entity_unit: false
+        precision: 1
+        attribute: attributes.humidity
+  - cells:
+      - type: icon
+        value: mdi:balcony
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Balcony
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: ""
+        align: center
+      - type: string
+        value: ""
+        align: center
+        use_entity_unit: true
+        style:
+          font_size: ""
+          icon_size: 10px
+      - type: entity
+        value: sensor.balkon_na_zewnatrz_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+      - type: entity
+        value: sensor.balkon_na_zewnatrz_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+  - type: separator
+    separator:
+      color: "#d0d7de"
+      background: ""
+      style: dashed
+      thickness: 1.5
+      length: 100%
+      align: center
+      opacity: 1
+      margin_top: 0
+      margin_bottom: 0
+    cells: []
+  - cells:
+      - type: icon
+        value: mdi:laptop
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: Laptop
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: ""
+        align: center
+      - type: string
+        value: ""
+        align: center
+        use_entity_unit: true
+        style:
+          font_size: ""
+          icon_size: 10px
+      - type: entity
+        value: sensor.szafka_pod_biurkiem_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+        dyn_color:
+          - entity: sensor.szafka_pod_biurkiem_temperature
+            attr: ""
+            op: ">="
+            val: "30"
+            bg: ""
+            fg: purple
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+            conditions:
+              - entity: sensor.szafka_pod_biurkiem_temperature
+                attr: ""
+                op: ">="
+                val: "27"
+                val2: ""
+            match: all
+          - conditions:
+              - entity: sensor.szafka_pod_biurkiem_temperature
+                attr: ""
+                op: ">="
+                val: "30"
+                val2: ""
+            match: all
+            bg: ""
+            fg: red
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: sensor.szafka_pod_biurkiem_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+  - cells:
+      - type: icon
+        value: mdi:television-classic
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: TV cabinet
+        align: left
+        style:
+          text_transform: ""
+      - type: string
+        value: ""
+        align: center
+      - type: string
+        value: ""
+        align: center
+        use_entity_unit: true
+        style:
+          font_size: ""
+          icon_size: 10px
+      - type: entity
+        value: sensor.szafka_pod_tv_temperature
+        align: right
+        use_entity_unit: false
+        precision: 1
+        dyn_color:
+          - entity: sensor.szafka_pod_tv_temperature
+            attr: ""
+            op: ">="
+            val: "30"
+            bg: ""
+            fg: purple
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+            conditions:
+              - entity: sensor.szafka_pod_tv_temperature
+                attr: ""
+                op: ">="
+                val: "27"
+                val2: ""
+            match: all
+          - conditions:
+              - entity: sensor.szafka_pod_tv_temperature
+                attr: ""
+                op: ">="
+                val: "30"
+                val2: ""
+            match: all
+            bg: ""
+            fg: red
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: sensor.szafka_pod_tv_humidity
+        align: right
+        use_entity_unit: false
+        precision: 1
+  - cells:
+      - type: string
+        value: hidden with CSS (used in templates -> cover)
+        align: left
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+        tap_action:
+          action: none
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: right
+        use_entity_unit: false
+        attribute: current_position
+        unit: "%"
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: 0 %
+                val2: ""
+            match: all
+            bg: red
+            fg: ""
+            overwrite: hide
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: cover.roleta_w_sypialni
+        align: right
+        use_entity_unit: true
+        attribute: state
+        style:
+          text_transform: capitalize
+      - type: string
+        value: ""
+        align: right
+      - type: string
+        value: ""
+        align: right
+    custom_css_enabled: true
+    custom_css: |-
+      tr {
+         display: none;
+      }
+  - cells:
+      - type: string
+        value: hidden with CSS (used in templates -> occupancy)
+        align: left
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_salonie_occupancy
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_kuchni_occupancy
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+      - type: entity
+        value: binary_sensor.czujnik_obecnosci_w_lazience_occupancy
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_sypialni_occupancy
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+      - type: entity
+        value: binary_sensor.czujnik_obecnosci_w_przedpokoju_occupancy
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT
+    custom_css_enabled: true
+    custom_css: |-
+      tr {
+         display: none;
+      }
+column_count: 6
+card_padding: 0
+overflow_x: true
+header_from_first_row: true
+zebra: true
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 8
+  bottom: 4
+  left: 7
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+column_widths:
+  - 40px
+  - auto
+  - auto
+  - 50px
+  - 50px
+  - 50px
+zebra_ignore_separators: true
+hide_on_narrow: []
+sort_columns:
+  - 5
+hide_separators_on_sort: false
+sort_desc: false
