@@ -272,7 +272,7 @@ filter:
 ```
 
 ## Changelog
-- v0.24.0-beta.3 (pre-release) —
+- v0.24.0 —
   - Added **custom HTML templates for each cell**. You can embed the same or different FCC cells using `<fcc row="x" col="y" />` while preserving actions, dynamic rules, and custom CSS. This allows you to place more than one element in a single cell.
   - Fixed **row/col recalculation for `<fcc>` tags** (and sort column numbers) when rows/columns are reordered or deleted in the visual editor.
   - Fixed ghost clicks on mobile after `navigate`/`url` actions by suppressing the first synthetic click for a short window.
