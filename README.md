@@ -65,6 +65,11 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
 - Search & Replace
   - If you want to perform the same action on multiple rows/cells, use the code editor and the "search & replace" function - to see additional options press Ctrl + F in code editor. For example, if you want to remove all underlines, search for "underline: true" and replace it with "underline: false".
 
+- Camera snapshots (refresh cadence)
+  - Applies only to `Entity display: Camera snapshot`.
+  - Precedence: per-cell `camera_snapshot_ttl_ms` → if empty, use card-level `camera_snapshot_ttl_ms` → if neither set, default is 5000 ms.
+  - TTL controls how often the card asks HA for a new snapshot (adds a cache-buster); it does **not** change how/when the camera itself captures frames.
+
 ## Templates
 ### Card-level (global) template
 - Templates, in addition to standard HTML tags, support their own tag:  
@@ -272,6 +277,10 @@ filter:
 ```
 
 ## Changelog
+- v0.25.0-beta.1 (pre-release) —
+  - Added camera entity display modes: `camera_stream` and `camera_snapshot`, also usable in dynamic rules.
+  - Added per-card `camera_snapshot_ttl_ms` plus per-cell override to control snapshot refresh/caching (default 5000 ms).
+  - Added optional sizing for camera cells via `camera_height` (px) or `camera_aspect` (e.g., `16:9`).
 - v0.24.0 —
   - Added **custom HTML templates for each cell**. You can embed the same or different FCC cells using `<fcc row="x" col="y" />` while preserving actions, dynamic rules, and custom CSS. This allows you to place more than one element in a single cell.
   - Fixed **row/col recalculation for `<fcc>` tags** (and sort column numbers) when rows/columns are reordered or deleted in the visual editor.

@@ -1120,8 +1120,42 @@ _cellAlignChanged(r,c,e){
   _cellEntityDisplayChanged(r,c,e){
     const raw = e?.detail?.value ?? e?.target?.value;
     const value = (typeof raw === 'string' && raw.trim()) ? raw.trim() : 'value';
-    const entityDisplay = value === 'value' ? undefined : value;
-    this._patchCell(r,c,{ entity_display: entityDisplay });
+    this._patchCell(r,c,{ entity_display: value });
+  }
+  _isCameraEntityId(entityId){
+    return typeof entityId === 'string' && entityId.startsWith('camera.');
+  }
+  _entityDisplayOptions(entityId){
+    const base = [
+      { value: "value", label: t(this.hass,"editor.entity_display_option_value") },
+      { value: "icon", label: t(this.hass,"editor.entity_display_option_icon") },
+      { value: "icon_value", label: t(this.hass,"editor.entity_display_option_icon_value") },
+    ];
+    if (this._isCameraEntityId(entityId)) {
+      base.push(
+        { value: "camera_stream", label: t(this.hass,"editor.entity_display_option_camera_stream") },
+        { value: "camera_snapshot", label: t(this.hass,"editor.entity_display_option_camera_snapshot") },
+      );
+    }
+    return base;
+  }
+  _isCameraDisplay(mode){
+    const m = (typeof mode === 'string' ? mode : '').toLowerCase();
+    return m === 'camera_stream' || m === 'camera-stream' || m === 'camera-snapshot' || m === 'camera_snapshot' || m === 'camera' || m === 'stream' || m === 'snapshot';
+  }
+  _cellSnapshotTtlChanged(r,c,e){
+    const raw = (e?.target?.value ?? '').trim();
+    const num = Number(raw);
+    const val = raw === '' ? undefined : (Number.isFinite(num) ? num : undefined);
+    this._patchCell(r,c,{ camera_snapshot_ttl_ms: val });
+  }
+  _initialEntityDisplay(cell){
+    const raw = cell?.entity_display;
+    const entityId = cell?.value;
+    const isCamera = this._isCameraEntityId(entityId);
+    if (!raw) return isCamera ? 'camera_stream' : 'value';
+    if (!isCamera && this._isCameraDisplay(raw)) return 'value';
+    return raw;
   }
   _cellPrecisionChanged(r,c,e){
     const v = e?.detail?.value ?? e?.target?.value;
@@ -1321,8 +1355,7 @@ _styleValue(r,c,key,e){
   _updateRuleEntityDisplay(r,c,idx,e){
     const raw = e?.detail?.value ?? e?.target?.value;
     const value = (typeof raw === 'string' && raw.trim()) ? raw.trim() : 'value';
-    const overwrite_entity_display = value === 'value' ? undefined : value;
-    this._updateRule(r,c,idx,{ overwrite_entity_display });
+    this._updateRule(r,c,idx,{ overwrite_entity_display: value });
   }
   _updateRuleScale(r,c,idx,key,e){
     const raw = (e?.target?.value ?? '').trim();
@@ -1960,7 +1993,14 @@ _styleValue(r,c,key,e){
   }
   _onEntityPicked(rIdx, cIdx, e) {
     const value = e?.detail?.value ?? e?.target?.value ?? '';
-    this._patchCell(rIdx, cIdx, { type: 'entity', value });
+    const cell = this.config?.rows?.[rIdx]?.cells?.[cIdx] || {};
+    const isCamera = this._isCameraEntityId(value);
+    const patch = { type: 'entity', value };
+    if (!isCamera && this._isCameraDisplay(cell?.entity_display)) {
+      patch.entity_display = 'value';
+      patch.camera_snapshot_ttl_ms = undefined;
+    }
+    this._patchCell(rIdx, cIdx, patch);
   }
   _onTypeSelect(rIdx, cIdx, e) {
     const value = e?.detail?.value ?? e?.target?.value;
@@ -2511,18 +2551,26 @@ _styleValue(r,c,key,e){
                         <div class="cell-grid cell-wide">
                           <ha-select
                             .label=${t(this.hass,"editor.entity_display_label")}
-                            .value=${cell.entity_display || "value"}
+                            .value=${this._initialEntityDisplay(cell)}
                             naturalMenuWidth
                             fixedMenuPosition
-                            .options=${[
-                              { value: "value", label: t(this.hass,"editor.entity_display_option_value") },
-                              { value: "icon", label: t(this.hass,"editor.entity_display_option_icon") },
-                              { value: "icon_value", label: t(this.hass,"editor.entity_display_option_icon_value") },
-                            ]}
+                            .options=${this._entityDisplayOptions(cell?.value)}
                             @selected=${(e)=>this._cellEntityDisplayChanged(rIdx,cIdx,e)}
                             @closed=${(e)=>e.stopPropagation()}>
                           </ha-select>
                         </div>
+                        ${ this._initialEntityDisplay(cell) === 'camera_snapshot' ? html`
+                          <div class="cell-grid cell-wide">
+                            <ha-textfield
+                              label=${t(this.hass,"editor.camera_snapshot_ttl")}
+                              type="number"
+                              min="5000"
+                              .value=${cell.camera_snapshot_ttl_ms ?? this.config.camera_snapshot_ttl_ms ?? 5000}
+                              @input=${(e)=> this._cellSnapshotTtlChanged(rIdx,cIdx,e)}>
+                            </ha-textfield>
+                            <div class="muted">${t(this.hass,"editor.camera_snapshot_ttl_hint")}</div>
+                          </div>
+                        ` : nothing }
 
                         ${ this._isSimpleControlEntity(cell) ? html`
                           <div class="cell-grid cell-wide">
@@ -3261,11 +3309,7 @@ _styleValue(r,c,key,e){
                                   .value=${rule.overwrite_entity_display || 'value'}
                                   naturalMenuWidth
                                   fixedMenuPosition
-                                  .options=${[
-                                    { value: "value", label: t(this.hass,"editor.entity_display_option_value") },
-                                    { value: "icon", label: t(this.hass,"editor.entity_display_option_icon") },
-                                    { value: "icon_value", label: t(this.hass,"editor.entity_display_option_icon_value") },
-                                  ]}
+                                  .options=${this._entityDisplayOptions(rule.overwrite_entity || cell?.value)}
                                   @selected=${(e)=>this._updateRuleEntityDisplay(rIdx,cIdx,ridx,e)}
                                   @closed=${(e)=>e.stopPropagation()}>
                                 </ha-select>

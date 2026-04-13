@@ -106,6 +106,28 @@ class FlexCellsCard extends LitElement {
       align-items: stretch;
       flex-wrap: nowrap;
     }
+    .fcc-camera-frame {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 10px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+    }
+    .fcc-camera-stream,
+    .fcc-camera-fallback {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .fc-camera-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--secondary-text-color);
+      font-size: 12px;
+      background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+    }
 
     /* === NEW: blokada zaznaczania/kontekstu tylko dla klikanych pól === */
     .clickable, .icon.clickable, td.clickable, th.clickable {
@@ -232,6 +254,7 @@ class FlexCellsCard extends LitElement {
     this._ghostClickUntil = 0;
     this._onGlobalClickCapture = this._onGlobalClickCapture.bind(this);
     this._ghostClickClearTid = null;
+    this._snapshotNonceByEntity = new Map();
   }
 
   connectedCallback() {
@@ -1008,7 +1031,10 @@ class FlexCellsCard extends LitElement {
 
   _normalizeDynamicEntityDisplay(mode) {
     const raw = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
-    return raw === 'icon' || raw === 'icon_value' ? raw : 'value';
+    if (raw === 'icon' || raw === 'icon_value') return raw;
+    if (raw === 'camera' || raw === 'camera_stream' || raw === 'camera-stream' || raw === 'stream') return 'camera_stream';
+    if (raw === 'camera_snapshot' || raw === 'camera-snapshot' || raw === 'snapshot') return 'camera_snapshot';
+    return 'value';
   }
 
   _resolveDynamicEntityOverwrite(cell, dyn) {
@@ -1058,6 +1084,11 @@ class FlexCellsCard extends LitElement {
     if (!resolved) return null;
     const mode = resolved.mode || 'value';
     const textDisplay = resolved.display != null ? String(resolved.display) : '';
+    if (mode === 'camera_stream' || mode === 'camera_snapshot') {
+      const cam = this._renderCameraContent(cell, resolved.stateObj, mode);
+      if (cam !== null && cam !== undefined && cam !== '') return cam;
+      return textDisplay;
+    }
     if (mode === 'icon' || mode === 'icon_value') {
       const iconTemplate = this._renderEntityIconTemplate(cell, resolved.stateObj, dyn);
       if (mode === 'icon') return iconTemplate || textDisplay;
@@ -2527,9 +2558,85 @@ class FlexCellsCard extends LitElement {
     if (alpha >= 0.999) return `rgb(${r}, ${g}, ${b})`;
     return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
   }
+  _snapshotCacheKey(entityId, ttlMs = 5000) {
+    const ttlRaw = Number(ttlMs);
+    const ttl = Number.isFinite(ttlRaw) && ttlRaw > 0 ? ttlRaw : 5000;
+    const now = Date.now();
+    const prev = this._snapshotNonceByEntity.get(entityId);
+    if (!prev || (now - prev) > ttl) {
+      this._snapshotNonceByEntity.set(entityId, now);
+      return now;
+    }
+    return prev;
+  }
+  _resolveCameraFrameStyle(cell) {
+    const styles = [];
+    const heightNum = Number(cell?.camera_height || this.config?.camera_height);
+    if (Number.isFinite(heightNum) && heightNum > 0) {
+      styles.push(`height:${heightNum}px`);
+    }
+    const aspectRaw = cell?.camera_aspect || this.config?.camera_aspect || '';
+    if (!styles.length && aspectRaw) {
+      const normalized = String(aspectRaw).replace(/:/g, ' / ');
+      const hasSlash = normalized.includes('/');
+      styles.push(`aspect-ratio:${hasSlash ? normalized : `${normalized} / 1`}`);
+    }
+    return styles.join(';');
+  }
+
+  _renderCameraContent(cell, stateObj, mode = 'camera') {
+    if (!stateObj) return null;
+    const entityId = stateObj.entity_id || '';
+    if (!entityId.startsWith('camera.')) return null;
+    const styleValue = this._resolveCameraFrameStyle(cell) || null;
+    const stillRaw = stateObj.attributes?.entity_picture || '';
+    const stillUrl = stillRaw && this.hass?.hassUrl ? this.hass.hassUrl(stillRaw) : stillRaw;
+    const proxyUrl = this.hass?.hassUrl ? this.hass.hassUrl(`/api/camera_proxy/${entityId}`) : `/api/camera_proxy/${entityId}`;
+    const streamType = stateObj.attributes?.frontend_stream_type;
+    const supportsStream = streamType === undefined
+      ? true // jeśli HA nie podało typu, spróbujmy i tak
+      : (streamType !== 'none');
+    const preferSnapshot = mode === 'camera_snapshot';
+    const ttlMs = Number.isFinite(Number(cell?.camera_snapshot_ttl_ms))
+      ? Number(cell.camera_snapshot_ttl_ms)
+      : (Number(this.config?.camera_snapshot_ttl_ms) || 5000);
+    const showStream = !preferSnapshot && supportsStream; // wymuś próbę strumienia (chyba że prosimy o snapshot)
+    const title = stateObj.attributes?.friendly_name || entityId;
+    const cacheBust = this._snapshotCacheKey(entityId, ttlMs);
+
+    if (showStream) {
+      return html`
+        <div class="fcc-camera-frame" style=${styleValue || nothing}>
+          <ha-camera-stream
+            class="fcc-camera-stream"
+            .hass=${this.hass}
+            .stateObj=${stateObj}
+            .cameraImage=${entityId}
+            .allowExoPlayer=${true}
+            muted
+            playsinline
+          ></ha-camera-stream>
+        </div>
+      `;
+    }
+    const snapshotUrl = stillUrl || proxyUrl || '';
+    if (snapshotUrl) {
+      return html`
+        <div class="fcc-camera-frame" style=${styleValue || nothing}>
+          <img class="fcc-camera-fallback" src="${`${snapshotUrl}${snapshotUrl.includes('?') ? '&' : '?'}t=${cacheBust}`}" alt="${title}" loading="lazy" />
+        </div>
+      `;
+    }
+    return html`<div class="fcc-camera-frame fc-camera-empty" style=${styleValue || nothing}>${title}</div>`;
+  }
   _getEntityDisplayMode(cell) {
-    const mode = cell?.entity_display;
-    return mode === "icon" || mode === "icon_value" ? mode : "value";
+    const modeRaw = (cell?.entity_display || '').toLowerCase();
+    if (modeRaw === "value" || modeRaw === "icon" || modeRaw === "icon_value") return modeRaw;
+    if (modeRaw === "camera" || modeRaw === "camera_stream" || modeRaw === "camera-stream" || modeRaw === "stream") return "camera_stream";
+    if (modeRaw === "camera_snapshot" || modeRaw === "camera-snapshot" || modeRaw === "snapshot") return "camera_snapshot";
+    const entityId = typeof cell?.value === 'string' ? cell.value : '';
+    if (entityId.startsWith('camera.')) return "camera_stream";
+    return "value";
   }
 
   _renderEntityIconTemplate(cell, stateObj, dyn) {
@@ -2573,6 +2680,14 @@ class FlexCellsCard extends LitElement {
       return dyn.mask || "";
     }
 
+    if (mode === "camera") {
+      const cam = this._renderCameraContent(cell, stateObj);
+      if (cam !== null && cam !== undefined && cam !== "") {
+        return cam;
+      }
+      return textDisplay;
+    }
+
     const wantsIcon = mode === "icon" || mode === "icon_value";
     const iconTemplate = wantsIcon ? this._renderEntityIconTemplate(cell, stateObj, dyn) : null;
     if (mode === "icon") {
@@ -2597,6 +2712,11 @@ class FlexCellsCard extends LitElement {
         return html`<span class="fc-entity-icon-text">${iconTemplate}${textSpan}</span>`;
       }
       return textSpan;
+    }
+    if (mode === "camera_stream" || mode === "camera_snapshot") {
+      const cam = this._renderCameraContent(cell, stateObj, mode);
+      if (cam !== null && cam !== undefined && cam !== "") return cam;
+      return textDisplay;
     }
     return textDisplay;
   }
