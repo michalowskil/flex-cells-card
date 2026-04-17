@@ -1070,7 +1070,7 @@ class FlexCellsCard extends LitElement {
     }
     const displayMode = this._normalizeDynamicEntityDisplay(dyn.overwrite_entity_display);
     if (displayMode !== 'value') stub.entity_display = displayMode;
-    const display = this._formatEntityCell(stub, stateObj);
+    const display = this._formatEntityCell(stub, stateObj, true);
     return { display, stateObj, mode: displayMode };
   }
 
@@ -1360,7 +1360,10 @@ class FlexCellsCard extends LitElement {
       const cur = String(stateObj?.state ?? '');
       return html`<select class="ctrl-select" .value=${cur}
         @change=${(e) => this._onSelectOption(entityId, e.target.value)}>
-        ${opts.map(o => html`<option value="${o}" ?selected=${o === cur}>${o}</option>`)}
+        ${opts.map((o) => {
+          const label = this._formatSelectOptionLabel(stateObj, o);
+          return html`<option value="${o}" ?selected=${o === cur}>${label}</option>`;
+        })}
       </select>`;
     }
     if (domain === 'input_text' || domain === 'text') {
@@ -2159,6 +2162,18 @@ class FlexCellsCard extends LitElement {
     const domain = entityId?.split?.('.')[0] || 'input_select';
     const serviceDomain = domain === 'select' ? 'select' : 'input_select';
     try { this.hass?.callService(serviceDomain, 'select_option', { entity_id: entityId, option }); } catch (e) { /* noop */ }
+  }
+
+  _formatSelectOptionLabel(stateObj, option) {
+    const raw = option === undefined || option === null ? '' : String(option);
+    if (!stateObj) return raw;
+    if (this.hass?.formatEntityState) {
+      try {
+        const formatted = this.hass.formatEntityState({ ...stateObj, state: raw });
+        if (formatted !== undefined && formatted !== null && formatted !== '') return String(formatted);
+      } catch (e) { /* noop */ }
+    }
+    return raw;
   }
 
 
