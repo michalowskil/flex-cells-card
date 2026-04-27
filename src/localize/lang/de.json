@@ -2,7 +2,7 @@
   "editor": {
     "appearance": "Aussehen & Stil (Zelle)",
     "appearance_row": "Aussehen & Stil (Zeile)",
-    "card_title": "Flex Cells card konfigurieren",
+    "card_title": "Flex Cells Card konfigurieren",
     "columns_count": "Spalten",
     "text_size_global": "Textgröße (Standard)",
     "card_padding": "Kartenabstand",
@@ -10,9 +10,12 @@
     "cell_padding_right": "Zellenabstand - rechts",
     "cell_padding_bottom": "Zellenabstand - unten",
     "cell_padding_left": "Zellenabstand - links",
-    "widths_label": "Spaltenbreite (px/%/rem/auto), z. B. \"80px, auto, 25%, 12rem\"",
-    "hide_cols_label": "Spalten, die unterhalb des Breakpoints ausgeblendet werden (z. B. 1,4)",
-    "sort_cols_label": "Spalten zum Sortieren der Zeilen (z. B. 5,2,3)",
+    "widths_label": "Spaltenbreiten",
+    "widths_placeholder": "px/%/rem/auto, z. B. 80px, auto, 25%, 12rem",
+    "hide_cols_label": "Spalten unterhalb Breakpoint ausblenden",
+    "hide_cols_placeholder": "z. B. 1,4",
+    "sort_cols_label": "Zeilen nach Spalten sortieren",
+    "sort_cols_placeholder": "z. B. 5,2,3",
     "sort_desc_label": "Sortierung umkehren",
     "sort_hide_separators_label": "Separatoren beim Sortieren ausblenden",
     "sort_hint_grouped": "Wenn du einen Separator einfügst, teilt er deine Zeilen in Gruppen. Jede Gruppe wird separat sortiert.",
@@ -75,8 +78,9 @@
     "attr_edit_control_color": "Farbschieber (Hue)",
     "attr_edit_control_color_sat": "Farbschieber (Sättigung)",
     "attr_edit_control_switch": "Schalter",
-    "attr_edit_min": "Min (Slider/Zahl)",
-    "attr_edit_max": "Max (Slider/Zahl)",
+    "attr_edit_min": "Min",
+    "attr_edit_max": "Max",
+    "attr_edit_slider_number_hint": "Numerischer Wert",
     "attr_edit_step": "Schritt",
     "attr_edit_checked": "Wert für \"an\"",
     "attr_edit_unchecked": "Wert für \"aus\"",
@@ -147,6 +151,10 @@
     "cell_custom_template": "Benutzerdefinierte Zellvorlage",
     "cell_custom_template_hint": "Eigenes HTML nur für diese Zelle. Füge andere Zellen mit <fcc row=\"1\" col=\"2\" /> ein (as=\"text\" für Klartext). Deaktivieren, um die Standarddarstellung zu behalten.",
     "actions_hint": "Wenn eine Aktion gesetzt ist, wird das Standard-\"more-info\" für die Entität deaktiviert.",
+    "action_confirmation": "Bestätigung verlangen",
+    "action_confirmation_title": "Bestätigungstitel",
+    "action_confirmation_text": "Bestätigungstext",
+    "action_confirmation_placeholder": "Optionale Nachricht",
     "scale_title": "Skalieren",
     "scale_in_min": "Eingabe min",
     "scale_in_max": "Eingabe max",
@@ -212,6 +220,9 @@
     "strike": "durchgestrichen"
   },
   "card": {
-    "no_rows": "Keine Zeilen zum Anzeigen."
+    "no_rows": "Keine Zeilen zum Anzeigen.",
+    "confirmation_default_title": "Bist du sicher?",
+    "cancel": "Abbrechen",
+    "ok": "OK"
   }
 }

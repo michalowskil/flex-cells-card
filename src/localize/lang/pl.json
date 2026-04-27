@@ -2,7 +2,7 @@
   "editor": {
     "appearance": "Wygląd i styl (komórka)",
     "appearance_row": "Wygląd i styl (wiersz)",
-    "card_title": "Konfiguracja karty Flex Cells",
+    "card_title": "Konfiguracja Flex Cells Card",
     "columns_count": "Liczba kolumn",
     "text_size_global": "Rozmiar tekstu (domyślny)",
     "card_padding": "Padding karty",
@@ -10,9 +10,12 @@
     "cell_padding_right": "Padding komórki - prawa",
     "cell_padding_bottom": "Padding komórki - dół",
     "cell_padding_left": "Padding komórki - lewa",
-    "widths_label": "Szerokości kolumn (px/%/rem/auto), np. \"80px, auto, 25%, 12rem\"",
-    "hide_cols_label": "Kolumny do ukrycia poniżej breakpointu (np. 1,4)",
-    "sort_cols_label": "Kolumny do sortowania wierszy (np. 5,2,3)",
+    "widths_label": "Szerokości kolumn",
+    "widths_placeholder": "px/%/rem/auto, np. 80px, auto, 25%, 12rem",
+    "hide_cols_label": "Kolumny do ukrycia poniżej breakpointu",
+    "hide_cols_placeholder": "np. 1,4",
+    "sort_cols_label": "Kolumny do sortowania wierszy",
+    "sort_cols_placeholder": "np. 5,2,3",
     "sort_desc_label": "Odwróć sortowanie",
     "sort_hide_separators_label": "Ukryj separatory gdy sortowanie jest włączone",
     "sort_hint_grouped": "Jeśli użyjesz separatora, podzieli on twoje wiersze na grupy. Każda grupa jest sortowana indywidualnie.",
@@ -75,8 +78,9 @@
     "attr_edit_control_color": "Suwak koloru (hue)",
     "attr_edit_control_color_sat": "Suwak nasycenia",
     "attr_edit_control_switch": "Przełącznik",
-    "attr_edit_min": "Min (suwak/liczba)",
-    "attr_edit_max": "Max (suwak/liczba)",
+    "attr_edit_min": "Min",
+    "attr_edit_max": "Max",
+    "attr_edit_slider_number_hint": "Wartość liczbowa",
     "attr_edit_step": "Krok",
     "attr_edit_checked": "Wartość dla zaznaczonego",
     "attr_edit_unchecked": "Wartość dla odznaczonego",
@@ -147,6 +151,10 @@
     "cell_custom_template": "Własny szablon komórki",
     "cell_custom_template_hint": "Wpisz dowolny HTML tylko dla tej komórki. Użyj np. <fcc row=\"1\" col=\"2\" /> aby wstawić inną komórkę (as=\"text\" zwróci sam tekst). Odznacz, aby wrócić do standardowego widoku.",
     "actions_hint": "Jeśli ustawisz jakąkolwiek akcję, domyślne 'more-info' dla encji zostanie wyłączone.",
+    "action_confirmation": "Wymagaj potwierdzenia",
+    "action_confirmation_title": "Tytuł potwierdzenia",
+    "action_confirmation_text": "Tekst potwierdzenia",
+    "action_confirmation_placeholder": "Opcjonalny komunikat",
     "scale_title": "Przeskalowanie",
     "scale_in_min": "Wejście min",
     "scale_in_max": "Wejście max",
@@ -212,6 +220,9 @@
     "strike": "przekreślenie"
   },
   "card": {
-    "no_rows": "Brak wierszy do wyświetlenia."
+    "no_rows": "Brak wierszy do wyświetlenia.",
+    "confirmation_default_title": "Czy na pewno?",
+    "cancel": "Anuluj",
+    "ok": "OK"
   }
 }

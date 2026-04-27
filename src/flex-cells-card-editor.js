@@ -6,7 +6,16 @@ class FlexCellsCardEditor extends LitElement {
 
   static styles = css`
     .row { margin-bottom: 16px; }
-    ha-textfield, ha-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+    ha-textfield, ha-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; min-width: 0; }
+    :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > ha-textfield,
+    :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > ha-select {
+      margin-bottom: 0;
+    }
+    ha-textfield::part(label) {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     input[list], select, .text-input {
       width: 100%; padding: 10px 12px; font-size: 14px;
       border: 1px solid var(--divider-color,#ccc); border-radius: 8px; box-sizing: border-box;
@@ -17,25 +26,37 @@ class FlexCellsCardEditor extends LitElement {
       border-color: var(--primary-color, #03a9f4);
       outline: none; box-shadow: 0 0 4px rgba(3,169,244,.4);
     }
-    .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .cols3 > * { min-width: 0; }
     .cols2 > * { min-width: 0; }
     .cols2 {
       /* prevent overflow from MWC internals */
        display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; }
     .cols2 > * { min-width: 0; }
     .option.group .cols1, .option.group .cols2, .option.group .cols3 { width: 100%; }
-    .cols1 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .cols1 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .cols2 > * { min-width: 0; }
     .cols4 {
       display: grid;
-      grid-template-columns: 1fr 1fr; /* było: repeat(4, 1fr) */
+      grid-template-columns: repeat(2, minmax(0, 1fr)); /* było: repeat(4, 1fr) */
       gap: 8px;
     }
-    .cols21 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+    .cols4 > * { min-width: 0; }
+    .cols21 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
+    .cols21 > * { min-width: 0; }
     .cols2 > * { min-width: 0; }
+    .row > .cols1,
+    .row > .cols2,
+    .row > .cols3,
+    .row > .cols4,
+    .row > .cols21 {
+      margin-bottom: 8px;
+    }
 
-    .cell-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .cell-wide { grid-template-columns: 1fr; }
+    .cell-grid { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+    .cell-grid > * { min-width: 0; max-width: 100%; }
+    .cell-wide { grid-template-columns: minmax(0, 1fr); }
+    ha-icon-picker, ha-entity-picker { width: 100%; min-width: 0; max-width: 100%; }
 
     .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .inline { display: inline-flex; align-items: center; gap: 8px; }
@@ -63,6 +84,30 @@ class FlexCellsCardEditor extends LitElement {
     .option.option-stack label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; }
     .option.option-stack label span { flex: 1 1 auto; }
     .option.option-stack label + label { margin-top: 4px; }
+    .action-sections {
+      border: 1px solid var(--divider-color, #ddd);
+      border-radius: 10px;
+      background: var(--card-background-color, #fff);
+      overflow: hidden;
+    }
+    .action-block {
+      padding: 10px 12px;
+    }
+    .action-block + .action-block {
+      border-top: 1px solid var(--divider-color, #e0e0e0);
+    }
+    .action-confirmation {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .action-confirmation .simple-check {
+      padding: 0 2px;
+    }
+    .action-confirmation ha-textfield {
+      margin-bottom: 0;
+    }
     .copy-section { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
     .copy-group {
       border: 1px solid var(--divider-color, #ddd);
@@ -205,6 +250,12 @@ class FlexCellsCardEditor extends LitElement {
       margin-top: 10px;
     }
     .attr-edit-fields.disabled { opacity: 0.6; pointer-events: none; }
+    @media (max-width: 1100px) {
+      .attr-edit-fields .cols2,
+      .attr-edit-fields .cols3 {
+        grid-template-columns: 1fr;
+      }
+    }
     .simple-check {
       display: flex;
       align-items: center;
@@ -247,7 +298,11 @@ class FlexCellsCardEditor extends LitElement {
 
     @media (max-width: 680px) {
       .cols3, .cols21 { grid-template-columns: 1fr; }
-      .cols4 { grid-template-columns: 1fr 1fr; }
+      .cols4 { grid-template-columns: 1fr; }
+      .rule-color-row {
+        grid-template-columns: 1fr;
+        row-gap: 0;
+      }
       .rowhdr { gap: 6px; padding: 8px 8px; }
       .handle { padding: 4px 6px; }
       .toggle { width: 28px; height: 28px; }
@@ -1736,7 +1791,7 @@ _styleValue(r,c,key,e){
 
     return html`
       <div class="rowbody">
-        <div class="cell-grid cell-wide">
+        <div class="cols2 rule-color-row">
           <div class="inline">
             <ha-textfield
               .label=${t(this.hass, "editor.separator_color")}
@@ -1748,9 +1803,7 @@ _styleValue(r,c,key,e){
               <ha-icon icon="mdi:palette"></ha-icon>
             </button>
           </div>
-        </div>
 
-        <div class="cell-grid cell-wide">
           <div class="inline">
             <ha-textfield
               .label=${t(this.hass, "editor.separator_background")}
@@ -2021,11 +2074,13 @@ _styleValue(r,c,key,e){
   _onActionsChanged(rIdx, cIdx, ev) {
     const v = ev.detail?.value || {};
     const cellType = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.type;
+    const currentCell = this.config?.rows?.[rIdx]?.cells?.[cIdx] || {};
     const isIconOrString = cellType === 'icon' || cellType === 'string';
 
     const clean = (obj) => {
-      if (!obj || !obj.action) return undefined;
+      if (!obj || (!obj.action && !obj.confirmation)) return undefined;
       const out = JSON.parse(JSON.stringify(obj));
+      if (!out.action && out.confirmation) out.action = 'default';
 
       if (out.action === 'none') {
         return { action: 'none' };
@@ -2040,13 +2095,27 @@ _styleValue(r,c,key,e){
       if (!out.data && !out.service_data) { delete out.data; delete out.service_data; }
       if (out.target && !Object.keys(out.target).length) delete out.target;
       if (!out.entity) delete out.entity;
+      if (out.confirmation && typeof out.confirmation === 'object' && !out.confirmation.title) delete out.confirmation.title;
+      if (out.confirmation && typeof out.confirmation === 'object' && !out.confirmation.text) delete out.confirmation.text;
       return out;
     };
 
+    const pick = (key) => {
+      if (Object.prototype.hasOwnProperty.call(v, key)) {
+        const next = clean(v[key]);
+        const currentConfirmation = currentCell[key]?.confirmation;
+        if (next && next.action !== 'none' && currentConfirmation && !next.confirmation) {
+          next.confirmation = JSON.parse(JSON.stringify(currentConfirmation));
+        }
+        return next;
+      }
+      return clean(currentCell[key]);
+    };
+
     this._patchCell(rIdx, cIdx, {
-      tap_action: clean(v.tap_action),
-      hold_action: clean(v.hold_action),
-      double_tap_action: clean(v.double_tap_action),
+      tap_action: pick('tap_action'),
+      hold_action: pick('hold_action'),
+      double_tap_action: pick('double_tap_action'),
     });
   }
 
@@ -2058,6 +2127,71 @@ _styleValue(r,c,key,e){
       default: return '';
     }
   };
+
+  _getActionConfirmationText(actionCfg) {
+    const confirmation = actionCfg?.confirmation;
+    if (!confirmation) return '';
+    if (typeof confirmation === 'string') return confirmation;
+    if (confirmation && typeof confirmation === 'object') return confirmation.text || '';
+    return '';
+  }
+
+  _getActionConfirmationTitle(actionCfg) {
+    const confirmation = actionCfg?.confirmation;
+    if (!confirmation || typeof confirmation !== 'object') return '';
+    return confirmation.title || '';
+  }
+
+  _updateActionConfirmation(rIdx, cIdx, actionKey, patch = {}) {
+    const current = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.[actionKey] || {};
+    const next = JSON.parse(JSON.stringify(current));
+    const enabled = Object.prototype.hasOwnProperty.call(patch, 'enabled') ? patch.enabled : !!next.confirmation;
+    const title = Object.prototype.hasOwnProperty.call(patch, 'title') ? patch.title : this._getActionConfirmationTitle(next);
+    const text = Object.prototype.hasOwnProperty.call(patch, 'text') ? patch.text : this._getActionConfirmationText(next);
+
+    if (enabled) {
+      if (!next.action) next.action = 'default';
+      next.confirmation = { ...(next.confirmation && typeof next.confirmation === 'object' ? next.confirmation : {}) };
+      if (title) next.confirmation.title = title;
+      else delete next.confirmation.title;
+      if (text) next.confirmation.text = text;
+      else delete next.confirmation.text;
+    } else {
+      delete next.confirmation;
+    }
+
+    this._patchCell(rIdx, cIdx, { [actionKey]: next.action ? next : undefined });
+  }
+
+  _renderActionConfirmation(rIdx, cIdx, actionKey, actionCfg) {
+    const enabled = !!actionCfg?.confirmation;
+    return html`
+      <div class="action-confirmation">
+        <label class="simple-check">
+          <input
+            type="checkbox"
+            .checked=${enabled}
+            @change=${(e) => this._updateActionConfirmation(rIdx, cIdx, actionKey, { enabled: e.target.checked })}
+          />
+          <span>${t(this.hass, 'editor.action_confirmation')}</span>
+        </label>
+        ${enabled ? html`
+          <ha-textfield
+            .label=${t(this.hass, 'editor.action_confirmation_title')}
+            .value=${this._getActionConfirmationTitle(actionCfg)}
+            .placeholder=${t(this.hass, 'card.confirmation_default_title')}
+            @input=${(e) => this._updateActionConfirmation(rIdx, cIdx, actionKey, { title: e.target.value })}
+          ></ha-textfield>
+          <ha-textfield
+            .label=${t(this.hass, 'editor.action_confirmation_text')}
+            .value=${this._getActionConfirmationText(actionCfg)}
+            .placeholder=${t(this.hass, 'editor.action_confirmation_placeholder')}
+            @input=${(e) => this._updateActionConfirmation(rIdx, cIdx, actionKey, { text: e.target.value })}
+          ></ha-textfield>
+        ` : nothing}
+      </div>
+    `;
+  }
 
   _onPaletteClick(ev, rIdx, cIdx, prop = "color") {
     const style = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.style || {};
@@ -2287,6 +2421,7 @@ _styleValue(r,c,key,e){
 
         <ha-textfield
           label=${t(this.hass,"editor.widths_label")}
+          placeholder=${t(this.hass,"editor.widths_placeholder")}
           .value=${widthsStr}
           @input=${(e)=> this._upd('column_widths', this._parseCsvList(e.target.value)) }>
         </ha-textfield>
@@ -2294,6 +2429,7 @@ _styleValue(r,c,key,e){
         <div class="cols21">
           <ha-textfield
             label=${t(this.hass,"editor.hide_cols_label")}
+            placeholder=${t(this.hass,"editor.hide_cols_placeholder")}
             .value=${hideStr}
             @input=${(e)=> this._upd('hide_on_narrow', this._parseCsvIntList(e.target.value)) }>
           </ha-textfield>
@@ -2310,6 +2446,7 @@ _styleValue(r,c,key,e){
           <ha-textfield
             style="width:100%;"
             label=${t(this.hass,"editor.sort_cols_label")}
+            placeholder=${t(this.hass,"editor.sort_cols_placeholder")}
             .value=${sortStr}
             @input=${(e)=> this._upd('sort_columns', this._parseCsvIntList(e.target.value)) }>
           </ha-textfield>
@@ -2543,7 +2680,7 @@ _styleValue(r,c,key,e){
                               .placeholder=${t(this.hass,"placeholder.datetime_format")}
                               @input=${(e)=> this._patchCell(rIdx,cIdx,{ datetime_format: (e.target.value||'') || undefined })}
                             ></ha-textfield>
-                            <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
+                            <div class="muted" style="margin-bottom: 0;">${t(this.hass,"editor.available_tokens")}</div>
                           </div>
 
                         </div>
@@ -2618,9 +2755,9 @@ _styleValue(r,c,key,e){
                                   @value-changed=${(e)=> this._updateAttrEditText(rIdx,cIdx,'service',{ target:{ value: e.detail?.value || e.target?.value || '' }})}>
                                 </ha-service-picker>
                                 ${attrEdit.service ? html`
-                                  <div class="service-id-preview">${attrEdit.service}</div>
+                                  <div class="service-id-preview" style="margin: 0;">${attrEdit.service}</div>
                                 ` : html`
-                                  <div class="service-id-preview" style="opacity:0.4;">domain.service</div>
+                                  <div class="service-id-preview" style="margin: 0; opacity:0.4;">domain.service</div>
                                 `}
                               ` : html`
                                 <input
@@ -2634,9 +2771,9 @@ _styleValue(r,c,key,e){
                                   ${serviceOptions.map(opt => html`<option value="${opt}"></option>`)}
                                 </datalist>
                                 ${attrEdit.service ? html`
-                                  <div class="service-id-preview">${attrEdit.service}</div>
+                                  <div class="service-id-preview" style="margin: 0;">${attrEdit.service}</div>
                                 ` : html`
-                                  <div class="service-id-preview" style="opacity:0.4;">domain.service</div>
+                                  <div class="service-id-preview" style="margin: 0; opacity:0.4;">domain.service</div>
                                 `}
                               `}
                             </div>
@@ -2654,7 +2791,7 @@ _styleValue(r,c,key,e){
                               </datalist>
                             </div>
 
-                            <div class="cell-grid cell-wide">
+                            <div class="cell-grid cell-wide" style="margin-bottom: 0;">
                             <ha-select
                               .label=${t(this.hass,"editor.attr_edit_control_type")}
                               .value=${attrEditControl}
@@ -2673,7 +2810,7 @@ _styleValue(r,c,key,e){
                           </div>
 
                             ${attrEditControl === 'slider' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
-                              <div class="cell-grid cell-wide">
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
                                 <label class="option full">
                                   <input type="checkbox"
                                     .checked=${showValueRightChecked}
@@ -2751,6 +2888,7 @@ _styleValue(r,c,key,e){
                                 <ha-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_min")}
+                                  placeholder=${t(this.hass,"editor.attr_edit_slider_number_hint")}
                                   .value=${attrEdit.min ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'min',e)}>
@@ -2758,6 +2896,7 @@ _styleValue(r,c,key,e){
                                 <ha-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_max")}
+                                  placeholder=${t(this.hass,"editor.attr_edit_slider_number_hint")}
                                   .value=${attrEdit.max ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'max',e)}>
@@ -2765,6 +2904,7 @@ _styleValue(r,c,key,e){
                                 <ha-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_step")}
+                                  placeholder=${t(this.hass,"editor.attr_edit_slider_number_hint")}
                                   .value=${attrEdit.step ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'step',e)}>
@@ -2915,7 +3055,7 @@ _styleValue(r,c,key,e){
 
                       ${(cell.type === 'string' || cell.type === 'entity') ? html`
                         <!-- TLO -->
-                        <div class="cell-grid cell-wide">
+                        <div class="cell-grid cell-wide" style="margin-bottom:0;">
                           <div class="inline">
                             <ha-textfield
                             .label=${t(this.hass,"editor.background_color")}
@@ -2930,7 +3070,7 @@ _styleValue(r,c,key,e){
                         </div>
 
                         <!-- KOLOR -->
-                        <div class="cell-grid cell-wide">
+                        <div class="cell-grid cell-wide" style="margin-bottom:0;">
                           <div class="inline">
                             <ha-textfield
                             .label=${t(this.hass,"editor.content_color")}
@@ -3002,27 +3142,25 @@ _styleValue(r,c,key,e){
                       ` : ''}
 
                       ${isIcon ? html`
-                        <div class="cell-grid cell-wide">
+                        <div class="cols2 rule-color-row">
                           <div class="inline">
                             <ha-textfield
-                            .label=${t(this.hass,"editor.background_color")}
-                            .placeholder=${"#ff5722 | red | var(--primary-color)"}
-                            .value=${st.background || ''}
-                            @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
+                              .label=${t(this.hass,"editor.background_color")}
+                              .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                              .value=${st.background || ''}
+                              @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
                             </ha-textfield>
                             <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'background')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
                           </div>
-                        </div>
 
-                        <div class="cell-grid cell-wide">
                           <div class="inline">
                             <ha-textfield
-                            .label=${t(this.hass,"editor.icon_color")}
-                            .placeholder=${"#ff5722 | red | var(--primary-color)"},
-                            .value=${st.color || ''}
-                            @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
+                              .label=${t(this.hass,"editor.icon_color")}
+                              .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                              .value=${st.color || ''}
+                              @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
                             </ha-textfield>
                             <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'color')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
@@ -3092,22 +3230,37 @@ _styleValue(r,c,key,e){
                         <div class="muted dyn-hint">${t(this.hass, 'editor.actions_hint')}</div>
 
 
-                        <div class="cell-grid cell-wide" style="margin-top:8px;">
-                          <ha-form
-                            .hass=${this.hass}
-                            .data=${{
-                              tap_action: dclone(cell.tap_action),
-                              hold_action: dclone(cell.hold_action),
-                              double_tap_action: dclone(cell.double_tap_action),
-                            }}
-                            .schema=${[
-                              { name: 'tap_action', selector: mkSelector() },
-                              { name: 'hold_action', selector: mkSelector() },
-                              { name: 'double_tap_action', selector: mkSelector() },
-                            ]}
-                            .computeLabel=${this._computeActionLabel}
-                            @value-changed=${(ev) => this._onActionsChanged(rIdx, cIdx, ev)}
-                          ></ha-form>
+                        <div class="action-sections" style="margin-top:8px;">
+                          <div class="action-block" style="background: linear-gradient(90deg,rgba(255, 0, 0, 1) 4px, rgba(255, 0, 0, 0) 0%);">
+                            <ha-form
+                              .hass=${this.hass}
+                              .data=${{ tap_action: dclone(cell.tap_action) }}
+                              .schema=${[{ name: 'tap_action', selector: mkSelector() }]}
+                              .computeLabel=${this._computeActionLabel}
+                              @value-changed=${(ev) => this._onActionsChanged(rIdx, cIdx, ev)}
+                            ></ha-form>
+                            ${this._renderActionConfirmation(rIdx, cIdx, 'tap_action', cell.tap_action)}
+                          </div>
+                          <div class="action-block" style="background: linear-gradient(90deg,rgba(0, 255, 0, 1) 4px, rgba(0, 255, 0, 0) 0%);">
+                            <ha-form
+                              .hass=${this.hass}
+                              .data=${{ hold_action: dclone(cell.hold_action) }}
+                              .schema=${[{ name: 'hold_action', selector: mkSelector() }]}
+                              .computeLabel=${this._computeActionLabel}
+                              @value-changed=${(ev) => this._onActionsChanged(rIdx, cIdx, ev)}
+                            ></ha-form>
+                            ${this._renderActionConfirmation(rIdx, cIdx, 'hold_action', cell.hold_action)}
+                          </div>
+                          <div class="action-block" style="background: linear-gradient(90deg,rgba(0, 0, 255, 1) 4px, rgba(0, 0, 255, 0) 0%);">
+                            <ha-form
+                              .hass=${this.hass}
+                              .data=${{ double_tap_action: dclone(cell.double_tap_action) }}
+                              .schema=${[{ name: 'double_tap_action', selector: mkSelector() }]}
+                              .computeLabel=${this._computeActionLabel}
+                              @value-changed=${(ev) => this._onActionsChanged(rIdx, cIdx, ev)}
+                            ></ha-form>
+                            ${this._renderActionConfirmation(rIdx, cIdx, 'double_tap_action', cell.double_tap_action)}
+                          </div>
                         </div>
 
                         
@@ -3223,7 +3376,7 @@ _styleValue(r,c,key,e){
                             </div>
 
                             <!-- Colors row: Background + Content 50/50 with pickers -->
-                            <div class="cols2">
+                            <div class="cols2 rule-color-row">
                               <div class="inline">
                                 <ha-textfield
                                   .label=${t(this.hass, 'dynamic.bg')}
@@ -3252,7 +3405,7 @@ _styleValue(r,c,key,e){
                             </div>
 
                             <!-- Overwrite select -->
-                            <div class="cols1">
+                            <div class="cols1" style="margin-bottom:8px;">
                               <ha-select
                                 .label=${t(this.hass, 'dynamic.overwrite_label')}
                                 .value=${rule.overwrite || ''}
@@ -3280,6 +3433,7 @@ _styleValue(r,c,key,e){
                               <div class="cols1">
                                 <input
                                   class="text-input attr-input"
+                                  style="margin-bottom: 0;"
                                   list=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}
                                   .value=${rule.overwrite_attr || ''}
                                   placeholder=${t(this.hass,"placeholder.attribute_path")}
@@ -3353,7 +3507,7 @@ _styleValue(r,c,key,e){
 
                             ${ (rule.overwrite || '') === 'text' ? html`
                               <div class="cols1">
-                                <ha-textfield class="mask-input"
+                                <ha-textfield class="mask-input" style="margin-top: 0;"
                                   .label=${t(this.hass, 'dynamic.text')}
                                   .value=${rule.text || ''}
                                   @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ text: e.target.value })}>
@@ -3379,7 +3533,7 @@ _styleValue(r,c,key,e){
                                   </ha-textfield>
                                 `}
                               </div>
-                              <div class="cols1">
+                              <div class="cols1" style="margin-bottom: 8px;">
                                 <ha-textfield class="mask-input"
                                   .label=${t(this.hass, 'dynamic.icon_optional_text')}
                                   .value=${rule.icon_text || ''}
@@ -3527,7 +3681,7 @@ _styleValue(r,c,key,e){
                               <button class="mini" @click=${()=>this._addRowCondition(rIdx,ridx)}>➕ ${t(this.hass,'dynamic.add_condition')}</button>
                             </div>
 
-                            <div class="cols2">
+                            <div class="cols2 rule-color-row">
                               <div class="inline">
                                 <ha-textfield
                                   .label=${t(this.hass, 'dynamic.bg')}
@@ -3720,6 +3874,16 @@ _styleValue(r,c,key,e){
             ${t(this.hass,"editor.custom_template_hint")}
           </div>
         ` : ''}
+      </div>
+
+      <div style="font-size: 10px; margin-bottom: 10px;">
+        FCC v0.25.0-beta.3
+        <span> • </span>
+        <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
+        <span> • </span>
+        <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#examples">Examples</a>
+        <span> • </span>
+        <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#templates">Templates</a>
       </div>
 
       <datalist id="entities-list">

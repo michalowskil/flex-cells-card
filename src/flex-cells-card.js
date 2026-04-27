@@ -66,7 +66,7 @@ const DEFAULT_SEPARATOR = {
 };
 
 class FlexCellsCard extends LitElement {
-  static properties = { config: {}, hass: {} };
+  static properties = { config: {}, hass: {}, _confirmationDialog: { state: true } };
 
   static styles = css`
     .card {
@@ -91,6 +91,70 @@ class FlexCellsCard extends LitElement {
     .fcc-preview-stack {
       display: grid;
       gap: 16px;
+    }
+    .fcc-confirm-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.32);
+    }
+    .fcc-confirm-dialog {
+      width: min(560px, 100%);
+      max-height: calc(100vh - 48px);
+      box-sizing: border-box;
+      overflow: auto;
+      border-radius: 28px;
+      padding: 28px 28px 20px;
+      background: var(--mdc-dialog-container-color, var(--ha-dialog-surface-color, var(--card-background-color, #fff)));
+      color: var(--primary-text-color);
+      box-shadow: var(--ha-card-box-shadow, 0 8px 24px rgba(0, 0, 0, 0.24));
+    }
+    .fcc-confirm-title {
+      margin: 0 0 22px;
+      font-size: 24px;
+      line-height: 1.25;
+      font-weight: 500;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .fcc-confirm-text {
+      margin: 0 0 32px;
+      color: var(--primary-text-color);
+      font-size: 16px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .fcc-confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+    }
+    .fcc-confirm-actions button {
+      min-width: 80px;
+      height: 40px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 20px;
+      background: transparent;
+      color: var(--primary-color);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .fcc-confirm-actions button.confirm {
+      background: var(--primary-color);
+      color: var(--text-primary-color, #fff);
+    }
+    .fcc-confirm-actions button:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
     .fcc-template-card {
       position: relative;
@@ -120,6 +184,12 @@ class FlexCellsCard extends LitElement {
       object-fit: cover;
       display: block;
     }
+    .fcc-camera-frame,
+    .fcc-camera-stream {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .fc-camera-empty {
       display: flex;
       align-items: center;
@@ -135,7 +205,7 @@ class FlexCellsCard extends LitElement {
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      /* nie ustawiamy touch-action:none, żeby nie zabić scrolla; to wystarcza */
+      touch-action: manipulation;
     }
 
     .icon ha-icon { color: var(--state-icon-color, var(--primary-text-color)); }
@@ -311,6 +381,7 @@ class FlexCellsCard extends LitElement {
   disconnectedCallback() {
     window.removeEventListener('fcc-locales-loaded', this._onLocalesLoaded);
     this._teardownNarrowMediaListener();
+    this._closeConfirmationDialog(false);
     // don't tear down ghost guard if a navigation suppression window is active;
     // it will auto-clean after its timeout.
     if (!this._ghostClickUntil) this._teardownGhostClickGuard();
@@ -394,6 +465,12 @@ class FlexCellsCard extends LitElement {
     if (next.navigation_path) next.navigation_path = this._applyTemplateTokens(next.navigation_path, meta);
     if (next.url_path) next.url_path = this._applyTemplateTokens(next.url_path, meta);
     if (next.service) next.service = this._applyTemplateTokens(next.service, meta);
+    if (next.confirmation && typeof next.confirmation === 'object' && next.confirmation.text !== undefined) {
+      next.confirmation = {
+        ...next.confirmation,
+        text: this._applyTemplateTokens(next.confirmation.text, meta),
+      };
+    }
     if (next.data && typeof next.data === 'object') {
       const dataClone = deepClone(next.data);
       Object.keys(dataClone || {}).forEach((key) => {
@@ -594,6 +671,12 @@ class FlexCellsCard extends LitElement {
         }
       }
       if (mutated) this.requestUpdate();
+    }
+
+    if (changedProps.has('_confirmationDialog') && this._confirmationDialog) {
+      this.updateComplete.then(() => {
+        this.renderRoot?.querySelector?.('.fcc-confirm-actions button.confirm')?.focus?.();
+      });
     }
   }
 
@@ -2806,7 +2889,56 @@ class FlexCellsCard extends LitElement {
     }
   }
 
+  _confirmationContent(actionCfg = {}) {
+    const confirmation = actionCfg?.confirmation;
+    if (!confirmation) return null;
+
+    let title = '';
+    let text = '';
+    if (typeof confirmation === 'string') {
+      text = confirmation;
+    } else if (confirmation && typeof confirmation === 'object') {
+      title = confirmation.title || '';
+      text = confirmation.text || '';
+    }
+
+    return {
+      title: title || t(this.hass, 'card.confirmation_default_title'),
+      text: text || '',
+    };
+  }
+
+  _confirmAction(actionCfg = {}) {
+    const content = this._confirmationContent(actionCfg);
+    if (!content) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+      if (this._confirmationDialog?.resolve) {
+        this._confirmationDialog.resolve(false);
+      }
+      this._confirmationDialog = { ...content, openedAt: Date.now(), resolve };
+    });
+  }
+
+  _closeConfirmationDialog(confirmed) {
+    const resolver = this._confirmationDialog?.resolve;
+    this._confirmationDialog = null;
+    if (resolver) resolver(!!confirmed);
+  }
+
+  _onConfirmationBackdropClick(e) {
+    const openedAt = this._confirmationDialog?.openedAt || 0;
+    if (openedAt && Date.now() - openedAt < 450) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      return;
+    }
+    this._closeConfirmationDialog(false);
+  }
+
   async _runAction(actionCfg = {}, entityId) {
+    if (!(await this._confirmAction(actionCfg))) return;
+
     if (actionCfg?.action === 'perform-action' || actionCfg?.action === 'perform_action') {
       const inner = actionCfg.perform_action || actionCfg.performAction || {};
       const outerTarget = actionCfg.target;
@@ -2834,6 +2966,7 @@ class FlexCellsCard extends LitElement {
     const payload = actionCfg.data || actionCfg.service_data || undefined;
 
     switch (a) {
+      case 'default':
       case 'more-info':
         this._openMoreInfo(actionEntity || target?.entity_id);
         break;
@@ -3924,6 +4057,43 @@ class FlexCellsCard extends LitElement {
     `;
   }
 
+  _renderConfirmationDialog() {
+    const title = this._confirmationDialog?.title;
+    const text = this._confirmationDialog?.text;
+    if (!title && !text) return nothing;
+
+    return html`
+      <div
+        class="fcc-confirm-backdrop"
+        role="presentation"
+        @click=${(e) => this._onConfirmationBackdropClick(e)}
+      >
+        <div
+          class="fcc-confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby=${title ? 'fcc-confirm-title' : nothing}
+          @click=${(e) => e.stopPropagation()}
+          @keydown=${(e) => {
+            if (e.key === 'Escape') this._closeConfirmationDialog(false);
+            if (e.key === 'Enter') this._closeConfirmationDialog(true);
+          }}
+        >
+          ${title ? html`<h2 id="fcc-confirm-title" class="fcc-confirm-title">${title}</h2>` : nothing}
+          ${text ? html`<p class="fcc-confirm-text">${text}</p>` : nothing}
+          <div class="fcc-confirm-actions">
+            <button type="button" @click=${() => this._closeConfirmationDialog(false)}>
+              ${t(this.hass, 'card.cancel')}
+            </button>
+            <button class="confirm" type="button" autofocus @click=${() => this._closeConfirmationDialog(true)}>
+              ${t(this.hass, 'card.ok')}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
 
   _resolveCardPadding() {
     const v = this.config?.card_padding;
@@ -3950,11 +4120,12 @@ class FlexCellsCard extends LitElement {
     const customTemplateHasContent = customTemplateEnabled && customTemplateRaw.trim() !== '';
     const customCssBlocks = this._collectCustomCss(rows);
     const extraStyle = customCssBlocks.length ? html`<style>${customCssBlocks.join('\n')}</style>` : nothing;
+    const confirmationDialog = this._renderConfirmationDialog();
 
     if (!rows.length) {
       const defaultCard = html`<ha-card class="card" style="padding:${padVal}px;">${t(this.hass, "card.no_rows")}</ha-card>`;
       if (!customTemplateHasContent) {
-        return html`${extraStyle}${defaultCard}`;
+        return html`${extraStyle}${defaultCard}${confirmationDialog}`;
       }
       const templateCard = html`
         <ha-card class="card fcc-template-card" style="padding:${padVal}px;">
@@ -3964,7 +4135,7 @@ class FlexCellsCard extends LitElement {
       const combined = this._isInEditorPreview()
         ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
         : templateCard;
-      return html`${extraStyle}${combined}`;
+      return html`${extraStyle}${combined}${confirmationDialog}`;
     }
 
     const headerFromFirstRow = autoEntities?.hasHeader ? true : !!cfg.header_from_first_row;
@@ -4268,7 +4439,7 @@ class FlexCellsCard extends LitElement {
     `;
 
     if (!customTemplateHasContent) {
-      return html`${extraStyle}${defaultCard}`;
+      return html`${extraStyle}${defaultCard}${confirmationDialog}`;
     }
 
     const templateCard = html`
@@ -4280,7 +4451,7 @@ class FlexCellsCard extends LitElement {
     const combined = this._isInEditorPreview()
       ? html`<div class="fcc-preview-stack">${defaultCard}${templateCard}</div>`
       : templateCard;
-    return html`${extraStyle}${combined}`;
+    return html`${extraStyle}${combined}${confirmationDialog}`;
   }
 
   // NEW: fallback import — gdyby przeglądarka wczytała wersję bez edytora lub cache „zgubił” definicję

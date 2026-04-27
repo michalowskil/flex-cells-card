@@ -277,11 +277,13 @@ filter:
 ```
 
 ## Changelog
-- v0.25.0-beta.2 (pre-release) —
-  - Added camera entity display modes: `camera_stream` and `camera_snapshot`, also usable in dynamic rules.
+- v0.25.0-beta.3 (pre-release) —
+  - Added **camera entity display modes: `camera_stream` and `camera_snapshot`**, also usable in dynamic rules.
   - Added per-card `camera_snapshot_ttl_ms` plus per-cell override to control snapshot refresh/caching (default 5000 ms).
   - Added optional sizing for camera cells via `camera_height` (px) or `camera_aspect` (e.g., `16:9`).
+  - Added **per-action confirmation dialogs** for tap, hold, and double-tap actions, with separate title and message fields.
   - Fixed localized entity state formatting for both select option lists and dynamic `overwrite: entity`.
+  - Improved the card editor visuals.
 - v0.24.0 —
   - Added **custom HTML templates for each cell**. You can embed the same or different FCC cells using `<fcc row="x" col="y" />` while preserving actions, dynamic rules, and custom CSS. This allows you to place more than one element in a single cell.
   - Fixed **row/col recalculation for `<fcc>` tags** (and sort column numbers) when rows/columns are reordered or deleted in the visual editor.

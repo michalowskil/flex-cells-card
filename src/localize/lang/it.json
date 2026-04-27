@@ -2,7 +2,7 @@
   "editor": {
     "appearance": "Aspetto e stile (cella)",
     "appearance_row": "Aspetto e stile (riga)",
-    "card_title": "Configurazione scheda Flex Cells",
+    "card_title": "Configurazione Flex Cells Card",
     "columns_count": "Colonne",
     "text_size_global": "Dimensione testo (predefinita)",
     "card_padding": "Padding scheda",
@@ -10,9 +10,12 @@
     "cell_padding_right": "Padding cella - destra",
     "cell_padding_bottom": "Padding cella - basso",
     "cell_padding_left": "Padding cella - sinistra",
-    "widths_label": "Larghezze colonne (px/%/rem/auto), es. \"80px, auto, 25%, 12rem\"",
-    "hide_cols_label": "Colonne da nascondere sotto il breakpoint (es. 1,4)",
-    "sort_cols_label": "Ordina righe per colonne (es. \"5,2,3\")",
+    "widths_label": "Larghezze colonne",
+    "widths_placeholder": "px/%/rem/auto, es. 80px, auto, 25%, 12rem",
+    "hide_cols_label": "Colonne da nascondere sotto il breakpoint",
+    "hide_cols_placeholder": "es. 1,4",
+    "sort_cols_label": "Ordina righe per colonne",
+    "sort_cols_placeholder": "es. 5,2,3",
     "sort_desc_label": "Ordine inverso",
     "sort_hide_separators_label": "Nascondi separatori quando l'ordinamento è attivo",
     "sort_hint_grouped": "Se aggiungi un separatore, le righe vengono divise in gruppi. Ogni gruppo viene ordinato in modo indipendente.",
@@ -75,8 +78,9 @@
     "attr_edit_control_color": "Slider colore (tonalità)",
     "attr_edit_control_color_sat": "Slider colore (saturazione)",
     "attr_edit_control_switch": "Interruttore",
-    "attr_edit_min": "Min (slider/numero)",
-    "attr_edit_max": "Max (slider/numero)",
+    "attr_edit_min": "Min",
+    "attr_edit_max": "Max",
+    "attr_edit_slider_number_hint": "Valore numerico",
     "attr_edit_step": "Passo",
     "attr_edit_checked": "Valore selezionato",
     "attr_edit_unchecked": "Valore non selezionato",
@@ -147,6 +151,10 @@
     "cell_custom_template": "Template personalizzato per la cella",
     "cell_custom_template_hint": "HTML personalizzato solo per questa cella. Inserisci altre celle con <fcc row=\"1\" col=\"2\" /> (usa as=\"text\" per il testo puro). Disattiva per tornare al rendering predefinito.",
     "actions_hint": "Se è impostata un'azione, l'azione predefinita 'more-info' dell'entità verrà disabilitata.",
+    "action_confirmation": "Richiedi conferma",
+    "action_confirmation_title": "Titolo conferma",
+    "action_confirmation_text": "Testo di conferma",
+    "action_confirmation_placeholder": "Messaggio opzionale",
     "scale_title": "Ridimensionamento",
     "scale_in_min": "Ingresso minimo",
     "scale_in_max": "Ingresso massimo",
@@ -212,6 +220,9 @@
     "strike": "barrato"
   },
   "card": {
-    "no_rows": "Nessuna riga da visualizzare."
+    "no_rows": "Nessuna riga da visualizzare.",
+    "confirmation_default_title": "Sei sicuro?",
+    "cancel": "Annulla",
+    "ok": "OK"
   }
 }
