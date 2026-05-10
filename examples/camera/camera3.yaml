@@ -1,0 +1,127 @@
+rows:
+  - cells:
+      - type: entity
+        value: camera.192_168_0_9
+        align: left
+        use_entity_unit: true
+        entity_display: camera_stream
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: left
+        use_entity_unit: true
+        datetime_format: "[More info]"
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             background-color: red;
+             padding: 0 10px !important;
+             border: 2px solid black;
+             box-shadow: 0 0 0 1px white;
+             color: white;
+          }
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: left
+        use_entity_unit: true
+        tap_action:
+          action: toggle
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+            padding: 2px 12px !important;
+            border: 1px solid #999;
+            border-radius: 8px;
+            background: #f0f0f0;
+          }
+        datetime_format: "[Toggle]"
+        style:
+          color: "#636363"
+          background: var(--primary-background-color)
+  - cells:
+      - type: entity
+        value: weather.forecast_dom
+        align: left
+        use_entity_unit: true
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             text-shadow: 1px 1px 0px black;
+          }
+        datetime_format: "[Forecast: ]RAW"
+        style:
+          text_transform: capitalize
+          background: ""
+          color: white
+          bold: false
+  - cells:
+      - type: entity
+        value: weather.forecast_dom
+        align: left
+        use_entity_unit: true
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             text-shadow: 1px 1px 1px black;
+          }
+        attribute: humidity
+        datetime_format: "[Humidity: ]RAW[ %]"
+        style:
+          color: white
+  - cells:
+      - type: string
+        value: "Room #1"
+        align: left
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             background-color: yellow;
+             border: 2px dashed red;
+             padding: 0px 10px !important;
+          }
+        style:
+          color: "#850000"
+column_count: 1
+card_padding: 0
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <div class="titles">
+     <fcc row="6" col="1" /><br/>
+     <fcc row="4" col="1" /><br/>
+     <fcc row="5" col="1" />
+  </div>
+  <div class="buttons">
+     <fcc row="2" col="1" />
+     <fcc row="3" col="1" />
+  </div>
+  <fcc row="1" col="1" class="stream" />
+  <style>
+  .stream {
+     display: block !important;
+  }
+  .titles, .buttons {
+     position: absolute;
+     z-index: 1;
+     bottom: 10px;
+     right: 20px;
+  }
+  .titles {
+     top: 5px;
+     bottom: auto;
+  }
+  .buttons .fcc-template-cell {
+    margin-left: 20px;
+  }
+  </style>
+type: custom:flex-cells-card

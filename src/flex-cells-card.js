@@ -172,6 +172,9 @@ class FlexCellsCard extends LitElement {
     }
     .fcc-camera-frame {
       width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
       aspect-ratio: 16 / 9;
       border-radius: 10px;
       overflow: hidden;
@@ -181,8 +184,12 @@ class FlexCellsCard extends LitElement {
     .fcc-camera-fallback {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
+    }
+    .fcc-camera-stream {
+      overflow: hidden;
+      --video-max-height: 100%;
     }
     .fcc-camera-frame,
     .fcc-camera-stream {
@@ -2672,6 +2679,7 @@ class FlexCellsCard extends LitElement {
     const heightNum = Number(cell?.camera_height || this.config?.camera_height);
     if (Number.isFinite(heightNum) && heightNum > 0) {
       styles.push(`height:${heightNum}px`);
+      styles.push('aspect-ratio:auto');
     }
     const aspectRaw = cell?.camera_aspect || this.config?.camera_aspect || '';
     if (!styles.length && aspectRaw) {
@@ -2680,6 +2688,16 @@ class FlexCellsCard extends LitElement {
       styles.push(`aspect-ratio:${hasSlash ? normalized : `${normalized} / 1`}`);
     }
     return styles.join(';');
+  }
+  _resolveCameraAspectRatio(cell) {
+    const raw = String(cell?.camera_aspect || this.config?.camera_aspect || '16:9').trim();
+    const normalized = raw.replace(/:/g, '/');
+    if (normalized.includes('/')) {
+      const [w, h] = normalized.split('/').map((v) => Number(String(v).trim()));
+      if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) return w / h;
+    }
+    const num = Number(normalized);
+    return Number.isFinite(num) && num > 0 ? num : 16 / 9;
   }
 
   _renderCameraContent(cell, stateObj, mode = 'camera') {
@@ -2701,6 +2719,7 @@ class FlexCellsCard extends LitElement {
     const showStream = !preferSnapshot && supportsStream; // wymuś próbę strumienia (chyba że prosimy o snapshot)
     const title = stateObj.attributes?.friendly_name || entityId;
     const cacheBust = this._snapshotCacheKey(entityId, ttlMs);
+    const aspectRatio = this._resolveCameraAspectRatio(cell);
 
     if (showStream) {
       return html`
@@ -2711,6 +2730,8 @@ class FlexCellsCard extends LitElement {
             .stateObj=${stateObj}
             .cameraImage=${entityId}
             .allowExoPlayer=${true}
+            .fitMode=${'contain'}
+            .aspectRatio=${aspectRatio}
             muted
             playsinline
           ></ha-camera-stream>
@@ -2821,12 +2842,20 @@ class FlexCellsCard extends LitElement {
   // ---------- Actions ----------
   _hasAction(cfg) { return !!(cfg && cfg.action && cfg.action !== 'none'); }
 
+  _hasActionEntityTarget(actionCfg) {
+    const targetEntity = actionCfg?.target?.entity_id;
+    return !!(actionCfg?.entity || (Array.isArray(targetEntity) ? targetEntity.length : targetEntity));
+  }
+
   // filter out more-info/toggle for icon/string
   _sanitizeActionForCell(cell, actionCfg) {
     if (!actionCfg) return undefined;
     const type = (cell?.type || 'string').toLowerCase();
     const a = actionCfg?.action;
     if ((type === 'icon' || type === 'string') && (a === 'more-info' || a === 'toggle')) {
+      return undefined;
+    }
+    if ((type === 'icon' || type === 'string') && a === 'default' && !this._hasActionEntityTarget(actionCfg)) {
       return undefined;
     }
     return actionCfg;

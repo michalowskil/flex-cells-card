@@ -7,7 +7,7 @@
 
 A Lovelace card for Home Assistant that lets you add **icons**, **text**,  **entities**, **attributes**, or **input controls** in flexible cell layouts — fully configurable from a **visual editor** (EN/PL/IT/DE), so **no documentation is required** to get started.
 
-If you like this card, please consider giving it a ⭐ on GitHub: [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card/stargazers)
+If you like this card, please consider giving it a ⭐ on GitHub: [![Star on GitHub](https://img.shields.io/github/stars/michalowskil/flex-cells-card.svg?style=social)](https://github.com/michalowskil/flex-cells-card)
 
 ## Features
 - Mix cells with **Icon / Text / Entity / Metadata / Input Control**
@@ -25,7 +25,7 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 
 Choose one installation method, via [HACS](https://www.hacs.xyz/docs/use/download/download/) or manually.
 
-> Compatibility: Flex Cells Card **v0.23.0+** requires **Home Assistant Core ≥ 2026.2** (MD3 frontend). On older cores the visual editor dropdowns will not work; use an earlier FCC release if you must stay on an older HA version.
+> Compatibility: Flex Cells Card **v0.23.0+** requires **Home Assistant Core ≥ 2026.2** (MD3 frontend). On older cores the visual editor dropdowns will not work; use an earlier FCC release if you must stay on an older HA version. For **Home Assistant Core 2026.5+**, use **Flex Cells Card v0.25.0+** because older FCC editor builds depended on Home Assistant's removed `ha-textfield` component and may show missing text inputs.
 
 ### HACS
 
@@ -229,7 +229,16 @@ type: custom:flex-cells-card
   - [Sports table](https://github.com/michalowskil/flex-cells-card/blob/main/examples/sports-table/sports-table.md) - tracking sports data using auto-entities and TeamTracker. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/sports-table/sports-table.md)  
 
     ![Sports table](examples/sports-table/images/dark-300.png)
-    ![Sports table](examples/sports-table/images/light-300.png)
+    ![Sports table](examples/sports-table/images/light-300.png)  
+  - [Camera](https://github.com/michalowskil/flex-cells-card/blob/main/examples/camera/camera.md) - here you'll find the simplest example displaying the camera image across the entire card, as well as two examples with additional buttons/information overlaid on the camera image. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/camera/camera.md)  
+
+    ![Camera](examples/camera/images/dark1-300.png)
+    ![Camera](examples/camera/images/light2-300.png)  
+
+  - [Select (custom CSS & cell template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/select/select.md) - list example. Appearance styled after the "Mushroom Select Card". [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/select/select.md)  
+
+    ![Select](examples/select/images/dark-300.png)
+    ![Select](examples/select/images/light-300.png)
 
 ## Translations
 If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one string will do - and it's not difficult.
@@ -277,11 +286,12 @@ filter:
 ```
 
 ## Changelog
-- v0.25.0-beta.3 (pre-release) —
+- v0.25.0 —
   - Added **camera entity display modes: `camera_stream` and `camera_snapshot`**, also usable in dynamic rules.
   - Added per-card `camera_snapshot_ttl_ms` plus per-cell override to control snapshot refresh/caching (default 5000 ms).
-  - Added optional sizing for camera cells via `camera_height` (px) or `camera_aspect` (e.g., `16:9`).
+  - Added optional sizing for camera cells via `camera_height` (px number, e.g., `200`) or `camera_aspect` (e.g., `16:9` or `16/9`), also available in the visual editor.
   - Added **per-action confirmation dialogs** for tap, hold, and double-tap actions, with separate title and message fields.
+  - Fixed missing visual editor text fields on Home Assistant 2026.5+ by replacing the removed `ha-textfield` dependency with an FCC-owned text field component.
   - Fixed localized entity state formatting for both select option lists and dynamic `overwrite: entity`.
   - Improved the card editor visuals.
 - v0.24.0 —

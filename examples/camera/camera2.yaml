@@ -1,0 +1,111 @@
+rows:
+  - cells:
+      - type: entity
+        value: camera.192_168_0_9
+        align: left
+        use_entity_unit: true
+        entity_display: camera_stream
+  - cells:
+      - type: entity
+        value: binary_sensor.sensor_ruchu_w_sypialni_occupancy
+        align: left
+        use_entity_unit: true
+        entity_display: icon
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:run-fast
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: ""
+            fg: ""
+            overwrite: icon
+            overwrite_entity: ""
+            overwrite_attr: ""
+            icon: mdi:run
+  - cells:
+      - type: entity
+        value: binary_sensor.sensor_zalania_1_water_leak
+        align: left
+        use_entity_unit: true
+        entity_display: icon
+  - cells:
+      - type: entity
+        value: light.zarowka_hue_sypialnia
+        align: left
+        use_entity_unit: true
+        entity_display: icon
+        tap_action:
+          action: toggle
+        hold_action:
+          action: more-info
+  - cells:
+      - type: string
+        value: "Room #1"
+        align: left
+        style:
+          color: white
+          bold: true
+        tap_action:
+          action: navigate
+          navigation_path: /config/areas/area/salon
+column_count: 1
+card_padding: 0
+overflow_x: false
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <div class="menu">
+    <fcc row="5" col="1" />
+    <span class="buttons">
+      <fcc row="2" col="1" />
+      <fcc row="3" col="1" />
+      <fcc row="4" col="1" />
+    </span>
+  </div>
+  <fcc row="1" col="1" class="stream" />
+  <style>
+  .stream {
+     display: block !important;
+  }
+  .buttons {
+     float: right;
+  }
+  .buttons > span {
+     margin-left: 15px;
+  }
+  .menu {
+     position: absolute;
+     z-index: 1;
+     bottom: 0;
+     width: stretch;
+     display: block;
+     height: 28px;
+     padding: 8px 20px;
+     background: rgba(0, 0, 0, 0.2);
+  }
+  </style>
+type: custom:flex-cells-card

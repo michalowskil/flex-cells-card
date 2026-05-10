@@ -1,17 +1,181 @@
 ﻿import { LitElement, html, css, nothing } from 'lit';
 import { t } from './localize/localize.js';
 
+class FccTextfield extends LitElement {
+  static properties = {
+    disabled: { type: Boolean, reflect: true },
+    label: { type: String },
+    max: {},
+    min: {},
+    name: { type: String },
+    placeholder: { type: String },
+    readonly: { type: Boolean, reflect: true },
+    required: { type: Boolean, reflect: true },
+    step: {},
+    type: { type: String },
+    value: {},
+  };
+
+  constructor() {
+    super();
+    this.disabled = false;
+    this.label = '';
+    this.placeholder = '';
+    this.readonly = false;
+    this.required = false;
+    this.type = 'text';
+    this.value = '';
+  }
+
+  static styles = css`
+    :host {
+      --fcc-textfield-height: 56px;
+      display: block;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      color: var(--primary-text-color);
+    }
+    :host([hidden]) {
+      display: none;
+    }
+    :host([disabled]) {
+      opacity: 0.65;
+    }
+    :host(.mini) {
+      --fcc-textfield-height: 48px;
+    }
+    .field {
+      display: block;
+      position: relative;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    .label {
+      position: absolute;
+      inset: 7px 12px auto 12px;
+      z-index: 1;
+      color: var(--secondary-text-color);
+      font-size: 12px;
+      line-height: 16px;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    input {
+      width: 100%;
+      min-width: 0;
+      height: var(--fcc-textfield-height);
+      box-sizing: border-box;
+      border: 0;
+      border-radius: 4px 4px 0 0;
+      background: var(--ha-color-form-background, var(--secondary-background-color, var(--card-background-color, #fff)));
+      box-shadow: inset 0 -1px var(--divider-color, #ccc);
+      color: var(--primary-text-color);
+      font: inherit;
+      font-size: 16px;
+      outline: none;
+      padding: 20px 12px 4px;
+      transition: background 0.2s, box-shadow 0.2s;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    :host(.mini) input {
+      font-size: 13px;
+      padding: 17px 8px 3px;
+    }
+    :host(.mini) .label {
+      inset: 5px 8px auto 8px;
+      font-size: 11px;
+      line-height: 14px;
+    }
+    .field:not(.has-label) input {
+      height: 40px;
+      padding-top: 4px;
+    }
+    input:hover:not(:disabled) {
+      background: var(--ha-color-form-background-hover, var(--secondary-background-color, var(--card-background-color, #fff)));
+    }
+    input:focus {
+      box-shadow: inset 0 -2px var(--primary-color, #03a9f4);
+    }
+    input:disabled {
+      background: var(--ha-color-form-background-disabled, var(--disabled-color, var(--secondary-background-color, #f5f5f5)));
+      color: var(--disabled-text-color, var(--secondary-text-color, #999));
+      cursor: not-allowed;
+    }
+    input::placeholder {
+      color: var(--secondary-text-color);
+      opacity: 0.75;
+    }
+  `;
+
+  render() {
+    const value = this.value == null ? '' : String(this.value);
+    const label = this.label || '';
+    const placeholder = this.placeholder || '';
+    const ariaLabel = label || placeholder || nothing;
+    return html`
+      <label class=${label ? 'field has-label' : 'field'}>
+        ${label ? html`<span part="label" class="label">${label}</span>` : nothing}
+        <input
+          part="input"
+          type=${this.type || 'text'}
+          .value=${value}
+          name=${this.name || nothing}
+          min=${this.min ?? nothing}
+          max=${this.max ?? nothing}
+          step=${this.step ?? nothing}
+          placeholder=${placeholder || nothing}
+          aria-label=${ariaLabel}
+          ?disabled=${this.disabled}
+          ?readonly=${this.readonly}
+          ?required=${this.required}
+          @input=${this._onInput}
+          @change=${this._onChange}
+        />
+      </label>
+    `;
+  }
+
+  focus(options) {
+    this.renderRoot?.querySelector('input')?.focus(options);
+  }
+
+  select() {
+    this.renderRoot?.querySelector('input')?.select();
+  }
+
+  _onInput(ev) {
+    ev.stopPropagation();
+    this.value = ev.target.value;
+    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  }
+
+  _onChange(ev) {
+    ev.stopPropagation();
+    this.value = ev.target.value;
+    this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  }
+}
+
+if (!customElements.get('fcc-textfield')) {
+  customElements.define('fcc-textfield', FccTextfield);
+}
+
 class FlexCellsCardEditor extends LitElement {
   static properties = { config: {}, hass: {} };
 
   static styles = css`
     .row { margin-bottom: 16px; }
-    ha-textfield, ha-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; min-width: 0; }
-    :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > ha-textfield,
+    fcc-textfield, ha-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; min-width: 0; }
+    :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > fcc-textfield,
     :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > ha-select {
       margin-bottom: 0;
     }
-    ha-textfield::part(label) {
+    fcc-textfield::part(label) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -77,7 +241,7 @@ class FlexCellsCardEditor extends LitElement {
     .option input { margin: 0; }
     .option.unit { align-items: center; gap: 12px; }
     .option.unit span.label { flex: 0 0 auto; }
-    .option.unit ha-textfield { flex: 1 1 auto; margin: 0; }
+    .option.unit fcc-textfield { flex: 1 1 auto; margin: 0; }
     .option.group { display:block; cursor: default; margin-bottom:12px; }
     .option.full { width: 100%; box-sizing: border-box; }
     .option.option-stack { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -105,7 +269,7 @@ class FlexCellsCardEditor extends LitElement {
     .action-confirmation .simple-check {
       padding: 0 2px;
     }
-    .action-confirmation ha-textfield {
+    .action-confirmation fcc-textfield {
       margin-bottom: 0;
     }
     .copy-section { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
@@ -273,8 +437,9 @@ class FlexCellsCardEditor extends LitElement {
       font-size: 14px;
     }
 
-    /* Sekcja przeskalowania: 4 rzędy, 2 kolumny */
-    .option.group.scale {
+    /* Kompaktowe pola: szeroko 2 kolumny, wąsko jedna kolumna */
+    .option.group.scale,
+    .option.group.camera-size {
       display: grid;
       grid-template-columns: repeat(2, minmax(140px, 1fr));
       gap: 8px 12px;
@@ -282,15 +447,18 @@ class FlexCellsCardEditor extends LitElement {
       border: none;
       border-radius: 12px;
       background: var(--card-background-color, #fff);
-      margin: 8px 0 12px; /* odstęp pod ramką przed "Alignment" */
+      margin: 8px 0 0;
     }
 
     .option.group.scale .label,
-    .option.group.scale .muted {
-      grid-column: 1 / -1; /* pierwszy i czwarty wiersz na pełną szerokość */
+    .option.group.scale .muted,
+    .option.group.camera-size .label,
+    .option.group.camera-size .muted {
+      grid-column: 1 / -1;
     }
 
-    .option.group.scale ha-textfield.mini {
+    .option.group.scale fcc-textfield.mini,
+    .option.group.camera-size fcc-textfield.mini {
       width: 100%;
       margin: 0;
       padding: 0;
@@ -309,7 +477,8 @@ class FlexCellsCardEditor extends LitElement {
       .rowtools { gap: 6px; }
       .rowtools button, .chiptools button { padding: 4px 8px; height: 28px; }
       .preview { display: none; }
-      .option.group.scale { grid-template-columns: 1fr; }
+      .option.group.scale,
+      .option.group.camera-size { grid-template-columns: 1fr; }
     }
 
     .toggle, .rowtools button { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
@@ -1204,6 +1373,16 @@ _cellAlignChanged(r,c,e){
     const val = raw === '' ? undefined : (Number.isFinite(num) ? num : undefined);
     this._patchCell(r,c,{ camera_snapshot_ttl_ms: val });
   }
+  _cellCameraHeightChanged(r,c,e){
+    const raw = (e?.target?.value ?? '').trim();
+    const num = Number(raw);
+    const val = raw === '' ? undefined : (Number.isFinite(num) ? num : undefined);
+    this._patchCell(r,c,{ camera_height: val });
+  }
+  _cellCameraSizingChanged(r,c,key,e){
+    const raw = (e?.target?.value ?? '').trim();
+    this._patchCell(r,c,{ [key]: raw || undefined });
+  }
   _initialEntityDisplay(cell){
     const raw = cell?.entity_display;
     const entityId = cell?.value;
@@ -1793,24 +1972,24 @@ _styleValue(r,c,key,e){
       <div class="rowbody">
         <div class="cols2 rule-color-row">
           <div class="inline">
-            <ha-textfield
+            <fcc-textfield
               .label=${t(this.hass, "editor.separator_color")}
               .value=${sep.color ?? ''}
               .placeholder=${"#d0d7de | var(--divider-color)"}
               @input=${(e)=>this._updateSeparator(rIdx,{ color: (e.target.value || '').trim() || defaults.color })}>
-            </ha-textfield>
+            </fcc-textfield>
             <button type="button" class="toggle" title=${t(this.hass,"editor.separator_color_picker")} @click=${(ev)=>this._onSeparatorPaletteClick(ev, rIdx, 'color')}>
               <ha-icon icon="mdi:palette"></ha-icon>
             </button>
           </div>
 
           <div class="inline">
-            <ha-textfield
+            <fcc-textfield
               .label=${t(this.hass, "editor.separator_background")}
               .value=${sep.background ?? ''}
               .placeholder=${"transparent | #f0f0f0 | var(--color)"}
               @input=${(e)=>this._updateSeparator(rIdx,{ background: (e.target.value || '').trim() || undefined })}>
-            </ha-textfield>
+            </fcc-textfield>
             <button type="button" class="toggle" title=${t(this.hass,"editor.separator_color_picker")} @click=${(ev)=>this._onSeparatorPaletteClick(ev, rIdx, 'background')}>
               <ha-icon icon="mdi:palette"></ha-icon>
             </button>
@@ -1835,7 +2014,7 @@ _styleValue(r,c,key,e){
             </ha-select>
           </div>
           <div>
-            <ha-textfield
+            <fcc-textfield
               style="width:100%;"
               .label=${t(this.hass, "editor.separator_thickness")}
               type="number"
@@ -1843,19 +2022,19 @@ _styleValue(r,c,key,e){
               step="0.1"
               .value=${String(sep.thickness ?? '')}
               @input=${(e)=>this._separatorNumberChanged(rIdx,'thickness',e,{ float:true, min:0 })}>
-            </ha-textfield>
+            </fcc-textfield>
           </div>
         </div>
 
         <div class="cols2">
           <div>
-            <ha-textfield
+            <fcc-textfield
               style="width:100%;"
               .label=${t(this.hass, "editor.separator_length")}
               .value=${sep.length ?? ''}
               .placeholder=${"100% | 80% | 240px"}
               @input=${(e)=>this._updateSeparator(rIdx,{ length: (e.target.value || '').trim() || defaults.length })}>
-            </ha-textfield>
+            </fcc-textfield>
           </div>
           <div>
             <ha-select
@@ -1878,29 +2057,29 @@ _styleValue(r,c,key,e){
 
         <div class="cols2">
           <div>
-            <ha-textfield
+            <fcc-textfield
               style="width:100%;"
               .label=${t(this.hass, "editor.separator_margin_top")}
               type="number"
               step="1"
               .value=${String(sep.margin_top ?? '')}
               @input=${(e)=>this._separatorNumberChanged(rIdx,'margin_top',e,{ float:true })}>
-            </ha-textfield>
+            </fcc-textfield>
           </div>
           <div>
-            <ha-textfield
+            <fcc-textfield
               style="width:100%;"
               .label=${t(this.hass, "editor.separator_margin_bottom")}
               type="number"
               step="1"
               .value=${String(sep.margin_bottom ?? '')}
               @input=${(e)=>this._separatorNumberChanged(rIdx,'margin_bottom',e,{ float:true })}>
-            </ha-textfield>
+            </fcc-textfield>
           </div>
         </div>
 
         <div class="cell-grid cell-wide">
-          <ha-textfield
+          <fcc-textfield
             .label=${t(this.hass, "editor.separator_opacity")}
             type="number"
             min="0"
@@ -1908,7 +2087,7 @@ _styleValue(r,c,key,e){
             step="0.05"
             .value=${String(sep.opacity ?? '')}
             @input=${(e)=>this._separatorNumberChanged(rIdx,'opacity',e,{ float:true, min:0, max:1 })}>
-          </ha-textfield>
+          </fcc-textfield>
         </div>
         <div class="muted" style="margin-top:10px;">${t(this.hass, "editor.separator_zero_hint")}</div>
       </div>
@@ -1959,7 +2138,7 @@ _styleValue(r,c,key,e){
       zIndex: '2147483647',
     });
 
-    const textfield = btn?.parentElement?.querySelector('ha-textfield') || null;
+    const textfield = btn?.parentElement?.querySelector('fcc-textfield') || null;
 
     let pending = null;
     let tid = 0;
@@ -2052,6 +2231,8 @@ _styleValue(r,c,key,e){
     if (!isCamera && this._isCameraDisplay(cell?.entity_display)) {
       patch.entity_display = 'value';
       patch.camera_snapshot_ttl_ms = undefined;
+      patch.camera_height = undefined;
+      patch.camera_aspect = undefined;
     }
     this._patchCell(rIdx, cIdx, patch);
   }
@@ -2069,6 +2250,11 @@ _styleValue(r,c,key,e){
     }
     // entity — pełna lista domyślna (nie narzucamy)
     return undefined;
+  }
+
+  _isDefaultOnlyAction(actionCfg) {
+    if (!actionCfg || actionCfg.action !== 'default') return false;
+    return Object.keys(actionCfg).every((key) => key === 'action' || actionCfg[key] === undefined);
   }
 
   _onActionsChanged(rIdx, cIdx, ev) {
@@ -2097,6 +2283,7 @@ _styleValue(r,c,key,e){
       if (!out.entity) delete out.entity;
       if (out.confirmation && typeof out.confirmation === 'object' && !out.confirmation.title) delete out.confirmation.title;
       if (out.confirmation && typeof out.confirmation === 'object' && !out.confirmation.text) delete out.confirmation.text;
+      if (isIconOrString && !out.confirmation && this._isDefaultOnlyAction(out)) return undefined;
       return out;
     };
 
@@ -2158,6 +2345,10 @@ _styleValue(r,c,key,e){
       else delete next.confirmation.text;
     } else {
       delete next.confirmation;
+      const cellType = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.type;
+      if ((cellType === 'icon' || cellType === 'string') && this._isDefaultOnlyAction(next)) {
+        delete next.action;
+      }
     }
 
     this._patchCell(rIdx, cIdx, { [actionKey]: next.action ? next : undefined });
@@ -2176,18 +2367,18 @@ _styleValue(r,c,key,e){
           <span>${t(this.hass, 'editor.action_confirmation')}</span>
         </label>
         ${enabled ? html`
-          <ha-textfield
+          <fcc-textfield
             .label=${t(this.hass, 'editor.action_confirmation_title')}
             .value=${this._getActionConfirmationTitle(actionCfg)}
             .placeholder=${t(this.hass, 'card.confirmation_default_title')}
             @input=${(e) => this._updateActionConfirmation(rIdx, cIdx, actionKey, { title: e.target.value })}
-          ></ha-textfield>
-          <ha-textfield
+          ></fcc-textfield>
+          <fcc-textfield
             .label=${t(this.hass, 'editor.action_confirmation_text')}
             .value=${this._getActionConfirmationText(actionCfg)}
             .placeholder=${t(this.hass, 'editor.action_confirmation_placeholder')}
             @input=${(e) => this._updateActionConfirmation(rIdx, cIdx, actionKey, { text: e.target.value })}
-          ></ha-textfield>
+          ></fcc-textfield>
         ` : nothing}
       </div>
     `;
@@ -2344,7 +2535,7 @@ _styleValue(r,c,key,e){
     });
 
     // Podgląd w polu obok (bez pełnego re-renderu)
-    const textfield = btn.parentElement?.querySelector('ha-textfield') || null;
+    const textfield = btn.parentElement?.querySelector('fcc-textfield') || null;
 
     let pending = null;
     let tid = 0;
@@ -2396,60 +2587,60 @@ _styleValue(r,c,key,e){
         <h3>${t(this.hass,"editor.card_title")}</h3>
 
         <div class="cols3">
-          <ha-textfield label=${t(this.hass,"editor.columns_count")} type="number" min="1" .value=${colCount}
-            @input=${(e)=>this._updateColumnCount(e)}></ha-textfield>
+          <fcc-textfield label=${t(this.hass,"editor.columns_count")} type="number" min="1" .value=${colCount}
+            @input=${(e)=>this._updateColumnCount(e)}></fcc-textfield>
 
-          <ha-textfield label=${t(this.hass,"editor.text_size_global")}
+          <fcc-textfield label=${t(this.hass,"editor.text_size_global")}
             .value=${this.config.text_size || ''} placeholder="14px | 1.1rem | 120%"
-            @input=${(e)=>this._updateTextSize(e)}></ha-textfield>
+            @input=${(e)=>this._updateTextSize(e)}></fcc-textfield>
 
-          <ha-textfield label=${t(this.hass,"editor.card_padding")} type="number"
+          <fcc-textfield label=${t(this.hass,"editor.card_padding")} type="number"
             .value=${this.config.card_padding ?? ''} placeholder="16"
-            @input=${(e)=>this._updateCardPadding(e)}></ha-textfield>
+            @input=${(e)=>this._updateCardPadding(e)}></fcc-textfield>
         </div>
 
         <div class="cols4">
-          <ha-textfield label=${t(this.hass,"editor.cell_padding_top")} type="number" .value=${cp.top ?? 4}
-            @input=${(e)=>this._updateCellPadding('top',e)}></ha-textfield>
-          <ha-textfield label=${t(this.hass,"editor.cell_padding_right")} type="number" .value=${cp.right ?? 0}
-            @input=${(e)=>this._updateCellPadding('right',e)}></ha-textfield>
-          <ha-textfield label=${t(this.hass,"editor.cell_padding_bottom")} type="number" .value=${cp.bottom ?? 4}
-            @input=${(e)=>this._updateCellPadding('bottom',e)}></ha-textfield>
-          <ha-textfield label=${t(this.hass,"editor.cell_padding_left")} type="number" .value=${cp.left ?? 0}
-            @input=${(e)=>this._updateCellPadding('left',e)}></ha-textfield>
+          <fcc-textfield label=${t(this.hass,"editor.cell_padding_top")} type="number" .value=${cp.top ?? 4}
+            @input=${(e)=>this._updateCellPadding('top',e)}></fcc-textfield>
+          <fcc-textfield label=${t(this.hass,"editor.cell_padding_right")} type="number" .value=${cp.right ?? 0}
+            @input=${(e)=>this._updateCellPadding('right',e)}></fcc-textfield>
+          <fcc-textfield label=${t(this.hass,"editor.cell_padding_bottom")} type="number" .value=${cp.bottom ?? 4}
+            @input=${(e)=>this._updateCellPadding('bottom',e)}></fcc-textfield>
+          <fcc-textfield label=${t(this.hass,"editor.cell_padding_left")} type="number" .value=${cp.left ?? 0}
+            @input=${(e)=>this._updateCellPadding('left',e)}></fcc-textfield>
         </div>
 
-        <ha-textfield
+        <fcc-textfield
           label=${t(this.hass,"editor.widths_label")}
           placeholder=${t(this.hass,"editor.widths_placeholder")}
           .value=${widthsStr}
           @input=${(e)=> this._upd('column_widths', this._parseCsvList(e.target.value)) }>
-        </ha-textfield>
+        </fcc-textfield>
 
         <div class="cols21">
-          <ha-textfield
+          <fcc-textfield
             label=${t(this.hass,"editor.hide_cols_label")}
             placeholder=${t(this.hass,"editor.hide_cols_placeholder")}
             .value=${hideStr}
             @input=${(e)=> this._upd('hide_on_narrow', this._parseCsvIntList(e.target.value)) }>
-          </ha-textfield>
+          </fcc-textfield>
 
-          <ha-textfield
+          <fcc-textfield
             label=${t(this.hass,"editor.breakpoint")} type="number"
             .value=${this.config.narrow_breakpoint ?? ''} placeholder="600"
             @input=${(e)=> this._updateBreakpoint(e)}>
-          </ha-textfield>
+          </fcc-textfield>
         </div>
 
 
         <div class="option-group">
-          <ha-textfield
+          <fcc-textfield
             style="width:100%;"
             label=${t(this.hass,"editor.sort_cols_label")}
             placeholder=${t(this.hass,"editor.sort_cols_placeholder")}
             .value=${sortStr}
             @input=${(e)=> this._upd('sort_columns', this._parseCsvIntList(e.target.value)) }>
-          </ha-textfield>
+          </fcc-textfield>
           <label class="simple-check">
             <input type="checkbox" .checked=${!!this.config.sort_desc} @change=${(e)=>this._toggle('sort_desc',e)} />
             <span>${t(this.hass,"editor.sort_desc_label")}</span>
@@ -2674,12 +2865,12 @@ _styleValue(r,c,key,e){
                           </datalist>
 
                           <div class="cell-wide">
-                            <ha-textfield
+                            <fcc-textfield
                               .label=${t(this.hass,"editor.datetime_format")}
                               .value=${cell.datetime_format || ''}
                               .placeholder=${t(this.hass,"placeholder.datetime_format")}
                               @input=${(e)=> this._patchCell(rIdx,cIdx,{ datetime_format: (e.target.value||'') || undefined })}
-                            ></ha-textfield>
+                            ></fcc-textfield>
                             <div class="muted" style="margin-bottom: 0;">${t(this.hass,"editor.available_tokens")}</div>
                           </div>
 
@@ -2696,15 +2887,34 @@ _styleValue(r,c,key,e){
                             @closed=${(e)=>e.stopPropagation()}>
                           </ha-select>
                         </div>
+                        ${ this._isCameraDisplay(this._initialEntityDisplay(cell)) ? html`
+                          <div class="option group camera-size full">
+                            <fcc-textfield class="mini"
+                              type="number"
+                              min="1"
+                              .label=${t(this.hass,"editor.camera_height")}
+                              .value=${cell.camera_height ?? ''}
+                              .placeholder=${"200"}
+                              @input=${(e)=>this._cellCameraHeightChanged(rIdx,cIdx,e)}>
+                            </fcc-textfield>
+                            <fcc-textfield class="mini"
+                              .label=${t(this.hass,"editor.camera_aspect")}
+                              .value=${cell.camera_aspect ?? ''}
+                              .placeholder=${"16:9 | 16/9"}
+                              @input=${(e)=>this._cellCameraSizingChanged(rIdx,cIdx,'camera_aspect',e)}>
+                            </fcc-textfield>
+                            <div class="muted">${t(this.hass,"editor.camera_size_hint")}</div>
+                          </div>
+                        ` : nothing }
                         ${ this._initialEntityDisplay(cell) === 'camera_snapshot' ? html`
                           <div class="cell-grid cell-wide">
-                            <ha-textfield
+                            <fcc-textfield
                               label=${t(this.hass,"editor.camera_snapshot_ttl")}
                               type="number"
                               min="5000"
                               .value=${cell.camera_snapshot_ttl_ms ?? this.config.camera_snapshot_ttl_ms ?? 5000}
                               @input=${(e)=> this._cellSnapshotTtlChanged(rIdx,cIdx,e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                             <div class="muted">${t(this.hass,"editor.camera_snapshot_ttl_hint")}</div>
                           </div>
                         ` : nothing }
@@ -2824,91 +3034,91 @@ _styleValue(r,c,key,e){
                             ${attrEditControl === 'color' ? html`
                               <div class="cell-grid cell-wide muted">${t(this.hass,"editor.attr_edit_color_hint")}</div>
                               <div class="cols1">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_color_hue_path")}
                                   .value=${attrEdit.hue_path || ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'hue_path',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                               <div class="cols1">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_color_sat_path")}
                                   .value=${attrEdit.sat_path || ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'sat_path',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                               <div class="cols1">
-                                <ha-textfield
+                                <fcc-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_color_sat_fallback")}
                                   .value=${attrEdit.sat_fallback ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'sat_fallback',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                             ` : (attrEditControl === 'color_sat' ? html`
                               <div class="cell-grid cell-wide muted">${t(this.hass,"editor.attr_edit_color_sat_hint")}</div>
                               <div class="cols1">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_color_hue_path")}
                                   .value=${attrEdit.hue_path || ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'hue_path',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                               <div class="cols1">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_color_sat_path")}
                                   .value=${attrEdit.sat_path || ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'sat_path',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                             ` : nothing)}
 
                             ${attrEditControl === 'switch' ? html`
                               <div class="cols2">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_checked")}
                                   .value=${attrEdit.checked ?? true}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditLiteral(rIdx,cIdx,'checked',e)}>
-                                </ha-textfield>
-                                <ha-textfield
+                                </fcc-textfield>
+                                <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_unchecked")}
                                   .value=${attrEdit.unchecked ?? false}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditLiteral(rIdx,cIdx,'unchecked',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                             ` : (attrEditControl === 'slider' || attrEditControl === 'color_sat' ? html`
                               <div class="cols3">
-                                <ha-textfield
+                                <fcc-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_min")}
                                   placeholder=${t(this.hass,"editor.attr_edit_slider_number_hint")}
                                   .value=${attrEdit.min ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'min',e)}>
-                                </ha-textfield>
-                                <ha-textfield
+                                </fcc-textfield>
+                                <fcc-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_max")}
                                   placeholder=${t(this.hass,"editor.attr_edit_slider_number_hint")}
                                   .value=${attrEdit.max ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'max',e)}>
-                                </ha-textfield>
-                                <ha-textfield
+                                </fcc-textfield>
+                                <fcc-textfield
                                   type="number"
                                   .label=${t(this.hass,"editor.attr_edit_step")}
                                   placeholder=${t(this.hass,"editor.attr_edit_slider_number_hint")}
                                   .value=${attrEdit.step ?? ''}
                                   ?disabled=${!attrEditEnabled}
                                   @input=${(e)=> this._updateAttrEditNumber(rIdx,cIdx,'step',e)}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                             ` : html``)}
                           </div>
@@ -2921,30 +3131,30 @@ _styleValue(r,c,key,e){
                           </summary>
                           <div class="muted dyn-hint">${t(this.hass, 'editor.scale_hint')}</div>
                           <div class="option group scale full">
-                                  <ha-textfield class="mini"
+                                  <fcc-textfield class="mini"
                                     type="number"
                                     .label=${t(this.hass,"editor.scale_in_min")}
                                     .value=${cell.scale_in_min ?? ''}
                                     @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_in_min',e)}>
-                                  </ha-textfield>
-                                  <ha-textfield class="mini"
+                                  </fcc-textfield>
+                                  <fcc-textfield class="mini"
                                     type="number"
                                     .label=${t(this.hass,"editor.scale_in_max")}
                                     .value=${cell.scale_in_max ?? ''}
                                     @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_in_max',e)}>
-                                  </ha-textfield>
-                                  <ha-textfield class="mini"
+                                  </fcc-textfield>
+                                  <fcc-textfield class="mini"
                                     type="number"
                                     .label=${t(this.hass,"editor.scale_out_min")}
                                     .value=${cell.scale_out_min ?? ''}
                                     @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_out_min',e)}>
-                                  </ha-textfield>
-                                  <ha-textfield class="mini"
+                                  </fcc-textfield>
+                                  <fcc-textfield class="mini"
                                     type="number"
                                     .label=${t(this.hass,"editor.scale_out_max")}
                                     .value=${cell.scale_out_max ?? ''}
                                     @input=${(e)=>this._cellScaleChanged(rIdx,cIdx,'scale_out_max',e)}>
-                                  </ha-textfield>
+                                  </fcc-textfield>
                           </div>
                         </details>
                       ` : isIcon ? html`
@@ -2957,22 +3167,22 @@ _styleValue(r,c,key,e){
                               @value-changed=${(e)=> this._cellValueChanged(rIdx,cIdx,{target:{value: e.detail?.value || ''}})}>
                             </ha-icon-picker>
                           ` : html`
-                            <ha-textfield
+                            <fcc-textfield
                               .label=${t(this.hass,"editor.icon_label")}
                               .value=${cell.value || ''}
                               .placeholder=${t(this.hass,"placeholder.icon")}
                               @input=${(e)=>this._cellValueChanged(rIdx,cIdx,e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                           `}
                         </div>
                       ` : html`
                         <div class="cell-grid cell-wide">
-                          <ha-textfield
+                          <fcc-textfield
                             .label=${t(this.hass,"editor.string_label")}
                             .value=${cell.value || ''}
                             .placeholder=${t(this.hass,"placeholder.string")}
                             @input=${(e)=>this._cellValueChanged(rIdx,cIdx,e)}>
-                          </ha-textfield>
+                          </fcc-textfield>
                         </div>
                       `}
 
@@ -3025,12 +3235,12 @@ _styleValue(r,c,key,e){
                               <span class="label">${t(this.hass,"editor.unit_from_entity")}</span>
                             </label>
                             ${cell.use_entity_unit === false ? html`
-                              <ha-textfield
+                              <fcc-textfield
                                 .label=${""}
                                 .placeholder=${"°C"}
                                 .value=${cell.unit || ''}
                                 @input=${(e) => this._cellUnitChanged(rIdx, cIdx, e)}>
-                              </ha-textfield>
+                              </fcc-textfield>
                             ` : nothing}
                           </div>
                         </div>
@@ -3057,12 +3267,12 @@ _styleValue(r,c,key,e){
                         <!-- TLO -->
                         <div class="cell-grid cell-wide" style="margin-bottom:0;">
                           <div class="inline">
-                            <ha-textfield
+                            <fcc-textfield
                             .label=${t(this.hass,"editor.background_color")}
                             .placeholder=${"#ff5722 | red | var(--color)"}
                             .value=${st.background || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                             <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'background')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
@@ -3072,12 +3282,12 @@ _styleValue(r,c,key,e){
                         <!-- KOLOR -->
                         <div class="cell-grid cell-wide" style="margin-bottom:0;">
                           <div class="inline">
-                            <ha-textfield
+                            <fcc-textfield
                             .label=${t(this.hass,"editor.content_color")}
                             .placeholder=${"#ff5722 | red | var(--color)"}
                             .value=${st.color || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                             <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'color')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
@@ -3086,32 +3296,32 @@ _styleValue(r,c,key,e){
                         </div>
                         ${ showEntityIconSize ? html`
                           <div class="cell-grid cell-wide">
-                            <ha-textfield
+                            <fcc-textfield
                               .label=${t(this.hass,"editor.icon_size")}
                               .placeholder=${"24px | 1.4rem"}
                               .value=${st.icon_size || ''}
                               @input=${(e)=>this._styleValue(rIdx,cIdx,'icon_size',e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                           </div>
                         ` : ''}
                         <!-- ROZMIAR -->
                         <div class="cell-grid cell-wide">
-                          <ha-textfield
+                          <fcc-textfield
                             .label=${t(this.hass,"editor.text_size")}
                             .placeholder=${"14px | 1.1rem | 120%"}
                             .value=${st.font_size || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'font_size',e)}>
-                          </ha-textfield>
+                          </fcc-textfield>
                         </div>
 
                         <!-- ODSTĘPY MIĘDZY LITERAMI -->
                         <div class="cell-grid cell-wide">
-                          <ha-textfield
+                          <fcc-textfield
                             .label=${t(this.hass,"editor.letter_spacing")}
                             .placeholder=${"0.08em | -0.3px"}
                             .value=${st.letter_spacing || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'letter_spacing',e)}>
-                          </ha-textfield>
+                          </fcc-textfield>
                         </div>
 
                         <!-- POJEDYNCZE CHECKBOXY -->
@@ -3144,24 +3354,24 @@ _styleValue(r,c,key,e){
                       ${isIcon ? html`
                         <div class="cols2 rule-color-row">
                           <div class="inline">
-                            <ha-textfield
+                            <fcc-textfield
                               .label=${t(this.hass,"editor.background_color")}
                               .placeholder=${"#ff5722 | red | var(--primary-color)"}
                               .value=${st.background || ''}
                               @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                             <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'background')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
                           </div>
 
                           <div class="inline">
-                            <ha-textfield
+                            <fcc-textfield
                               .label=${t(this.hass,"editor.icon_color")}
                               .placeholder=${"#ff5722 | red | var(--primary-color)"}
                               .value=${st.color || ''}
                               @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
-                            </ha-textfield>
+                            </fcc-textfield>
                             <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'color')}>
                               <ha-icon icon="mdi:palette"></ha-icon>
                             </button>
@@ -3169,12 +3379,12 @@ _styleValue(r,c,key,e){
                         </div>
 
                         <div class="cell-grid cell-wide">
-                          <ha-textfield
+                          <fcc-textfield
                             .label=${t(this.hass,"editor.icon_size")}
                             .placeholder=${"24px | 1.4rem"}
                             .value=${st.icon_size || ''}
                             @input=${(e)=>this._styleValue(rIdx,cIdx,'icon_size',e)}>
-                          </ha-textfield>
+                          </fcc-textfield>
                         </div>
                       ` : ''}
 
@@ -3341,23 +3551,23 @@ _styleValue(r,c,key,e){
 
                                   ${ cond && cond.op === 'between' ? html`
                                     <div class="cols2">
-                                      <ha-textfield
+                                      <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.min')}
                                         .value=${cond.val || ''}
                                         @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val: e.target.value })}>
-                                      </ha-textfield>
-                                      <ha-textfield
+                                      </fcc-textfield>
+                                      <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.max')}
                                         .value=${cond.val2 || ''}
                                         @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val2: e.target.value })}>
-                                      </ha-textfield>
+                                      </fcc-textfield>
                                     </div>
                                   ` : html`
-                                    <ha-textfield
+                                    <fcc-textfield
                                       .label=${t(this.hass, 'editor.value')}
                                       .value=${cond.val || ''}
                                       @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val: e.target.value })}>
-                                    </ha-textfield>
+                                    </fcc-textfield>
                                   ` }
                                 </div>
 
@@ -3378,12 +3588,12 @@ _styleValue(r,c,key,e){
                             <!-- Colors row: Background + Content 50/50 with pickers -->
                             <div class="cols2 rule-color-row">
                               <div class="inline">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass, 'dynamic.bg')}
                                   .value=${rule.bg || ''}
                                   .placeholder=${"transparent | #ff5722 | red | var(--color)"}
                                   @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ bg: e.target.value })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                                 <button class="toggle" title="Palette"
                                   @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, cIdx, ridx, 'bg')}>
                                   <ha-icon icon="mdi:palette"></ha-icon>
@@ -3391,12 +3601,12 @@ _styleValue(r,c,key,e){
                               </div>
 
                               <div class="inline">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass, 'dynamic.fg')}
                                   .value=${rule.fg || ''}
                                   .placeholder=${"transparent | #ff5722 | red | var(--color)"}
                                   @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ fg: e.target.value })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                                 <button class="toggle" title="Palette"
                                   @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, cIdx, ridx, 'fg')}>
                                   <ha-icon icon="mdi:palette"></ha-icon>
@@ -3445,7 +3655,7 @@ _styleValue(r,c,key,e){
                                 </datalist>
                               </div>
                               <div class="cols1">
-                                <ha-textfield class="mask-input"
+                                <fcc-textfield class="mask-input"
                                   .label=${t(this.hass,"editor.datetime_format")}
                                   .value=${rule.overwrite_datetime_format || ''}
                                   .placeholder=${t(this.hass,"placeholder.datetime_format")}
@@ -3454,7 +3664,7 @@ _styleValue(r,c,key,e){
                                       ? e.target.value
                                       : undefined
                                   })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                                 <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
                               </div>
                               <div class="cols1">
@@ -3476,30 +3686,30 @@ _styleValue(r,c,key,e){
 
                                   <div class="muted dyn-hint">${t(this.hass, 'editor.scale_hint')}</div>
                                   <div class="option group scale full">
-                                          <ha-textfield class="mini"
+                                          <fcc-textfield class="mini"
                                             type="number"
                                             .label=${t(this.hass,"editor.scale_in_min")}
                                             .value=${rule.overwrite_scale_in_min ?? ''}
                                             @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_min',e)}>
-                                          </ha-textfield>
-                                          <ha-textfield class="mini"
+                                          </fcc-textfield>
+                                          <fcc-textfield class="mini"
                                             type="number"
                                             .label=${t(this.hass,"editor.scale_in_max")}
                                             .value=${rule.overwrite_scale_in_max ?? ''}
                                             @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_in_max',e)}>
-                                          </ha-textfield>
-                                          <ha-textfield class="mini"
+                                          </fcc-textfield>
+                                          <fcc-textfield class="mini"
                                             type="number"
                                             .label=${t(this.hass,"editor.scale_out_min")}
                                             .value=${rule.overwrite_scale_out_min ?? ''}
                                             @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_min',e)}>
-                                          </ha-textfield>
-                                          <ha-textfield class="mini"
+                                          </fcc-textfield>
+                                          <fcc-textfield class="mini"
                                             type="number"
                                             .label=${t(this.hass,"editor.scale_out_max")}
                                             .value=${rule.overwrite_scale_out_max ?? ''}
                                             @input=${(e)=>this._updateRuleScale(rIdx,cIdx,ridx,'overwrite_scale_out_max',e)}>
-                                          </ha-textfield>
+                                          </fcc-textfield>
                                   </div>                                  
                                 </details>
                               </div>
@@ -3507,11 +3717,11 @@ _styleValue(r,c,key,e){
 
                             ${ (rule.overwrite || '') === 'text' ? html`
                               <div class="cols1">
-                                <ha-textfield class="mask-input" style="margin-top: 0;"
+                                <fcc-textfield class="mask-input" style="margin-top: 0;"
                                   .label=${t(this.hass, 'dynamic.text')}
                                   .value=${rule.text || ''}
                                   @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ text: e.target.value })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                             ` : html`` }
 
@@ -3525,29 +3735,29 @@ _styleValue(r,c,key,e){
                                     @value-changed=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ icon: e.detail?.value || '' })}>
                                   </ha-icon-picker>
                                 ` : html`
-                                  <ha-textfield
+                                  <fcc-textfield
                                     .label=${t(this.hass,"editor.icon_label")}
                                     .value=${rule.icon || ''}
                                     .placeholder=${t(this.hass,"placeholder.icon")}
                                     @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon: e.target.value })}>
-                                  </ha-textfield>
+                                  </fcc-textfield>
                                 `}
                               </div>
                               <div class="cols1" style="margin-bottom: 8px;">
-                                <ha-textfield class="mask-input"
+                                <fcc-textfield class="mask-input"
                                   .label=${t(this.hass, 'dynamic.icon_optional_text')}
                                   .value=${rule.icon_text || ''}
                                   @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon_text: e.target.value })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                               </div>
                               <div class="cols1">
                                 <div class="inline">
-                                  <ha-textfield
+                                  <fcc-textfield
                                     .label=${t(this.hass, 'dynamic.icon_color')}
                                     .value=${rule.icon_color || ''}
                                     .placeholder=${"#ff5722 | red | var(--color)"}
                                     @input=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ icon_color: e.target.value })}>
-                                  </ha-textfield>
+                                  </fcc-textfield>
                                   <button class="toggle" title="Palette"
                                     @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, cIdx, ridx, 'icon_color')}>
                                     <ha-icon icon="mdi:palette"></ha-icon>
@@ -3647,23 +3857,23 @@ _styleValue(r,c,key,e){
 
                                   ${ cond && cond.op === 'between' ? html`
                                     <div class="cols2">
-                                      <ha-textfield
+                                      <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.min')}
                                         .value=${cond?.val || ''}
                                         @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val: e.target.value })}>
-                                      </ha-textfield>
-                                      <ha-textfield
+                                      </fcc-textfield>
+                                      <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.max')}
                                         .value=${cond?.val2 || ''}
                                         @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val2: e.target.value })}>
-                                      </ha-textfield>
+                                      </fcc-textfield>
                                     </div>
                                   ` : html`
-                                    <ha-textfield
+                                    <fcc-textfield
                                       .label=${t(this.hass, 'editor.value')}
                                       .value=${cond?.val || ''}
                                       @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val: e.target.value })}>
-                                    </ha-textfield>
+                                    </fcc-textfield>
                                   ` }
                                 </div>
 
@@ -3683,12 +3893,12 @@ _styleValue(r,c,key,e){
 
                             <div class="cols2 rule-color-row">
                               <div class="inline">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass, 'dynamic.bg')}
                                   .value=${rule?.bg || ''}
                                   .placeholder=${"transparent | #ff5722 | red | var(--color)"}
                                   @input=${(e)=>this._updateRowRule(rIdx,ridx,{ bg: e.target.value })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                                 <button class="toggle" title="Palette"
                                   @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, null, ridx, 'bg')}>
                                   <ha-icon icon="mdi:palette"></ha-icon>
@@ -3696,12 +3906,12 @@ _styleValue(r,c,key,e){
                               </div>
 
                               <div class="inline">
-                                <ha-textfield
+                                <fcc-textfield
                                   .label=${t(this.hass, 'dynamic.fg')}
                                   .value=${rule?.fg || ''}
                                   .placeholder=${"transparent | #ff5722 | red | var(--color)"}
                                   @input=${(e)=>this._updateRowRule(rIdx,ridx,{ fg: e.target.value })}>
-                                </ha-textfield>
+                                </fcc-textfield>
                                 <button class="toggle" title="Palette"
                                   @click=${(ev)=> this._onRuleColorPicker(ev, rIdx, null, ridx, 'fg')}>
                                   <ha-icon icon="mdi:palette"></ha-icon>
@@ -3877,7 +4087,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.25.0-beta.3
+        FCC v0.25.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

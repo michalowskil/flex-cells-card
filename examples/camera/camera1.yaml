@@ -1,0 +1,21 @@
+rows:
+  - cells:
+      - type: entity
+        value: camera.192_168_0_9
+        align: left
+        use_entity_unit: true
+column_count: 1
+card_padding: 0
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card

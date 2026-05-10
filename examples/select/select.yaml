@@ -1,0 +1,128 @@
+rows:
+  - cells:
+      - type: entity
+        value: select.allmighty_hub_activities
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+             width: 40px !important;
+             margin-right: 10px;
+          }
+          td:first-child  {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 14px 0 14px !important;
+            color: #f5a623;
+            background: transparent !important;
+          }
+          td:first-child::before {
+            content: "";
+            position: absolute;
+            height: 40px;
+            width: 40px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: 0.2;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+          }
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: power_off
+                val2: ""
+            match: all
+            bg: ""
+            fg: "#878787"
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: select.allmighty_hub_activities
+        align: left
+        use_entity_unit: true
+        entity_display: value
+        datetime_format: "[Harmony Activities]"
+        custom_css_enabled: true
+        custom_css: |
+          th, td {
+             padding-right: 20px !important
+          }
+        tap_action:
+          action: perform-action
+          perform_action: script.harmony_power_on_selected_activity_devices
+        custom_template_enabled: true
+        custom_template_html: |-
+          <div style="font-weight: 500">
+             <fcc row="1" col="2" />
+          </div>
+          <div style="font-size: 10px;">
+             <fcc row="2" col="2" />
+          </div>
+        style:
+          bold: false
+      - type: entity
+        value: select.allmighty_hub_activities
+        align: left
+        use_entity_unit: true
+        show_control: true
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             width: 100%;
+          }
+          select{
+             width: 100% !important;
+          }
+  - cells:
+      - type: string
+        value: ""
+        align: right
+      - type: entity
+        value: select.allmighty_hub_activities
+        align: left
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT[ ago]
+        custom_css_enabled: false
+        custom_css: |
+          th, td {
+             background-color: yellow;
+             border: 2px dashed red;
+          }
+        dyn_color: []
+        tap_action:
+          action: none
+      - type: string
+        value: ""
+        align: right
+    custom_css_enabled: true
+    custom_css: |
+      tr {
+         display: none;
+      }
+column_count: 3
+card_padding: 10
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+column_widths: []
