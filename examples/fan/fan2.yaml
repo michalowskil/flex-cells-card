@@ -1,0 +1,104 @@
+rows:
+  - cells:
+      - type: entity
+        value: fan.bedroom_fan
+        align: left
+        use_entity_unit: true
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+            border-radius: 70px;
+            padding: 8px !important;
+            height: 23px;
+            width: 23px;
+          }
+        style:
+          background: var(--divider-color)
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: fan.bedroom_fan
+        align: left
+        use_entity_unit: true
+        attribute: friendly_name
+        style:
+          bold: false
+        custom_template_enabled: true
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             padding-left: 16px !important;
+          }
+        custom_template_html: |-
+          <b>
+            <fcc row="1" col="2" />
+          </b>
+          <br />
+          <fcc row="1" col="3" />
+      - type: entity
+        value: fan.bedroom_fan
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT_AGO_ROUNDED
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             display: none;
+          }
+        style:
+          font_size: 12px
+      - type: entity
+        value: fan.bedroom_fan
+        attribute: percentage
+        align: right
+        unit: ""
+        precision: 0
+        attr_edit:
+          enabled: true
+          service: fan.set_percentage
+          field: percentage
+          control: slider
+          min: 0
+          max: 100
+          step: 1
+        scale_in_min: 0
+        scale_in_max: 100
+        scale_out_min: 0
+        scale_out_max: 3
+        use_entity_unit: true
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             padding-left: 16px !important;
+          }
+          td, .ctrl-wrap, .ctrl-range{
+             width: 100%;
+          }
+column_count: 4
+card_padding: 10
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card

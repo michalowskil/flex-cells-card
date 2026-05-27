@@ -1,0 +1,238 @@
+rows:
+  - cells:
+      - type: entity
+        value: fan.bedroom_fan
+        align: center
+        use_entity_unit: true
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+            border-radius: 70px;
+            padding: 8px !important;
+            height: 23px;
+          }
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+        style:
+          background: var(--divider-color)
+      - type: string
+        value: "0"
+        align: center
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            fg: var(--primary-color)
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 0
+      - type: string
+        value: "1"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 33
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: percentage
+                op: "="
+                val: "33"
+                val2: ""
+            match: all
+            fg: var(--primary-color)
+      - type: string
+        value: "2"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 66
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: percentage
+                op: "="
+                val: "66"
+                val2: ""
+            match: all
+            fg: var(--primary-color)
+      - type: string
+        value: "3"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 100
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: percentage
+                op: "="
+                val: "100"
+                val2: ""
+            match: all
+            fg: var(--primary-color)
+      - type: entity
+        value: fan.bedroom_fan
+        attribute: percentage
+        align: right
+        attr_edit:
+          enabled: true
+          service: fan.set_percentage
+          field: percentage
+          control: slider
+          min: 0
+          max: 100
+          step: 1
+        scale_in_min: 0
+        scale_in_max: 100
+        scale_out_min: 0
+        scale_out_max: 3
+        use_entity_unit: true
+      - type: entity
+        value: fan.bedroom_fan
+        align: right
+        use_entity_unit: true
+        attribute: friendly_name
+        entity_display: value
+        style:
+          bold: true
+      - type: entity
+        value: fan.bedroom_fan
+        align: left
+        use_entity_unit: true
+        attribute: last_changed
+        style:
+          font_size: 12px
+        dyn_color: []
+        datetime_format: REL_SHORT_AGO_ROUNDED
+column_count: 8
+card_padding: 0
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: true
+custom_template_html: |
+  <style>
+    .fan-speed-row {
+      display: flex;
+      align-items: center;
+      width: calc(100% - 20px);
+      gap: 16px;
+      padding: 10px;
+    }
+    .fan-speed-control {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: visible;
+      # background-color: red;
+      width: 100%;
+    }
+    .fan-slider .ctrl-wrap,
+    .fan-slider .ctrl-wrap input{
+      width: 100%;
+    }
+    .fan-speed-labels {
+      position: relative;
+      width: 160px;
+      height: 16px;
+      overflow: visible;
+      # background-color: yellow;
+      width: 100%;
+    }
+    .fan-speed-labels .fcc-template-cell {
+      position: absolute;
+      top: 0;
+      width: 18px;
+      justify-content: center;
+      text-align: center;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--secondary-text-color);
+    }
+    .fan-speed-labels .fcc-template-cell:nth-child(1) {
+      left: 0%;
+      transform: translateX(0);
+    }
+    
+    .fan-speed-labels .fcc-template-cell:nth-child(2) {
+      left: calc(33.333% + 3px);
+      transform: translateX(-50%);
+    }
+    
+    .fan-speed-labels .fcc-template-cell:nth-child(3) {
+      left: calc(66.666% - 3px);
+      transform: translateX(-50%);
+    }
+    
+    .fan-speed-labels .fcc-template-cell:nth-child(4) {
+      left: 100%;
+      transform: translateX(-100%);
+    }
+    .fan-speed-labels .fcc-template-cell[style*="color:var(--primary-color)"] {
+      font-weight: 700;
+    }
+    .fan-slider .ctrl-value {
+      display: none;
+    }
+    .fan-slider .ctrl-range {
+      width: 160px;
+    }
+  </style>
+
+  <div class="fan-speed-row">
+    <fcc row="1" col="1" />
+    <div style="display: flex; gap: 0px; flex-direction: column">
+      <fcc row="1" col="7" style="height: 16px" />
+      <fcc row="1" col="8" />
+    </div>
+    <div class="fan-speed-control">
+      <div class="fan-speed-labels">
+        <fcc row="1" col="2" />
+        <fcc row="1" col="3" />
+        <fcc row="1" col="4" />
+        <fcc row="1" col="5" />
+      </div>
+      <fcc row="1" col="6" class="fan-slider" />
+    </div>
+  </div>
+type: custom:flex-cells-card

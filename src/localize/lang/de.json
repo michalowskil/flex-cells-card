@@ -75,9 +75,16 @@
     "attr_edit_service_field": "Service-Feld",
     "attr_edit_control_type": "Steuerungstyp",
     "attr_edit_control_slider": "Slider",
+    "attr_edit_control_number": "Zahlenfeld",
+    "attr_edit_control_text": "Textfeld",
+    "attr_edit_control_stepper": "Stepper",
     "attr_edit_control_color": "Farbschieber (Hue)",
     "attr_edit_control_color_sat": "Farbschieber (Sättigung)",
     "attr_edit_control_switch": "Schalter",
+    "attr_edit_control_select": "Auswahlliste",
+    "attr_edit_control_buttons": "Auswahlbuttons",
+    "attr_edit_select_options": "Attributpfad mit Optionen",
+    "attr_edit_select_hint": "Liest Optionen aus dem konfigurierten Attributpfad und sendet den ausgewählten Wert an das Service-Feld.",
     "attr_edit_min": "Min",
     "attr_edit_max": "Max",
     "attr_edit_slider_number_hint": "Numerischer Wert",
@@ -89,6 +96,11 @@
     "attr_edit_color_hue_path": "Hue-Attributpfad (optional)",
     "attr_edit_color_sat_path": "Sättigungs-Attributpfad (optional)",
     "attr_edit_color_sat_fallback": "Fallback-Sättigung (0-100)",
+    "attr_edit_step_buttons": "+/- Buttons anzeigen",
+    "attr_edit_step_buttons_position": "+/- Buttons Position",
+    "attr_edit_step_buttons_position_sides": "Beide Seiten",
+    "attr_edit_step_buttons_position_left": "Links",
+    "attr_edit_step_buttons_position_right": "Rechts",
     "press": "Drücken",
     "entity_display_label": "Entitaetsdarstellung",
     "entity_display_option_value": "Entitaets-/Metadatenwert",
@@ -168,14 +180,15 @@
     "dynamic_row_title": "Dynamische Regeln (Zeile): Farben und Zeilenausblenden",
     "dynamic_hint": "Regeln von oben nach unten prüfen, die letzte Übereinstimmung gewinnt.",
     "datetime_format": "Datums-/Zeitformat & Textüberschreibung",
-    "available_tokens": "Verfügbare Tokens: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (verstrichene Zeit), REL_SHORT (kompakte Zeit), [Literale in Klammern]",
+    "available_tokens": "Datums-/Zeit-Tokens:",
+    "token_reference": "Token-Referenz öffnen",
     "value": "Wert"
   },
   "placeholder": {
     "entity": "Entität auswählen",
     "string": "Anzuzeigender Text",
     "icon": "mdi:icon-name",
-    "datetime_format": "z. B. H:mm:ss, YYYY-MM-DD H:mm, REL [vor], REL_SHORT [vor] oder [eigener Text]",
+    "datetime_format": "z. B. H[:]mm[:]ss, YYYY[-]MM[-]DD[ ]h[:]mm[ ]AMPM, REL, REL_SHORT_AGO oder [eigener Text]",
     "attribute_path": "Metadatenpfad (z. B. a.b[0].c)"
   },
   "dynamic": {
@@ -225,6 +238,8 @@
   "card": {
     "no_rows": "Keine Zeilen zum Anzeigen.",
     "confirmation_default_title": "Bist du sicher?",
+    "decrease": "Verringern",
+    "increase": "Erhöhen",
     "cancel": "Abbrechen",
     "ok": "OK"
   }

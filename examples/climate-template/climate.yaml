@@ -106,6 +106,8 @@ rows:
           step: 1
           checked: true
           unchecked: false
+          step_buttons: true
+          step_buttons_position: sides
         unit: °C
         show_control_value_right: true
   - cells:

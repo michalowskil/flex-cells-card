@@ -226,6 +226,8 @@ class FlexCellsCardEditor extends LitElement {
     .inline { display: inline-flex; align-items: center; gap: 8px; }
     .cols2 > * { min-width: 0; }
     .muted { color: #888; font-size: 12px; margin-top: -4px; margin-bottom: 8px; }
+    .datetime-token-help.no-bottom { margin-bottom: 0; }
+    .datetime-token-help a { color: var(--primary-color, #03a9f4); }
     .rulehdr { color: #888; font-size: 12px; margin: 0 0 4px; }
     .mini { width: 140px; padding: 6px 8px; font-size: 13px; margin: 0; }
     .mini-wide { width: 220px; padding: 6px 8px; font-size: 13px; margin: 0; }
@@ -542,7 +544,14 @@ class FlexCellsCardEditor extends LitElement {
     const row = { ...(rows[r] || {}) };
     const cells = [ ...(row.cells || []) ];
     const cell = { ...(cells[c] || {}) };
-    if (val) cell.show_control = true; else { delete cell.show_control; delete cell.show_control_value_right; }
+    if (val) {
+      cell.show_control = true;
+    } else {
+      delete cell.show_control;
+      delete cell.show_control_value_right;
+      delete cell.step_buttons;
+      delete cell.step_buttons_position;
+    }
     cells[c] = cell; rows[r] = { ...row, cells };
     this.config = { ...this.config, rows };
     this._fireConfigChanged?.();
@@ -558,6 +567,30 @@ class FlexCellsCardEditor extends LitElement {
     cells[c] = cell; rows[r] = { ...row, cells };
     this.config = { ...this.config, rows };
     this._fireConfigChanged?.();
+  }
+
+  _cellStepButtonsChanged(r, c, e) {
+    const val = !!(e?.target?.checked);
+    const rows = [ ...(this.config.rows || []) ];
+    const row = { ...(rows[r] || {}) };
+    const cells = [ ...(row.cells || []) ];
+    const cell = { ...(cells[c] || {}) };
+    if (val) {
+      cell.step_buttons = true;
+      if (!cell.step_buttons_position) cell.step_buttons_position = 'sides';
+    } else {
+      delete cell.step_buttons;
+      delete cell.step_buttons_position;
+    }
+    cells[c] = cell; rows[r] = { ...row, cells };
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged?.();
+  }
+
+  _cellStepButtonsPositionChanged(r, c, e) {
+    const raw = e?.detail?.value ?? e?.target?.value;
+    const value = ['sides', 'left', 'right'].includes(raw) ? raw : 'sides';
+    this._patchCell(r, c, { step_buttons_position: value });
   }
 
   _defaultRowCss() {
@@ -1408,14 +1441,30 @@ _cellAlignChanged(r,c,e){
     const controlRaw = typeof raw.control === 'string' ? raw.control.trim().toLowerCase() : 'slider';
     const control = controlRaw === 'switch'
       ? 'switch'
-      : (['color','color-slider','color_hs'].includes(controlRaw) ? 'color'
-        : (['color_sat','color-sat','color_saturation'].includes(controlRaw) ? 'color_sat' : 'slider'));
+      : (controlRaw === 'stepper' ? 'stepper'
+        : (['select','dropdown','list'].includes(controlRaw) ? 'select'
+        : (['buttons','button','button_group','button-group','segmented','segmented_buttons','segmented-buttons'].includes(controlRaw) ? 'buttons'
+        : (['text','text_box','text-box','textbox','string'].includes(controlRaw) ? 'text'
+        : (['number','number_box','number-box','box'].includes(controlRaw) ? 'number'
+        : (['color','color-slider','color_hs'].includes(controlRaw) ? 'color'
+        : (['color_sat','color-sat','color_saturation'].includes(controlRaw) ? 'color_sat' : 'slider')))))));
+    const stepButtonsPositionRaw = typeof raw.step_buttons_position === 'string'
+      ? raw.step_buttons_position.trim().toLowerCase()
+      : 'sides';
+    const step_buttons_position = ['sides', 'left', 'right'].includes(stepButtonsPositionRaw)
+      ? stepButtonsPositionRaw
+      : 'sides';
     const minNum = Number(raw.min);
     const maxNum = Number(raw.max);
     const stepNum = Number(raw.step);
     const defaultField = (control === 'color' || control === 'color_sat') ? 'hs_color' : '';
     const fieldRaw = typeof raw.field === 'string' ? raw.field : (cell?.attribute || defaultField);
     const satFallbackNum = Number(raw.sat_fallback);
+    const options = Array.isArray(raw.options)
+      ? raw.options
+      : (typeof raw.options === 'string'
+        ? raw.options
+        : (typeof raw.options_path === 'string' ? raw.options_path : ''));
     return {
       enabled: raw.enabled === true,
       service: typeof raw.service === 'string' ? raw.service : '',
@@ -1424,13 +1473,20 @@ _cellAlignChanged(r,c,e){
         : fieldRaw,
       control,
       min: control === 'color' ? undefined : (Number.isFinite(minNum) ? minNum : undefined),
-      max: control === 'color' ? undefined : (Number.isFinite(maxNum) ? maxNum : undefined),
+      max: control === 'color'
+        ? undefined
+        : (Number.isFinite(maxNum)
+          ? (Number.isFinite(minNum) && maxNum <= minNum ? minNum : maxNum)
+          : undefined),
       step: control === 'color' ? undefined : (Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined),
       checked: raw.checked !== undefined ? raw.checked : true,
       unchecked: raw.unchecked !== undefined ? raw.unchecked : false,
+      options,
       hue_path: typeof raw.hue_path === 'string' ? raw.hue_path : '',
       sat_path: typeof raw.sat_path === 'string' ? raw.sat_path : '',
       sat_fallback: Number.isFinite(satFallbackNum) ? satFallbackNum : undefined,
+      step_buttons: raw.step_buttons === true,
+      step_buttons_position,
     };
   }
   _patchAttrEdit(r,c,patch){
@@ -2807,6 +2863,7 @@ _styleValue(r,c,key,e){
                     const attrEdit = this._getAttrEditConfig(cell);
                     const attrEditEnabled = attrEdit.enabled === true;
                     const attrEditControl = attrEdit.control || 'slider';
+                    const attrEditOptionsPath = typeof attrEdit.options === 'string' ? attrEdit.options : '';
                     const serviceOptions = this._listServiceNames();
                     const serviceFieldOptions = this._listServiceFields(attrEdit.service);
 
@@ -2871,7 +2928,7 @@ _styleValue(r,c,key,e){
                               .placeholder=${t(this.hass,"placeholder.datetime_format")}
                               @input=${(e)=> this._patchCell(rIdx,cIdx,{ datetime_format: (e.target.value||'') || undefined })}
                             ></fcc-textfield>
-                            <div class="muted" style="margin-bottom: 0;">${t(this.hass,"editor.available_tokens")}</div>
+                            ${this._renderDateTimeTokensHelp(true)}
                           </div>
 
                         </div>
@@ -2935,6 +2992,27 @@ _styleValue(r,c,key,e){
                                         @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
                                   <span>${t(this.hass,"editor.show_value_on_right")}</span>
                                 </label>
+                                <label>
+                                  <input type="checkbox"
+                                        .checked=${cell.step_buttons === true}
+                                        @change=${(e)=> this._cellStepButtonsChanged(rIdx, cIdx, e)} />
+                                  <span>${t(this.hass,"editor.attr_edit_step_buttons")}</span>
+                                </label>
+                                ${(cell.step_buttons === true) ? html`
+                                  <ha-select
+                                    .label=${t(this.hass,"editor.attr_edit_step_buttons_position")}
+                                    .value=${cell.step_buttons_position || 'sides'}
+                                    naturalMenuWidth
+                                    fixedMenuPosition
+                                    .options=${[
+                                      { value: "sides", label: t(this.hass,"editor.attr_edit_step_buttons_position_sides") },
+                                      { value: "left", label: t(this.hass,"editor.attr_edit_step_buttons_position_left") },
+                                      { value: "right", label: t(this.hass,"editor.attr_edit_step_buttons_position_right") },
+                                    ]}
+                                    @selected=${(e)=> this._cellStepButtonsPositionChanged(rIdx, cIdx, e)}
+                                    @closed=${(e)=>e.stopPropagation()}>
+                                  </ha-select>
+                                ` : nothing}
                               ` : nothing}
                             </div>
                           </div>
@@ -3010,16 +3088,21 @@ _styleValue(r,c,key,e){
                               fixedMenuPosition
                               .options=${[
                                 { value: "slider", label: t(this.hass,"editor.attr_edit_control_slider") },
+                                { value: "number", label: t(this.hass,"editor.attr_edit_control_number") },
+                                { value: "text", label: t(this.hass,"editor.attr_edit_control_text") },
+                                { value: "stepper", label: t(this.hass,"editor.attr_edit_control_stepper") },
                                 { value: "color", label: t(this.hass,"editor.attr_edit_control_color") },
                                 { value: "color_sat", label: t(this.hass,"editor.attr_edit_control_color_sat") },
                                 { value: "switch", label: t(this.hass,"editor.attr_edit_control_switch") },
+                                { value: "select", label: t(this.hass,"editor.attr_edit_control_select") },
+                                { value: "buttons", label: t(this.hass,"editor.attr_edit_control_buttons") },
                               ]}
                               @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'control',e)}
                               @closed=${(e)=>e.stopPropagation()}>
                             </ha-select>
                           </div>
 
-                            ${attrEditControl === 'slider' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
+                            ${attrEditControl === 'slider' || attrEditControl === 'number' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
                               <div class="cell-grid cell-wide" style="margin-bottom: 0;">
                                 <label class="option full">
                                   <input type="checkbox"
@@ -3031,8 +3114,58 @@ _styleValue(r,c,key,e){
                               </div>
                             ` : nothing}
 
+                            ${(attrEditControl === 'select' || attrEditControl === 'buttons') ? html`
+                              <div class="cell-grid cell-wide muted" style="margin: 0;">${t(this.hass,"editor.attr_edit_select_hint")}</div>
+                              <div class="cols1">
+                                <input
+                                  class="text-input"
+                                  list=${`attr-edit-options-list-${rIdx}-${cIdx}`}
+                                  .value=${attrEditOptionsPath}
+                                  placeholder=${t(this.hass,"editor.attr_edit_select_options")}
+                                  ?disabled=${!attrEditEnabled}
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'options',e)} />
+                                <datalist id=${`attr-edit-options-list-${rIdx}-${cIdx}`}>
+                                  ${
+                                    (this._buildAttrSuggestions(rIdx, cIdx, attrEditOptionsPath) || [])
+                                      .map(opt => html`<option value="${opt}"></option>`)
+                                  }
+                                </datalist>
+                              </div>
+                            ` : nothing}
+
+                            ${attrEditControl === 'slider' ? html`
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
+                                <label class="option full">
+                                  <input type="checkbox"
+                                    .checked=${attrEdit.step_buttons === true}
+                                    ?disabled=${!attrEditEnabled}
+                                    @change=${(e)=> this._patchAttrEdit(rIdx,cIdx,{ step_buttons: !!e.target.checked })} />
+                                  ${t(this.hass,"editor.attr_edit_step_buttons")}
+                                </label>
+                              </div>
+                            ` : nothing}
+
+                            ${(attrEditControl === 'stepper' || (attrEditControl === 'slider' && attrEdit.step_buttons === true)) ? html`
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
+                                <ha-select
+                                  .label=${t(this.hass,"editor.attr_edit_step_buttons_position")}
+                                  .value=${attrEdit.step_buttons_position || 'sides'}
+                                  ?disabled=${!attrEditEnabled}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${[
+                                    { value: "sides", label: t(this.hass,"editor.attr_edit_step_buttons_position_sides") },
+                                    { value: "left", label: t(this.hass,"editor.attr_edit_step_buttons_position_left") },
+                                    { value: "right", label: t(this.hass,"editor.attr_edit_step_buttons_position_right") },
+                                  ]}
+                                  @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'step_buttons_position',e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
+                              </div>
+                            ` : nothing}
+
                             ${attrEditControl === 'color' ? html`
-                              <div class="cell-grid cell-wide muted">${t(this.hass,"editor.attr_edit_color_hint")}</div>
+                              <div class="cell-grid cell-wide muted" style="margin: 0;">${t(this.hass,"editor.attr_edit_color_hint")}</div>
                               <div class="cols1">
                                 <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_color_hue_path")}
@@ -3059,7 +3192,7 @@ _styleValue(r,c,key,e){
                                 </fcc-textfield>
                               </div>
                             ` : (attrEditControl === 'color_sat' ? html`
-                              <div class="cell-grid cell-wide muted">${t(this.hass,"editor.attr_edit_color_sat_hint")}</div>
+                              <div class="cell-grid cell-wide muted" style="margin: 0;">${t(this.hass,"editor.attr_edit_color_sat_hint")}</div>
                               <div class="cols1">
                                 <fcc-textfield
                                   .label=${t(this.hass,"editor.attr_edit_color_hue_path")}
@@ -3093,7 +3226,7 @@ _styleValue(r,c,key,e){
                                   @input=${(e)=> this._updateAttrEditLiteral(rIdx,cIdx,'unchecked',e)}>
                                 </fcc-textfield>
                               </div>
-                            ` : (attrEditControl === 'slider' || attrEditControl === 'color_sat' ? html`
+                            ` : (attrEditControl === 'slider' || attrEditControl === 'number' || attrEditControl === 'stepper' || attrEditControl === 'color_sat' ? html`
                               <div class="cols3">
                                 <fcc-textfield
                                   type="number"
@@ -3665,7 +3798,7 @@ _styleValue(r,c,key,e){
                                       : undefined
                                   })}>
                                 </fcc-textfield>
-                                <div class="muted">${t(this.hass,"editor.available_tokens")}</div>
+                                ${this._renderDateTimeTokensHelp()}
                               </div>
                               <div class="cols1">
                                 <ha-select
@@ -4087,7 +4220,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.25.0
+        FCC v0.26.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>
@@ -4099,6 +4232,15 @@ _styleValue(r,c,key,e){
       <datalist id="entities-list">
         ${Object.keys(this.hass?.states || {}).map((id) => html`<option value=${id}></option>`)}
       </datalist>
+    `;
+  }
+
+  _renderDateTimeTokensHelp(noBottom = false) {
+    return html`
+      <div class=${`muted datetime-token-help${noBottom ? ' no-bottom' : ''}`}>
+        ${t(this.hass, 'editor.available_tokens')}
+        <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#date-and-time-format-tokens">${t(this.hass, 'editor.token_reference')}</a>
+      </div>
     `;
   }
 

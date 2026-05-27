@@ -1,0 +1,275 @@
+rows:
+  - cells:
+      - type: string
+        value: Attribute editing (service) → Control type
+        align: left
+        style:
+          background: ""
+          bold: false
+      - type: string
+        value: ""
+        align: right
+    merge_columns: true
+  - cells:
+      - type: string
+        value: select
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.select_source
+          field: source
+          control: select
+          checked: true
+          unchecked: false
+          options: source_list
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+  - cells:
+      - type: string
+        value: select buttons
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.select_source
+          field: source
+          control: buttons
+          checked: true
+          unchecked: false
+          options: source_list
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+  - cells:
+      - type: string
+        value: slider
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.volume_set
+          field: volume_level
+          control: slider
+          min: 0
+          max: 80
+          step: 1
+          checked: true
+          unchecked: false
+          options: ""
+          hue_path: ""
+          sat_path: ""
+          step_buttons: true
+          step_buttons_position: sides
+        show_control_value_right: true
+        scale_in_min: 0
+        scale_in_max: 1
+        scale_out_min: 0
+        scale_out_max: 80
+  - cells:
+      - type: string
+        value: number box
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: media_player.tx_nr646
+        attribute: volume_level
+        attr_edit:
+          enabled: true
+          service: media_player.volume_set
+          field: volume_level
+          control: number
+          min: 0
+          max: 80
+          step: 1
+        align: left
+        use_entity_unit: false
+        show_control_value_right: true
+        unit: out of 80
+        scale_out_max: 80
+        scale_out_min: 0
+        scale_in_max: 1
+        scale_in_min: 0
+  - cells:
+      - type: string
+        value: stepper
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.volume_set
+          field: volume_level
+          control: stepper
+          min: 0
+          max: 80
+          step: 1
+          checked: true
+          unchecked: false
+          options: ""
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+        scale_in_min: 0
+        scale_in_max: 1
+        scale_out_min: 0
+        scale_out_max: 80
+  - cells:
+      - type: string
+        value: switch
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.volume_mute
+          field: is_volume_muted
+          control: switch
+          checked: true
+          unchecked: false
+          options: ""
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+        show_control_value_right: false
+  - cells:
+      - type: string
+        value: hue
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: light.led_wyspa
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: hs_color
+          control: color
+          checked: true
+          unchecked: false
+          options: ""
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+        show_control_value_right: true
+  - cells:
+      - type: string
+        value: saturation
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: light.led_wyspa
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: light.turn_on
+          field: hs_color
+          control: color_sat
+          min: 1
+          max: 100
+          step: 1
+          checked: true
+          unchecked: false
+          options: ""
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+        show_control_value_right: true
+  - cells:
+      - type: string
+        value: text box
+        align: left
+        style:
+          background: var(--divider-color)
+          bold: true
+      - type: entity
+        value: climate.samsung_ac
+        align: left
+        attr_edit:
+          enabled: true
+          service: climate.set_hvac_mode
+          field: hvac_mode
+          control: text
+          checked: true
+          unchecked: false
+          options: ""
+          hue_path: ""
+          sat_path: ""
+          step_buttons: false
+          step_buttons_position: sides
+        style:
+          background: ""
+          bold: false
+        use_entity_unit: true
+column_count: 2
+card_padding: 0
+overflow_x: true
+header_from_first_row: true
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 4
+  right: 8
+  bottom: 4
+  left: 8
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+value: media_player.twoj_glosnik
+attribute: volume_level
+scale_out_min: 0
+scale_out_max: 100
+scale_in_min: 0
+scale_in_max: 1
+attr_edit:
+  enabled: true
+  service: media_player.volume_set
+  field: volume_level
+  control: number
+  min: 0
+  max: 100
+  step: 1

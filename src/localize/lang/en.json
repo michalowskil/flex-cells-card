@@ -75,9 +75,16 @@
     "attr_edit_service_field": "Service field",
     "attr_edit_control_type": "Control type",
     "attr_edit_control_slider": "Slider",
+    "attr_edit_control_number": "Number box",
+    "attr_edit_control_text": "Text box",
+    "attr_edit_control_stepper": "Stepper",
     "attr_edit_control_color": "Color slider (hue)",
     "attr_edit_control_color_sat": "Color slider (saturation)",
     "attr_edit_control_switch": "Switch",
+    "attr_edit_control_select": "Select",
+    "attr_edit_control_buttons": "Select buttons",
+    "attr_edit_select_options": "Options attribute path",
+    "attr_edit_select_hint": "Reads options from the configured attribute path and sends the selected value to the service field.",
     "attr_edit_min": "Min",
     "attr_edit_max": "Max",
     "attr_edit_slider_number_hint": "Numeric value",
@@ -89,6 +96,11 @@
     "attr_edit_color_hue_path": "Hue attribute path (optional)",
     "attr_edit_color_sat_path": "Saturation attribute path (optional)",
     "attr_edit_color_sat_fallback": "Saturation fallback (0-100)",
+    "attr_edit_step_buttons": "Show +/- buttons",
+    "attr_edit_step_buttons_position": "+/- buttons position",
+    "attr_edit_step_buttons_position_sides": "On both sides",
+    "attr_edit_step_buttons_position_left": "Left",
+    "attr_edit_step_buttons_position_right": "Right",
     "press": "Press",
     "entity_display_label": "Entity display",
     "entity_display_option_value": "Entity/metadata value",
@@ -168,14 +180,15 @@
     "dynamic_row_title": "Dynamic Rules (row): Color & Row Hiding",
     "dynamic_hint": "Evaluate rules from top to bottom, the last match wins.",
     "datetime_format": "Date/Time format & Text override",
-    "available_tokens": "Available tokens: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (elapsed time), REL_SHORT (short elapsed time), [literals in brackets]",
+    "available_tokens": "Date/time tokens:",
+    "token_reference": "Open token reference",
     "value": "Value"
   },
   "placeholder": {
     "entity": "Select entity",
     "string": "Text to display",
     "icon": "mdi:icon-name",
-    "datetime_format": "e.g. H:mm:ss, YYYY-MM-DD H:mm, REL [ago], REL_SHORT [ago] or [Custom text]",
+    "datetime_format": "e.g. H[:]mm[:]ss, YYYY[-]MM[-]DD[ ]h[:]mm[ ]AMPM, REL, REL_SHORT_AGO or [Custom text]",
     "attribute_path": "Metadata path (e.g. a.b[0].c)"
   },
   "dynamic": {
@@ -225,6 +238,8 @@
   "card": {
     "no_rows": "No rows to display.",
     "confirmation_default_title": "Are you sure?",
+    "decrease": "Decrease",
+    "increase": "Increase",
     "cancel": "Cancel",
     "ok": "OK"
   }

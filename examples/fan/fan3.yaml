@@ -1,0 +1,182 @@
+rows:
+  - cells:
+      - type: entity
+        value: fan.bedroom_fan
+        align: left
+        use_entity_unit: true
+        entity_display: icon
+        custom_css_enabled: true
+        custom_css: |-
+          td {
+            border-radius: 70px;
+            padding: 8px !important;
+            height: 24px;
+            width: 49px !important;
+          }
+        style:
+          background: var(--divider-color)
+        dyn_color:
+          - conditions:
+              - entity: ""
+                attr: ""
+                op: "="
+                val: "on"
+                val2: ""
+            match: all
+            bg: "#ff980033"
+            fg: ""
+            overwrite: ""
+            overwrite_entity: ""
+            overwrite_attr: ""
+      - type: entity
+        value: fan.bedroom_fan
+        align: left
+        custom_css_enabled: true
+        custom_css: |
+          th, td {
+             width: 100%;
+             padding-left: 16px !important;
+          }
+        use_entity_unit: true
+        attribute: friendly_name
+        style:
+          bold: false
+        custom_template_enabled: true
+        custom_template_html: |-
+          <b>
+            <fcc row="1" col="2" />
+          </b>
+          <br />
+          <fcc row="1" col="3" />
+      - type: entity
+        value: fan.bedroom_fan
+        align: right
+        use_entity_unit: true
+        attribute: last_changed
+        datetime_format: REL_SHORT_AGO_ROUNDED
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             display: none;
+          }
+        style:
+          font_size: 12px
+      - type: string
+        value: "0"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 0
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: ""
+                op: "="
+                val: "off"
+                val2: ""
+            match: all
+            bg: var(--primary-color)
+            fg: var(--text-primary-color)
+      - type: string
+        value: "1"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 33
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: percentage
+                op: "="
+                val: "33"
+                val2: ""
+            match: all
+            bg: var(--primary-color)
+            fg: var(--text-primary-color)
+      - type: string
+        value: "2"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 66
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: percentage
+                op: "="
+                val: "66"
+                val2: ""
+            match: all
+            bg: var(--primary-color)
+            fg: var(--text-primary-color)
+      - type: string
+        value: "3"
+        align: center
+        tap_action:
+          action: perform-action
+          perform_action: fan.set_percentage
+          target:
+            entity_id: fan.bedroom_fan
+          data:
+            percentage: 100
+        dyn_color:
+          - conditions:
+              - entity: fan.bedroom_fan
+                attr: percentage
+                op: "="
+                val: "100"
+                val2: ""
+            match: all
+            bg: var(--primary-color)
+            fg: var(--text-primary-color)
+    custom_css_enabled: true
+    custom_css: |-
+      tr {
+        display: flex;
+        align-items: center;
+      }
+      td:nth-child(n+4) {
+        max-width: 44px;
+        width: 100%;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 6px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+        color: var(--primary-text-color);
+        font-weight: 600;
+        box-sizing: border-box;
+      }
+      td:nth-child(4) {
+        margin-left: 16px;
+      }
+column_count: 7
+card_padding: 10
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ""
+text_size: ""
+cell_padding:
+  top: 0
+  right: 0
+  bottom: 0
+  left: 0
+custom_template_enabled: false
+custom_template_html: ""
+type: custom:flex-cells-card
+column_widths: []

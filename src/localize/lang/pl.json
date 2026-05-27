@@ -75,9 +75,16 @@
     "attr_edit_service_field": "Pole usługi",
     "attr_edit_control_type": "Typ kontrolki",
     "attr_edit_control_slider": "Suwak",
+    "attr_edit_control_number": "Pole liczby",
+    "attr_edit_control_text": "Pole tekstowe",
+    "attr_edit_control_stepper": "Stepper",
     "attr_edit_control_color": "Suwak koloru (hue)",
     "attr_edit_control_color_sat": "Suwak nasycenia",
     "attr_edit_control_switch": "Przełącznik",
+    "attr_edit_control_select": "Lista",
+    "attr_edit_control_buttons": "Przyciski wyboru",
+    "attr_edit_select_options": "Ścieżka atrybutu z opcjami",
+    "attr_edit_select_hint": "Odczytuje opcje ze wskazanej ścieżki atrybutu i wysyła wybraną wartość do pola usługi.",
     "attr_edit_min": "Min",
     "attr_edit_max": "Max",
     "attr_edit_slider_number_hint": "Wartość liczbowa",
@@ -89,6 +96,11 @@
     "attr_edit_color_hue_path": "Ścieżka atrybutu hue (opcjonalnie)",
     "attr_edit_color_sat_path": "Ścieżka atrybutu nasycenia (opcjonalnie)",
     "attr_edit_color_sat_fallback": "Domyślne nasycenie (0-100)",
+    "attr_edit_step_buttons": "Pokaż przyciski +/-",
+    "attr_edit_step_buttons_position": "Układ przycisków +/-",
+    "attr_edit_step_buttons_position_sides": "Po bokach",
+    "attr_edit_step_buttons_position_left": "Po lewej",
+    "attr_edit_step_buttons_position_right": "Po prawej",
     "press": "Wciśnij",
     "entity_display_label": "Wyświetlanie encji",
     "entity_display_option_value": "Wartość encji/metadanych",
@@ -168,14 +180,15 @@
     "dynamic_row_title": "Reguły dynamiczne (wiersz): kolor i ukrywanie wiersza",
     "dynamic_hint": "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa.",
     "datetime_format": "Format daty/czasu i nadpisanie tekstu",
-    "available_tokens": "Dostępne tokeny: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (czas, który upłynął), REL_SHORT (skrót czasu), [literały w nawiasach]",
+    "available_tokens": "Tokeny daty/czasu:",
+    "token_reference": "Otwórz opis tokenów",
     "value": "Wartość"
   },
   "placeholder": {
     "entity": "Wybierz encję",
     "string": "Tekst do wyświetlenia",
     "icon": "mdi:nazwa-ikony",
-    "datetime_format": "np. H:mm:ss, YYYY-MM-DD H:mm, REL [temu], REL_SHORT [temu] lub [dowolny tekst]",
+    "datetime_format": "np. H[:]mm[:]ss, YYYY[-]MM[-]DD[ ]h[:]mm[ ]AMPM, REL, REL_SHORT_AGO lub [dowolny tekst]",
     "attribute_path": "Ścieżka metadanych (np. a.b[0].c)"
   },
   "dynamic": {
@@ -225,6 +238,8 @@
   "card": {
     "no_rows": "Brak wierszy do wyświetlenia.",
     "confirmation_default_title": "Czy na pewno?",
+    "decrease": "Zmniejsz",
+    "increase": "Zwiększ",
     "cancel": "Anuluj",
     "ok": "OK"
   }

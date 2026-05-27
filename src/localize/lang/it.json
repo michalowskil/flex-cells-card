@@ -75,9 +75,16 @@
     "attr_edit_service_field": "Campo del servizio",
     "attr_edit_control_type": "Tipo di controllo",
     "attr_edit_control_slider": "Slider",
+    "attr_edit_control_number": "Campo numerico",
+    "attr_edit_control_text": "Campo testo",
+    "attr_edit_control_stepper": "Stepper",
     "attr_edit_control_color": "Slider colore (tonalità)",
     "attr_edit_control_color_sat": "Slider colore (saturazione)",
     "attr_edit_control_switch": "Interruttore",
+    "attr_edit_control_select": "Elenco",
+    "attr_edit_control_buttons": "Pulsanti scelta",
+    "attr_edit_select_options": "Percorso attributo opzioni",
+    "attr_edit_select_hint": "Legge le opzioni dal percorso attributo configurato e invia il valore selezionato al campo del servizio.",
     "attr_edit_min": "Min",
     "attr_edit_max": "Max",
     "attr_edit_slider_number_hint": "Valore numerico",
@@ -89,6 +96,11 @@
     "attr_edit_color_hue_path": "Percorso attributo tonalità (opzionale)",
     "attr_edit_color_sat_path": "Percorso attributo saturazione (opzionale)",
     "attr_edit_color_sat_fallback": "Valore di fallback saturazione (0-100)",
+    "attr_edit_step_buttons": "Mostra pulsanti +/-",
+    "attr_edit_step_buttons_position": "Posizione pulsanti +/-",
+    "attr_edit_step_buttons_position_sides": "Su entrambi i lati",
+    "attr_edit_step_buttons_position_left": "Sinistra",
+    "attr_edit_step_buttons_position_right": "Destra",
     "press": "Premi",
     "entity_display_label": "Visualizzazione entità",
     "entity_display_option_value": "Valore entità/metadati",
@@ -168,14 +180,15 @@
     "dynamic_row_title": "Regole dinamiche (riga): colore e nascondi riga",
     "dynamic_hint": "Le regole vengono valutate dall'alto verso il basso, l'ultima corrispondenza ha la priorità.",
     "datetime_format": "Formato data/ora e sovrascrittura testo",
-    "available_tokens": "Token disponibili: RAW, YYYY, YY, MM, M, DD, D, HH, H, hh, h, mm, m, ss, s, MMMM, REL (tempo trascorso), REL_SHORT (tempo trascorso breve), [testo tra parentesi]",
+    "available_tokens": "Token data/ora:",
+    "token_reference": "Apri riferimento token",
     "value": "Valore"
   },
   "placeholder": {
     "entity": "Seleziona entità",
     "string": "Testo da visualizzare",
     "icon": "mdi:nome-icona",
-    "datetime_format": "es. H:mm:ss, YYYY-MM-DD H:mm, REL [fa], REL_SHORT [fa] o [Testo personalizzato]",
+    "datetime_format": "es. H[:]mm[:]ss, YYYY[-]MM[-]DD[ ]h[:]mm[ ]AMPM, REL, REL_SHORT_AGO o [Testo personalizzato]",
     "attribute_path": "Percorso metadati (es. a.b[0].c)"
   },
   "dynamic": {
@@ -225,6 +238,8 @@
   "card": {
     "no_rows": "Nessuna riga da visualizzare.",
     "confirmation_default_title": "Sei sicuro?",
+    "decrease": "Diminuisci",
+    "increase": "Aumenta",
     "cancel": "Annulla",
     "ok": "OK"
   }

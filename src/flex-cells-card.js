@@ -5,6 +5,7 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { live } from 'lit/directives/live.js';
 
 const SORT_LOCALE_OPTS = { numeric: true, sensitivity: 'base' };
+const RELATIVE_NOW_TOLERANCE_MS = 2000;
 
 
 const UNAVAILABLE = 'unavailable';
@@ -237,6 +238,71 @@ class FlexCellsCard extends LitElement {
     /* === Simple HA input controls === */
     .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; touch-action: pan-y; }
     .ctrl-range { width: 160px; vertical-align: middle; touch-action: pan-y !important; }
+    .ctrl-step-button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid var(--divider-color,#ddd);
+      background: var(--primary-background-color, #f7f7f7);
+      color: var(--primary-text-color);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font: inherit;
+      font-weight: 600;
+      flex: 0 0 auto;
+      touch-action: manipulation;
+    }
+    .ctrl-step-button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .ctrl-button-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      max-width: 100%;
+      touch-action: manipulation;
+    }
+    .ctrl-option-button {
+      min-height: 30px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--divider-color,#ddd);
+      background: var(--card-background-color,#fff);
+      color: var(--primary-text-color);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font: inherit;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .ctrl-option-button.active {
+      border-color: var(--primary-color);
+      background: var(--primary-color);
+      color: var(--text-primary-color,#fff);
+    }
+    .ctrl-option-button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .ctrl-stepper-value {
+      min-width: 3.5em;
+      text-align: center;
+      display: inline-flex;
+      justify-content: center;
+      white-space: nowrap;
+    }
+    .ctrl-step-buttons .ctrl-range {
+      flex: 1 1 0;
+      min-width: 0;
+    }
     .ctrl-range-color {
       width: 160px;
       height: 12px;
@@ -323,6 +389,7 @@ class FlexCellsCard extends LitElement {
     this._numberControlDrafts = new Map();
     this._attrControlDrafts = new Map();
     this._attrActivePointers = new Set();
+    this._attrActiveInputs = new Set();
     this._attrDraftTimestamps = new Map();
     this._customTemplateCache = new Map();
     this._narrowMedia = null;
@@ -638,6 +705,7 @@ class FlexCellsCard extends LitElement {
       let mutated = false;
       for (const [key, draft] of [...this._attrControlDrafts.entries()]) {
         if (this._attrActivePointers && this._attrActivePointers.has(key)) continue;
+        if (this._attrActiveInputs && this._attrActiveInputs.has(key)) continue;
         const { entityId, attrPath } = this._parseAttrEditKey(key);
         if (!entityId) {
           this._attrControlDrafts.delete(key);
@@ -825,13 +893,16 @@ class FlexCellsCard extends LitElement {
     const locale = hasDate
       ? (this?.hass?.locale?.language || this?.hass?.language || (typeof navigator !== 'undefined' ? navigator.language : 'en') || 'en')
       : undefined;
-    const tokens = ['YYYY','MMMM','REL_SHORT','REL','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s','RAW'];
+    const tokens = ['YYYY','MMMM','REL_SHORT_AGO_ROUNDED','REL_SHORT_ROUNDED','REL_SHORT_AGO','REL_SHORT','REL','AMPM','ampm','YY','MM','M','DD','D','HH','H','hh','h','mm','m','ss','s','RAW'];
     const mapping = { 'RAW': rawStr };
     if (hasDate) {
       const hours24 = date.getHours();
       Object.assign(mapping, {
         'YYYY': String(date.getFullYear()),
         'MMMM': new Intl.DateTimeFormat(locale, { month: 'long' }).format(date),
+        'REL_SHORT_AGO_ROUNDED': this._formatRelativeAgoText(date, locale, { short: true, rounded: true }),
+        'REL_SHORT_ROUNDED': this._formatRelativeDurationText(date, locale, { short: true, rounded: true }),
+        'REL_SHORT_AGO': this._formatRelativeAgoText(date, locale, { short: true }),
         'REL_SHORT': this._formatRelativeDurationText(date, locale, { short: true }),
         'REL': this._formatRelativeDurationText(date, locale),
         'YY': String(date.getFullYear()).slice(-2).padStart(2, '0'),
@@ -843,6 +914,8 @@ class FlexCellsCard extends LitElement {
         'H': String(hours24),
         'hh': String(((hours24 % 12) || 12)).padStart(2, '0'),
         'h': String(((hours24 % 12) || 12)),
+        'AMPM': hours24 >= 12 ? 'PM' : 'AM',
+        'ampm': hours24 >= 12 ? 'pm' : 'am',
         'mm': String(date.getMinutes()).padStart(2, '0'),
         'm': String(date.getMinutes()),
         'ss': String(date.getSeconds()).padStart(2, '0'),
@@ -890,16 +963,11 @@ class FlexCellsCard extends LitElement {
     const now = Date.now();
     const diff = now - date.getTime();
     if (!Number.isFinite(diff)) return '';
-    const absMs = Math.abs(diff);
-    const short = !!opts?.short;
-    if (absMs < 1000) {
-      try {
-        return new Intl.RelativeTimeFormat(locale || undefined, { numeric: 'auto' }).format(0, 'second');
-      } catch (_e) {
-        return 'now';
-      }
-    }
-    const units = [
+    return this._formatRelativeDurationFromMs(Math.abs(diff), locale, opts);
+  }
+
+  _relativeTimeUnits() {
+    return [
       { unit: 'year', ms: 365 * 24 * 60 * 60 * 1000 },
       { unit: 'month', ms: 30 * 24 * 60 * 60 * 1000 },
       { unit: 'week', ms: 7 * 24 * 60 * 60 * 1000 },
@@ -908,13 +976,45 @@ class FlexCellsCard extends LitElement {
       { unit: 'minute', ms: 60 * 1000 },
       { unit: 'second', ms: 1000 },
     ];
+  }
+
+  _formatRelativeNowText(locale, short = false) {
+    try {
+      return new Intl.RelativeTimeFormat(locale || undefined, {
+        numeric: 'auto',
+        style: short ? 'narrow' : 'long',
+      }).format(0, 'second');
+    } catch (_e) {
+      return 'now';
+    }
+  }
+
+  _formatRelativeDurationFromMs(absMs, locale, opts = {}) {
+    if (!Number.isFinite(absMs)) return '';
+    const short = !!opts?.short;
+    const rounded = !!opts?.rounded;
+    const maxParts = rounded ? 1 : Math.max(1, Number.isInteger(opts?.maxParts) ? opts.maxParts : 2);
+    if (absMs < RELATIVE_NOW_TOLERANCE_MS) return this._formatRelativeNowText(locale, short);
+    const units = this._relativeTimeUnits();
+    if (rounded) {
+      let idx = units.findIndex((u) => absMs >= u.ms);
+      if (idx === -1) idx = units.length - 1;
+      let unit = units[idx];
+      let value = Math.max(1, Math.round(absMs / unit.ms));
+      while (idx > 0 && value * unit.ms >= units[idx - 1].ms) {
+        idx -= 1;
+        unit = units[idx];
+        value = Math.max(1, Math.round(absMs / unit.ms));
+      }
+      return this._formatRelativeDurationUnit(value, unit.unit, locale, short);
+    }
     const baseUnit = units.find((u) => absMs >= u.ms) || units[units.length - 1];
     const parts = [];
     const baseValue = Math.max(1, Math.floor(absMs / baseUnit.ms));
     const baseText = this._formatRelativeDurationUnit(baseValue, baseUnit.unit, locale, short);
     if (baseText) parts.push(baseText);
     let remainder = absMs - (baseValue * baseUnit.ms);
-    for (let idx = units.indexOf(baseUnit) + 1; idx < units.length && parts.length < 2; idx += 1) {
+    for (let idx = units.indexOf(baseUnit) + 1; idx < units.length && parts.length < maxParts; idx += 1) {
       const unit = units[idx];
       if (remainder >= unit.ms) {
         const value = Math.floor(remainder / unit.ms);
@@ -926,6 +1026,82 @@ class FlexCellsCard extends LitElement {
       }
     }
     return parts.join(short ? ' ' : ' ');
+  }
+
+  _formatRelativeAgoText(date, locale, opts = {}) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const now = Date.now();
+    const diff = now - date.getTime();
+    if (!Number.isFinite(diff)) return '';
+    const absMs = Math.abs(diff);
+    const short = !!opts?.short;
+    const rounded = !!opts?.rounded;
+    const rtfStyle = short ? 'narrow' : 'long';
+    if (absMs < RELATIVE_NOW_TOLERANCE_MS) return this._formatRelativeNowText(locale, short);
+    if (short || rounded) {
+      const duration = this._formatRelativeDurationFromMs(absMs, locale, { short, rounded });
+      return this._formatRelativeDirectionText(duration, diff, locale, { short });
+    }
+    const units = this._relativeTimeUnits();
+    const baseUnit = units.find((u) => absMs >= u.ms) || units[units.length - 1];
+    const baseValue = Math.max(1, Math.floor(absMs / baseUnit.ms));
+    const signedValue = diff >= 0 ? -baseValue : baseValue;
+    try {
+      return new Intl.RelativeTimeFormat(locale || undefined, { numeric: 'always', style: rtfStyle }).format(signedValue, baseUnit.unit);
+    } catch (_e) {
+      const duration = this._formatRelativeDurationUnit(baseValue, baseUnit.unit, locale, short);
+      return diff >= 0 ? `${duration} ago` : `in ${duration}`;
+    }
+  }
+
+  _formatRelativeDirectionText(duration, diff, locale, opts = {}) {
+    if (!duration) return '';
+    const future = diff < 0;
+    const lang = String(locale || '').trim().toLowerCase().split(/[-_]/)[0];
+    const affixesByLang = {
+      de: { past: { prefix: 'vor ' }, future: { prefix: 'in ' } },
+      en: { past: { suffix: ' ago' }, future: { prefix: 'in ' } },
+      it: { past: { suffix: ' fa' }, future: { prefix: 'tra ' } },
+      pl: { past: { suffix: ' temu' }, future: { prefix: 'za ' } },
+    };
+    const affixes = affixesByLang[lang]?.[future ? 'future' : 'past'];
+    if (affixes) return `${affixes.prefix || ''}${duration}${affixes.suffix || ''}`.trim();
+    return this._formatRelativeDirectionTextFromIntl(duration, diff, locale, opts);
+  }
+
+  _formatRelativeDirectionTextFromIntl(duration, diff, locale, opts = {}) {
+    const short = !!opts?.short;
+    const rtfStyle = short ? 'narrow' : 'long';
+    try {
+      const rtf = new Intl.RelativeTimeFormat(locale || undefined, { numeric: 'always', style: rtfStyle });
+      if (typeof rtf.formatToParts === 'function') {
+        const parts = rtf.formatToParts(diff >= 0 ? -1 : 1, 'second');
+        const numberTypes = new Set(['integer', 'group', 'decimal', 'fraction', 'minusSign', 'plusSign']);
+        const firstNumberIdx = parts.findIndex((part) => numberTypes.has(part.type));
+        let lastNumberIdx = -1;
+        for (let idx = parts.length - 1; idx >= 0; idx -= 1) {
+          if (numberTypes.has(parts[idx].type)) {
+            lastNumberIdx = idx;
+            break;
+          }
+        }
+        if (firstNumberIdx !== -1 && lastNumberIdx !== -1) {
+          let prefix = parts.slice(0, firstNumberIdx).map((part) => part.value).join('');
+          let suffix = parts.slice(lastNumberIdx + 1).map((part) => part.value).join('');
+          const unitText = this._formatRelativeDurationUnit(1, 'second', locale, short).replace(/^1/, '');
+          const unitTrimmed = unitText.trim();
+          if (unitTrimmed) {
+            const escaped = unitTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            prefix = prefix.replace(new RegExp(`[\\s\\u00A0\\u202F]*${escaped}[\\s\\u00A0\\u202F]*$`, 'u'), '');
+            suffix = suffix.replace(new RegExp(`^[\\s\\u00A0\\u202F]*${escaped}[\\s\\u00A0\\u202F]*`, 'u'), '');
+          }
+          return `${prefix}${duration}${suffix}`.trim();
+        }
+      }
+    } catch (_e) {
+      // fall back below
+    }
+    return diff >= 0 ? `${duration} ago` : `in ${duration}`;
   }
 
   _formatRelativeDurationUnit(value, unit, locale, short = false) {
@@ -1434,14 +1610,30 @@ class FlexCellsCard extends LitElement {
       const displayState = stateObj
         ? { ...stateObj, state: String(controlValue) }
         : { state: String(controlValue), attributes: {}, entity_id: entityId };
-      return html`<span class="ctrl-wrap">
-        <input class="ctrl-range" type="range" min="${min}" max="${max}" step="${stepAttr}"
+      const rangeInput = html`<input class="ctrl-range" type="range" min="${min}" max="${max}" step="${stepAttr}"
           .value=${String(controlValue)}
           @focus=${() => this._onNumberFocus(entityId)}
           @blur=${() => this._onNumberBlur(entityId)}
           @input=${(e) => this._onNumberInput(e, entityId)}
-          @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />
-        ${showValue ? html`<span class="ctrl-value">${this._formatEntityCell(cell, displayState)}</span>` : nothing}
+          @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />`;
+      const valueDisplay = showValue
+        ? html`<span class="ctrl-value">${this._formatEntityCell(cell, displayState)}</span>`
+        : nothing;
+      if (cell?.step_buttons === true) {
+        const stepForButtons = this._numberStepForButtons(min, max, stepForCalc);
+        const epsilon = Math.max(stepForButtons * 1e-6, 1e-9);
+        const minusDisabled = controlValue <= min + epsilon;
+        const plusDisabled = controlValue >= max - epsilon;
+        const minusButton = this._renderNumberStepButton(entityId, -1, minusDisabled, min, max, stepForButtons);
+        const plusButton = this._renderNumberStepButton(entityId, 1, plusDisabled, min, max, stepForButtons);
+        const stepPosition = this._normalizeStepButtonsPosition(cell?.step_buttons_position);
+        return html`<span class=${`ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`}>
+          ${this._stepButtonLayout(stepPosition, minusButton, rangeInput, plusButton, valueDisplay)}
+        </span>`;
+      }
+      return html`<span class="ctrl-wrap">
+        ${rangeInput}
+        ${valueDisplay}
       </span>`;
     }
     if (domain === 'input_select' || domain === 'select') {
@@ -1534,6 +1726,38 @@ class FlexCellsCard extends LitElement {
     const disabled = !attrEdit.service || !attrEdit.field || !entityId;
     const range = this._attrEffectiveRange(cell, attrEdit);
 
+    if (attrEdit.control === 'select' || attrEdit.control === 'buttons') {
+      const options = this._attrSelectOptions(stateObj, attrEdit, tree);
+      const draftValue = draft && draft.actual !== undefined ? draft.actual : null;
+      const current = String(draftValue !== null ? draftValue : (raw ?? ''));
+      const renderOptions = current && !options.includes(current)
+        ? [current, ...options]
+        : options;
+      const isDisabled = disabled || options.length === 0;
+      if (attrEdit.control === 'buttons') {
+        return html`<span class="ctrl-wrap ctrl-button-group">
+          ${renderOptions.map((option) => html`<button
+            type="button"
+            class=${`ctrl-option-button ${option === current ? 'active' : ''}`}
+            aria-pressed=${option === current ? 'true' : 'false'}
+            ?disabled=${isDisabled}
+            @pointerdown=${(e) => e.stopPropagation()}
+            @click=${(e) => this._onAttrSelectButtonClick(e, cell, option)}>
+              ${option}
+          </button>`)}
+        </span>`;
+      }
+      return html`<span class="ctrl-wrap">
+        <select class="ctrl-select" .value=${current}
+          ?disabled=${isDisabled}
+          @change=${(e) => this._onAttrSelectChange(e, cell)}>
+          ${renderOptions.length
+            ? renderOptions.map((option) => html`<option value="${option}" ?selected=${option === current}>${option}</option>`)
+            : html`<option value=""></option>`}
+        </select>
+      </span>`;
+    }
+
     if (attrEdit.control === 'switch') {
       const draftDisplay = typeof draft?.display === 'boolean' ? draft.display : null;
       const isChecked = draftDisplay !== null
@@ -1547,6 +1771,45 @@ class FlexCellsCard extends LitElement {
           ?disabled=${disabled}
           @change=${(e) => this._onAttrSwitchChange(e, cell)} />
         ${showValueRight ? html`<span class="ctrl-value">${formatted || ''}</span>` : nothing}
+      </span>`;
+    }
+
+    if (attrEdit.control === 'text') {
+      const inputValue = draft && draft.display !== undefined
+        ? String(draft.display ?? '')
+        : String(raw ?? '');
+      return html`<span class="ctrl-wrap">
+        <input class="ctrl-input" type="text"
+          .value=${live(inputValue)}
+          ?disabled=${disabled}
+          @focus=${() => this._onAttrTextFocus(cell)}
+          @blur=${() => this._onAttrTextBlur(cell)}
+          @input=${(e) => this._onAttrTextInput(e, cell)}
+          @change=${(e) => this._onAttrTextChange(e, cell)}
+          @keydown=${(e) => this._onAttrTextKeydown(e, cell)} />
+      </span>`;
+    }
+
+    if (attrEdit.control === 'number') {
+      const numberRange = this._attrNumberBoxRange(cell, attrEdit);
+      const rawNum = raw === '' ? NaN : Number(raw);
+      const stateDisplay = Number.isFinite(rawNum) ? this._rescaleIfConfigured(cell, rawNum) : '';
+      let inputValue = draft && draft.display !== undefined ? draft.display : stateDisplay;
+      if (inputValue === null || inputValue === undefined || !Number.isFinite(Number(inputValue))) inputValue = '';
+      const formattedValue = inputValue === '' ? '' : this._formatAttrDisplayValue(inputValue, cell);
+      return html`<span class="ctrl-wrap">
+        <input class="ctrl-input" type="number"
+          min=${Number.isFinite(numberRange.min) ? numberRange.min : nothing}
+          max=${Number.isFinite(numberRange.max) ? numberRange.max : nothing}
+          step=${Number.isFinite(numberRange.step) && numberRange.step > 0 ? numberRange.step : 'any'}
+          .value=${live(String(inputValue))}
+          ?disabled=${disabled}
+          @focus=${() => this._onAttrNumberFocus(cell)}
+          @blur=${() => this._onAttrNumberBlur(cell)}
+          @input=${(e) => this._onAttrNumberInput(e, cell)}
+          @change=${(e) => this._onAttrNumberChange(e, cell)}
+          @keydown=${(e) => this._onAttrNumberKeydown(e, cell)} />
+        ${showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing}
       </span>`;
     }
 
@@ -1573,8 +1836,26 @@ class FlexCellsCard extends LitElement {
       ? `background: linear-gradient(90deg, hsl(${hue || 0},0%,50%) 0%, hsl(${hue || 0},100%,50%) 100%);`
       : '';
     const rangeStyle = satGradient;
-    return html`<span class="ctrl-wrap">
-      <input class=${rangeClass} type="range" min="${min}" max="${max}" step="${step}"
+    const stepNum = Number(step);
+    const epsilon = Number.isFinite(stepNum) && stepNum > 0 ? Math.max(stepNum * 1e-6, 1e-9) : 1e-9;
+    const currentNum = Number(controlValue);
+    const minusDisabled = disabled || currentNum <= min + epsilon;
+    const plusDisabled = disabled || currentNum >= max - epsilon;
+    const minusButton = this._renderAttrStepButton(cell, -1, minusDisabled);
+    const plusButton = this._renderAttrStepButton(cell, 1, plusDisabled);
+    const stepPosition = attrEdit.step_buttons_position || 'sides';
+    const valueDisplay = showColorSwatch
+      ? colorSwatch
+      : (showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing);
+
+    if (attrEdit.control === 'stepper') {
+      const valueContent = html`<span class="ctrl-stepper-value">${formattedValue}</span>`;
+      return html`<span class=${`ctrl-wrap ctrl-stepper ctrl-stepper-${stepPosition}`}>
+        ${this._stepButtonLayout(stepPosition, minusButton, valueContent, plusButton)}
+      </span>`;
+    }
+
+    const rangeInput = html`<input class=${rangeClass} type="range" min="${min}" max="${max}" step="${step}"
         .value=${String(controlValue)}
         ?disabled=${disabled}
         style=${rangeStyle}
@@ -1583,8 +1864,17 @@ class FlexCellsCard extends LitElement {
         @pointerup=${(e) => this._onAttrSliderPointerUp(e, cell)}
         @pointercancel=${(e) => this._onAttrSliderPointerUp(e, cell)}
         @input=${(e) => this._onAttrSliderInput(e, cell)}
-        @change=${(e) => this._onAttrSliderChange(e, cell)} />
-      ${showColorSwatch ? colorSwatch : (showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing)}
+        @change=${(e) => this._onAttrSliderChange(e, cell)} />`;
+
+    if (attrEdit.control === 'slider' && attrEdit.step_buttons) {
+      return html`<span class=${`ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`}>
+        ${this._stepButtonLayout(stepPosition, minusButton, rangeInput, plusButton, valueDisplay)}
+      </span>`;
+    }
+
+    return html`<span class="ctrl-wrap">
+      ${rangeInput}
+      ${valueDisplay}
     </span>`;
   }
 
@@ -1639,6 +1929,23 @@ class FlexCellsCard extends LitElement {
     }
     const normalizedStr = String(normalized);
     target.value = normalizedStr;
+    this._setNumberDraft(entityId, normalizedStr);
+    this._onSetNumber(entityId, normalized);
+  }
+  _onNumberStepButtonClick(event, entityId, direction, min, max, step) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    if (!entityId) return;
+    const draft = this._getNumberDraft(entityId);
+    const draftNum = Number(draft);
+    const stateNum = Number(this.hass?.states?.[entityId]?.state);
+    let current = Number.isFinite(draftNum) ? draftNum : (Number.isFinite(stateNum) ? stateNum : min);
+    current = this._clampNumber(current, min, max);
+    const stepValue = this._numberStepForButtons(min, max, step);
+    const delta = direction < 0 ? -stepValue : stepValue;
+    const normalized = this._normalizeNumberValue(current + delta, min, max, stepValue);
+    if (normalized === null) return;
+    const normalizedStr = String(normalized);
     this._setNumberDraft(entityId, normalizedStr);
     this._onSetNumber(entityId, normalized);
   }
@@ -1792,13 +2099,25 @@ class FlexCellsCard extends LitElement {
     const controlRaw = typeof raw.control === 'string' ? raw.control.trim().toLowerCase() : 'slider';
     const control = controlRaw === 'switch'
       ? 'switch'
-      : (['color', 'color-slider', 'color_hs'].includes(controlRaw) ? 'color'
-        : (['color_sat', 'color-sat', 'color_saturation'].includes(controlRaw) ? 'color_sat' : 'slider'));
+      : (controlRaw === 'stepper' ? 'stepper'
+        : (['select', 'dropdown', 'list'].includes(controlRaw) ? 'select'
+        : (['buttons', 'button', 'button_group', 'button-group', 'segmented', 'segmented_buttons', 'segmented-buttons'].includes(controlRaw) ? 'buttons'
+        : (['text', 'text_box', 'text-box', 'textbox', 'string'].includes(controlRaw) ? 'text'
+        : (['number', 'number_box', 'number-box', 'box'].includes(controlRaw) ? 'number'
+        : (['color', 'color-slider', 'color_hs'].includes(controlRaw) ? 'color'
+        : (['color_sat', 'color-sat', 'color_saturation'].includes(controlRaw) ? 'color_sat' : 'slider')))))));
+    const stepButtonsPositionRaw = typeof raw.step_buttons_position === 'string'
+      ? raw.step_buttons_position.trim().toLowerCase()
+      : 'sides';
+    const step_buttons_position = ['sides', 'left', 'right'].includes(stepButtonsPositionRaw)
+      ? stepButtonsPositionRaw
+      : 'sides';
     const minNum = Number(raw.min);
     const maxNum = Number(raw.max);
     const stepNum = Number(raw.step);
     const min = control === 'color' ? undefined : (Number.isFinite(minNum) ? minNum : undefined);
-    const max = control === 'color' ? undefined : (Number.isFinite(maxNum) ? maxNum : undefined);
+    const rawMax = control === 'color' ? undefined : (Number.isFinite(maxNum) ? maxNum : undefined);
+    const max = Number.isFinite(rawMax) && Number.isFinite(min) && rawMax <= min ? min : rawMax;
     const step = control === 'color' ? undefined : (Number.isFinite(stepNum) && stepNum > 0 ? stepNum : undefined);
     const defaultField = (control === 'color' || control === 'color_sat') ? 'hs_color' : '';
     const fieldRaw = typeof raw.field === 'string' ? raw.field.trim() : (cell?.attribute || defaultField);
@@ -1810,21 +2129,29 @@ class FlexCellsCard extends LitElement {
     const unchecked = raw.unchecked !== undefined ? raw.unchecked : false;
     const huePath = typeof raw.hue_path === 'string' ? raw.hue_path.trim() : '';
     const satPath = typeof raw.sat_path === 'string' ? raw.sat_path.trim() : '';
+    const options = Array.isArray(raw.options)
+      ? raw.options
+      : (typeof raw.options === 'string'
+        ? raw.options.trim()
+        : (typeof raw.options_path === 'string' ? raw.options_path.trim() : ''));
     const satFallbackNum = Number(raw.sat_fallback);
     const sat_fallback = Number.isFinite(satFallbackNum) ? satFallbackNum : 100;
     return {
       enabled: raw.enabled === true,
       control,
       min,
-      max: max > min ? max : min,
+      max,
       step,
       field,
       service,
       checked,
       unchecked,
+      options,
       hue_path: huePath,
       sat_path: satPath,
       sat_fallback,
+      step_buttons: raw.step_buttons === true,
+      step_buttons_position,
     };
   }
 
@@ -1856,6 +2183,84 @@ class FlexCellsCard extends LitElement {
       return `${formatted}${unit}`;
     }
     return String(value);
+  }
+
+  _attrSelectOptions(stateObj, attrEdit, tree) {
+    const configured = attrEdit?.options;
+    let source;
+    if (Array.isArray(configured)) {
+      source = configured;
+    } else {
+      const optionsPath = typeof configured === 'string' ? configured.trim() : '';
+      source = optionsPath && stateObj
+        ? this._resolveEntityValuePath(stateObj, optionsPath, tree)
+        : undefined;
+    }
+    let values = [];
+    if (Array.isArray(source)) {
+      values = source;
+    } else if (source && typeof source === 'object') {
+      values = Object.values(source);
+    } else if (typeof source === 'string') {
+      values = source.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    const seen = new Set();
+    return values
+      .filter((value) => value !== undefined && value !== null)
+      .map((value) => String(value))
+      .filter((value) => {
+        if (seen.has(value)) return false;
+        seen.add(value);
+        return true;
+      });
+  }
+
+  _normalizeStepButtonsPosition(position) {
+    return ['left', 'right', 'sides'].includes(position) ? position : 'sides';
+  }
+
+  _stepButtonLayout(position, minusButton, mainContent, plusButton, trailingContent = nothing) {
+    const pos = this._normalizeStepButtonsPosition(position);
+    if (pos === 'left') return [minusButton, plusButton, mainContent, trailingContent];
+    if (pos === 'right') return [mainContent, trailingContent, minusButton, plusButton];
+    return [minusButton, mainContent, plusButton, trailingContent];
+  }
+
+  _numberStepForButtons(min, max, step) {
+    const stepNum = Number(step);
+    if (Number.isFinite(stepNum) && stepNum > 0) return stepNum;
+    const span = Math.abs(Number(max) - Number(min));
+    return span > 0 ? Number((span / 100).toFixed(4)) || 0.01 : 0.01;
+  }
+
+  _renderNumberStepButton(entityId, direction, disabled, min, max, step) {
+    const isMinus = direction < 0;
+    const label = isMinus ? t(this.hass, 'card.decrease') : t(this.hass, 'card.increase');
+    return html`<button
+      type="button"
+      class="ctrl-step-button"
+      aria-label=${label}
+      title=${label}
+      ?disabled=${disabled}
+      @pointerdown=${(e) => e.stopPropagation()}
+      @click=${(e) => this._onNumberStepButtonClick(e, entityId, direction, min, max, step)}>
+        ${isMinus ? '-' : '+'}
+      </button>`;
+  }
+
+  _renderAttrStepButton(cell, direction, disabled) {
+    const isMinus = direction < 0;
+    const label = isMinus ? t(this.hass, 'card.decrease') : t(this.hass, 'card.increase');
+    return html`<button
+      type="button"
+      class="ctrl-step-button"
+      aria-label=${label}
+      title=${label}
+      ?disabled=${disabled}
+      @pointerdown=${(e) => e.stopPropagation()}
+      @click=${(e) => this._onAttrStepButtonClick(e, cell, direction)}>
+        ${isMinus ? '-' : '+'}
+      </button>`;
   }
 
   _attrEffectiveRange(cell, attrEdit) {
@@ -1892,6 +2297,25 @@ class FlexCellsCard extends LitElement {
       const span = Math.abs(max - min);
       step = span > 0 ? Number((span / 100).toFixed(4)) || 0.01 : 0.01;
     }
+    return { min, max, step };
+  }
+
+  _attrNumberBoxRange(cell, attrEdit) {
+    const outMin = Number(cell?.scale_out_min);
+    const outMax = Number(cell?.scale_out_max);
+    const hasOutRange = Number.isFinite(outMin) && Number.isFinite(outMax) && outMin !== outMax;
+    let min = hasOutRange
+      ? Math.min(outMin, outMax)
+      : (Number.isFinite(attrEdit?.min) ? Number(attrEdit.min) : undefined);
+    let max = hasOutRange
+      ? Math.max(outMin, outMax)
+      : (Number.isFinite(attrEdit?.max) ? Number(attrEdit.max) : undefined);
+    if (Number.isFinite(min) && Number.isFinite(max) && max < min) {
+      const tmp = min;
+      min = max;
+      max = tmp;
+    }
+    const step = Number.isFinite(attrEdit?.step) && attrEdit.step > 0 ? Number(attrEdit.step) : undefined;
     return { min, max, step };
   }
 
@@ -2018,6 +2442,109 @@ class FlexCellsCard extends LitElement {
     this._callAttrEditService(cell, actual);
   }
 
+  _onAttrNumberFocus(cell) {
+    const key = this._attrEditKey(cell);
+    if (!key) return;
+    if (!this._attrActiveInputs) this._attrActiveInputs = new Set();
+    this._attrActiveInputs.add(key);
+  }
+
+  _onAttrNumberBlur(cell) {
+    const key = this._attrEditKey(cell);
+    if (!key || !this._attrActiveInputs) return;
+    this._attrActiveInputs.delete(key);
+  }
+
+  _onAttrNumberInput(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    if (!key) return;
+    const raw = event.target?.value ?? '';
+    const rawNum = raw === '' ? NaN : Number(raw);
+    const actual = Number.isFinite(rawNum) ? this._rescaleOutputToInput(cell, rawNum) : raw;
+    this._setAttrDraft(key, { display: raw, actual });
+  }
+
+  _onAttrNumberKeydown(event, _cell) {
+    if (event?.key !== 'Enter') return;
+    event.stopPropagation?.();
+    event.target?.blur?.();
+  }
+
+  _onAttrNumberChange(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const target = event.target;
+    if (!target) return;
+    const entityId = cell?.value || '';
+    if (!entityId || !attrEdit.service || !attrEdit.field) return;
+
+    const raw = target.value ?? '';
+    const range = this._attrNumberBoxRange(cell, attrEdit);
+    const normalized = this._normalizeNumberValue(raw, range.min, range.max, range.step);
+    const stateObj = this.hass?.states?.[entityId];
+    const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+    const attrPath = this._attrKeyPath(cell, attrEdit);
+    const fallbackRaw = attrPath && stateObj ? this._resolveEntityValuePath(stateObj, attrPath, tree) : undefined;
+    if (normalized === null) {
+      this._clearAttrDraft(key);
+      const fallbackNum = fallbackRaw === '' ? NaN : Number(fallbackRaw);
+      target.value = Number.isFinite(fallbackNum) ? String(this._rescaleIfConfigured(cell, fallbackNum)) : '';
+      return;
+    }
+
+    const displayValue = Number(normalized);
+    const actual = this._rescaleOutputToInput(cell, displayValue);
+    target.value = String(displayValue);
+    this._setAttrDraft(key, { display: displayValue, actual });
+    this._callAttrEditService(cell, actual);
+  }
+
+  _onAttrTextFocus(cell) {
+    const key = this._attrEditKey(cell);
+    if (!key) return;
+    if (!this._attrActiveInputs) this._attrActiveInputs = new Set();
+    this._attrActiveInputs.add(key);
+  }
+
+  _onAttrTextBlur(cell) {
+    const key = this._attrEditKey(cell);
+    if (!key || !this._attrActiveInputs) return;
+    this._attrActiveInputs.delete(key);
+  }
+
+  _onAttrTextInput(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    if (!key) return;
+    const value = String(event.target?.value ?? '');
+    this._setAttrDraft(key, { display: value, actual: value });
+  }
+
+  _onAttrTextKeydown(event, _cell) {
+    if (event?.key !== 'Enter') return;
+    event.stopPropagation?.();
+    event.target?.blur?.();
+  }
+
+  _onAttrTextChange(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const entityId = cell?.value || '';
+    if (!entityId || !attrEdit.service || !attrEdit.field) return;
+    const value = String(event.target?.value ?? '');
+    this._setAttrDraft(key, { display: value, actual: value });
+    this._callAttrEditService(cell, value);
+  }
+
   _onAttrSwitchChange(event, cell) {
     if (!event) return;
     event.stopPropagation?.();
@@ -2028,6 +2555,77 @@ class FlexCellsCard extends LitElement {
     const valueToSend = checked ? attrEdit.checked : attrEdit.unchecked;
     this._setAttrDraft(key, { display: checked, actual: valueToSend });
     this._callAttrEditService(cell, valueToSend);
+  }
+
+  _onAttrSelectChange(event, cell) {
+    if (!event) return;
+    event.stopPropagation?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const entityId = cell?.value || '';
+    if (!entityId || !attrEdit.service || !attrEdit.field) return;
+    const option = String(event.target?.value ?? '');
+    const stateObj = this.hass?.states?.[entityId];
+    const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+    const options = this._attrSelectOptions(stateObj, attrEdit, tree);
+    if (!options.includes(option)) return;
+    this._setAttrDraft(key, { display: option, actual: option });
+    this._callAttrEditService(cell, option);
+  }
+
+  _onAttrSelectButtonClick(event, cell, option) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const entityId = cell?.value || '';
+    if (!entityId || !attrEdit.service || !attrEdit.field) return;
+    const value = String(option ?? '');
+    const stateObj = this.hass?.states?.[entityId];
+    const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+    const options = this._attrSelectOptions(stateObj, attrEdit, tree);
+    if (!options.includes(value)) return;
+    this._setAttrDraft(key, { display: value, actual: value });
+    this._callAttrEditService(cell, value);
+  }
+
+  _onAttrStepButtonClick(event, cell, direction) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const entityId = cell?.value || '';
+    if (!entityId || !attrEdit.service || !attrEdit.field) return;
+
+    const stateObj = this.hass?.states?.[entityId];
+    const attrPath = this._attrKeyPath(cell, attrEdit);
+    if (!stateObj || !attrPath) return;
+
+    const range = this._attrEffectiveRange(cell, attrEdit);
+    const min = Number.isFinite(range.min) ? range.min : 0;
+    const max = Number.isFinite(range.max) ? range.max : min + 1;
+    const step = Number.isFinite(range.step) && range.step > 0 ? range.step : 1;
+    const tree = this._buildEntityValueTree(stateObj);
+    const raw = this._resolveEntityValuePath(stateObj, attrPath, tree);
+    const rawNum = Number(raw);
+    const stateDisplay = Number.isFinite(rawNum) ? this._rescaleIfConfigured(cell, rawNum) : rawNum;
+    const draft = this._getAttrDraft(key);
+    const draftDisplay = draft && draft.display !== undefined ? Number(draft.display) : NaN;
+    let current = Number.isFinite(draftDisplay) ? draftDisplay : stateDisplay;
+    if (!Number.isFinite(Number(current))) current = min;
+    current = Math.max(min, Math.min(max, Number(current)));
+
+    const delta = direction < 0 ? -step : step;
+    const normalized = this._normalizeAttrSliderValue(current + delta, { min, max, step });
+    if (normalized === null) return;
+
+    const displayValue = Number(normalized);
+    const actual = this._rescaleOutputToInput(cell, displayValue);
+    this._setAttrDraft(key, { display: displayValue, actual });
+    this._callAttrEditService(cell, actual);
   }
 
   _callAttrEditService(cell, value) {

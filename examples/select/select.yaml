@@ -92,7 +92,7 @@ rows:
         align: left
         use_entity_unit: true
         attribute: last_changed
-        datetime_format: REL_SHORT[ ago]
+        datetime_format: REL_SHORT_AGO_ROUNDED
         custom_css_enabled: false
         custom_css: |
           th, td {

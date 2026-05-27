@@ -25,15 +25,12 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 
 Choose one installation method, via [HACS](https://www.hacs.xyz/docs/use/download/download/) or manually.
 
-> Compatibility: Flex Cells Card **v0.23.0+** requires **Home Assistant Core ≥ 2026.2** (MD3 frontend). On older cores the visual editor dropdowns will not work; use an earlier FCC release if you must stay on an older HA version. For **Home Assistant Core 2026.5+**, use **Flex Cells Card v0.25.0+** because older FCC editor builds depended on Home Assistant's removed `ha-textfield` component and may show missing text inputs.
-
 ### HACS
 
 1. In HACS use the search bar and type **Flex Cells Card**.
 2. Install the card.
 3. The resource is added automatically as `/hacsfiles/flex-cells-card/flex-cells-card.js`.
 4. Reload browser cache or refresh resources in Home Assistant if needed.
-5. If you previously added this repo as a custom repository, you can remove that entry now.
 
 ### Manual
 
@@ -42,6 +39,8 @@ Choose one installation method, via [HACS](https://www.hacs.xyz/docs/use/downloa
 2. Add a resource in **Edit Dashboard → ⋮ → Manage resources**:  
    `/local/flex-cells-card/flex-cells-card.js` (type: **JavaScript module**).
 3. Hard refresh the browser.
+
+> Compatibility: **Flex Cells Card ≥ v0.23.0** requires **Home Assistant Core ≥ 2026.2** (MD3 frontend). On older cores the visual editor dropdowns will not work; use an earlier FCC release if you must stay on an older HA version. For **Home Assistant Core ≥ 2026.5**, use **Flex Cells Card ≥ v0.25.0** because older FCC editor builds depended on Home Assistant's removed `ha-textfield` component and may show missing text inputs.
 
 ## Usage
 Add the card in the UI and configure everything from the visual editor.
@@ -210,10 +209,14 @@ type: custom:flex-cells-card
 
     ![Cover](examples/cover/images/dark_open-300.png)
     ![Cover](examples/cover/images/light_closing-300.png)
+  - [Fan](https://github.com/michalowskil/flex-cells-card/blob/main/examples/fan/fan.md) - fan speed control examples using a slider, speed buttons, custom CSS, and cell templates. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/fan/fan.md)  
+
+    ![Fan](examples/fan/images/dark-300.png)
+    ![Fan](examples/fan/images/light-300.png)
   - [Climate (global template)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md) - another example of an FCC template (HTML, CSS). [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/climate-template/climate.md)  
 
     ![Climate template](examples/climate-template/images/dark-heat-300.png)
-    ![Climate template](examples/climate-template/images/light-fan-300.png)
+    ![Climate template](examples/climate-template/images/light-cool-300.png)
   - [Button lights (custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md) - turning on/off lighting, setting color/brightness. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/button-lights/button-lights.md)  
 
     ![Button lights](examples/button-lights/images/dark-300.png)
@@ -222,6 +225,10 @@ type: custom:flex-cells-card
 
     ![Input controls](examples/input-controls/images/dark-300.png)
     ![Input controls](examples/input-controls/images/light-300.png)
+  - [Attribute editing controls](https://github.com/michalowskil/flex-cells-card/blob/main/examples/attribute-editing-controls/attribute-controls.md) - a presentation of controls available in Attribute editing (service), including select, buttons, slider, number, stepper, switch, color, and text controls. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/attribute-editing-controls/attribute-controls.md)  
+
+    ![Attribute editing controls](examples/attribute-editing-controls/images/dark-300.png)
+    ![Attribute editing controls](examples/attribute-editing-controls/images/light-300.png)
   - [Hue and saturation (simple global template & custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md) - an example of using sliders to control hue and saturation. It also demonstrates how to use presets for lighting. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/hue-saturation/hue-saturation.md)  
 
     ![Hue saturation](examples/hue-saturation/images/dark-on-300.png)
@@ -285,7 +292,54 @@ filter:
     - domain: light
 ```
 
+## Date and Time Format Tokens
+
+These tokens can be used in **Date/Time format & Text override** fields. The examples below use this raw value:
+
+```text
+2026-04-05T13:03:07
+```
+
+Relative examples assume the current time is `2026-04-05T14:34:37` and the locale is English, so the raw value is `1 hour 31 minutes 30 seconds` in the past. Relative output uses the Home Assistant language when available, then falls back to the browser locale.
+
+| Token | Description | Example output |
+|---|---|---|
+| `RAW` | Outputs the original unformatted value exactly as it was read. | `2026-04-05T13:03:07` |
+| `YYYY` | Outputs the four-digit year. | `2026` |
+| `YY` | Outputs the two-digit year. | `26` |
+| `MMMM` | Outputs the localized full month name. | `April` |
+| `MM` | Outputs the month number with a leading zero. | `04` |
+| `M` | Outputs the month number without a leading zero. | `4` |
+| `DD` | Outputs the day of month with a leading zero. | `05` |
+| `D` | Outputs the day of month without a leading zero. | `5` |
+| `HH` | Outputs the 24-hour clock hour with a leading zero. | `13` |
+| `H` | Outputs the 24-hour clock hour without a leading zero. | `13` |
+| `hh` | Outputs the 12-hour clock hour with a leading zero. | `01` |
+| `h` | Outputs the 12-hour clock hour without a leading zero. | `1` |
+| `AMPM` | Outputs the uppercase 12-hour period marker. | `PM` |
+| `ampm` | Outputs the lowercase 12-hour period marker. | `pm` |
+| `mm` | Outputs minutes with a leading zero. | `03` |
+| `m` | Outputs minutes without a leading zero. | `3` |
+| `ss` | Outputs seconds with a leading zero. | `07` |
+| `s` | Outputs seconds without a leading zero. | `7` |
+| `REL` | Outputs a localized elapsed duration with up to two units and no past/future direction. | `1 hour 31 minutes` |
+| `REL_SHORT` | Outputs a localized short elapsed duration with up to two units and no past/future direction. | `1h 31m` |
+| `REL_SHORT_AGO` | Outputs the same precise short duration as `REL_SHORT`, with localized past/future direction. | `1h 31m ago` |
+| `REL_SHORT_ROUNDED` | Outputs a rounded one-unit short duration with no past/future direction. | `2h` |
+| `REL_SHORT_AGO_ROUNDED` | Outputs a rounded one-unit short duration with localized past/future direction. | `2h ago` |
+| `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
+
 ## Changelog
+- v0.26.0 —
+  - Added **step controls**: attribute-editing sliders and native `input_number` / `number` sliders can show optional `+/-` buttons with configurable button position; attribute editing also supports `control: stepper`, which renders `- value +` without a slider.
+  - Added **number box for attribute editing**: `control: number` renders a numeric input and sends the value when the field is committed.
+  - Added **text box for attribute editing**: `control: text` renders a text input and sends the value when the field is committed.
+  - Added **select control for attribute editing**: `control: select` can render dropdown options from a configured attribute path (for example `source_list`) and call the configured service/field with the selected value.
+  - Added **select buttons for attribute editing**: `control: buttons` uses the same options/service/field setup as `select`, but renders short option lists as buttons.
+  - Added **`REL_SHORT_AGO`** token, using the same precise duration as **`REL_SHORT`** while adding the localized past/future direction.
+  - Added **`REL_SHORT_ROUNDED`** and **`REL_SHORT_AGO_ROUNDED`** tokens for rounded one-unit relative times, e.g. values over 60 seconds are shown in minutes instead of appending seconds.
+  - Added **`AMPM`** and **`ampm`** tokens for 12-hour time formats.
+  - Improved relative time tokens by treating values within 2 seconds of the current time as `now`, avoiding brief clock-skew jumps such as `1s → now → 1s`.
 - v0.25.0 —
   - Added **camera entity display modes: `camera_stream` and `camera_snapshot`**, also usable in dynamic rules.
   - Added per-card `camera_snapshot_ttl_ms` plus per-cell override to control snapshot refresh/caching (default 5000 ms).
