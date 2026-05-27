@@ -77,7 +77,7 @@
     "attr_edit_control_slider": "Slider",
     "attr_edit_control_number": "Zahlenfeld",
     "attr_edit_control_text": "Textfeld",
-    "attr_edit_control_stepper": "Stepper",
+    "attr_edit_control_stepper": "",
     "attr_edit_control_color": "Farbschieber (Hue)",
     "attr_edit_control_color_sat": "Farbschieber (Sättigung)",
     "attr_edit_control_switch": "Schalter",
@@ -85,8 +85,8 @@
     "attr_edit_control_buttons": "Auswahlbuttons",
     "attr_edit_select_options": "Attributpfad mit Optionen",
     "attr_edit_select_hint": "Liest Optionen aus dem konfigurierten Attributpfad und sendet den ausgewählten Wert an das Service-Feld.",
-    "attr_edit_min": "Min",
-    "attr_edit_max": "Max",
+    "attr_edit_min": "",
+    "attr_edit_max": "",
     "attr_edit_slider_number_hint": "Numerischer Wert",
     "attr_edit_step": "Schritt",
     "attr_edit_checked": "Wert für \"an\"",
@@ -241,6 +241,6 @@
     "decrease": "Verringern",
     "increase": "Erhöhen",
     "cancel": "Abbrechen",
-    "ok": "OK"
+    "ok": ""
   }
 }

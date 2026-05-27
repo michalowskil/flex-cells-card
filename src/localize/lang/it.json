@@ -77,7 +77,7 @@
     "attr_edit_control_slider": "Slider",
     "attr_edit_control_number": "Campo numerico",
     "attr_edit_control_text": "Campo testo",
-    "attr_edit_control_stepper": "Stepper",
+    "attr_edit_control_stepper": "",
     "attr_edit_control_color": "Slider colore (tonalità)",
     "attr_edit_control_color_sat": "Slider colore (saturazione)",
     "attr_edit_control_switch": "Interruttore",
@@ -85,8 +85,8 @@
     "attr_edit_control_buttons": "Pulsanti scelta",
     "attr_edit_select_options": "Percorso attributo opzioni",
     "attr_edit_select_hint": "Legge le opzioni dal percorso attributo configurato e invia il valore selezionato al campo del servizio.",
-    "attr_edit_min": "Min",
-    "attr_edit_max": "Max",
+    "attr_edit_min": "",
+    "attr_edit_max": "",
     "attr_edit_slider_number_hint": "Valore numerico",
     "attr_edit_step": "Passo",
     "attr_edit_checked": "Valore selezionato",
@@ -241,6 +241,6 @@
     "decrease": "Diminuisci",
     "increase": "Aumenta",
     "cancel": "Annulla",
-    "ok": "OK"
+    "ok": ""
   }
 }

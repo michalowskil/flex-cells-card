@@ -77,7 +77,7 @@
     "attr_edit_control_slider": "Suwak",
     "attr_edit_control_number": "Pole liczby",
     "attr_edit_control_text": "Pole tekstowe",
-    "attr_edit_control_stepper": "Stepper",
+    "attr_edit_control_stepper": "",
     "attr_edit_control_color": "Suwak koloru (hue)",
     "attr_edit_control_color_sat": "Suwak nasycenia",
     "attr_edit_control_switch": "Przełącznik",
@@ -85,8 +85,8 @@
     "attr_edit_control_buttons": "Przyciski wyboru",
     "attr_edit_select_options": "Ścieżka atrybutu z opcjami",
     "attr_edit_select_hint": "Odczytuje opcje ze wskazanej ścieżki atrybutu i wysyła wybraną wartość do pola usługi.",
-    "attr_edit_min": "Min",
-    "attr_edit_max": "Max",
+    "attr_edit_min": "",
+    "attr_edit_max": "",
     "attr_edit_slider_number_hint": "Wartość liczbowa",
     "attr_edit_step": "Krok",
     "attr_edit_checked": "Wartość dla zaznaczonego",
@@ -241,6 +241,6 @@
     "decrease": "Zmniejsz",
     "increase": "Zwiększ",
     "cancel": "Anuluj",
-    "ok": "OK"
+    "ok": ""
   }
 }
