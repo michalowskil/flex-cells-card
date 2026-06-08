@@ -1,5 +1,10 @@
 ﻿import { LitElement, html, css, nothing } from 'lit';
 import { t } from './localize/localize.js';
+import {
+  ensureHomeAssistantRegistryData,
+  metadataPathNeedsRegistry,
+  resolveEntityRegistryMeta,
+} from './ha-registry-utils.js';
 
 class FccTextfield extends LitElement {
   static properties = {
@@ -691,6 +696,10 @@ class FlexCellsCardEditor extends LitElement {
     this._preventContextMenu = (ev)=>{ try { ev.preventDefault(); } catch(_) {} };
     this._boundRowPointerCancel = (e)=>this._onRowPointerCancel?.(e);
     this._boundColPointerCancel = (e)=>this._onColPointerCancel?.(e);
+    this._registryConnection = null;
+    this._registryData = null;
+    this._registryLoadPromise = null;
+    this._registrySource = null;
   }
   /* === Attribute suggestions helpers === */
   _getStateObject(entityId) {
@@ -698,9 +707,19 @@ class FlexCellsCardEditor extends LitElement {
     return this.hass?.states?.[entityId];
   }
 
-  _buildEntityValueTree(stateObj) {
+  _ensureRegistryData() {
+    return ensureHomeAssistantRegistryData(this);
+  }
+
+  _resolveRegistryMeta(stateObjOrEntityId, load = false) {
+    const registryData = load ? this._ensureRegistryData() : this._registryData;
+    return resolveEntityRegistryMeta(registryData, stateObjOrEntityId);
+  }
+
+  _buildEntityValueTree(stateObj, includeRegistry = false) {
     if (!stateObj) return {};
     const attrs = stateObj.attributes || {};
+    const registry = this._resolveRegistryMeta(stateObj, includeRegistry);
     const tree = {
       ...attrs,
       attributes: attrs,
@@ -708,14 +727,25 @@ class FlexCellsCardEditor extends LitElement {
       state: stateObj.state,
       last_changed: stateObj.last_changed,
       last_updated: stateObj.last_updated,
+      entity_registry: registry.entity_registry,
+      device: registry.device,
+      device_id: registry.device_id,
+      device_name: registry.device_name,
+      area: registry.area,
+      area_id: registry.area_id,
+      area_name: registry.area_name,
     };
     if (stateObj.context !== undefined) tree.context = stateObj.context;
+    Object.defineProperty(tree, '__fcc_registry_included', {
+      value: includeRegistry || !!this._registryData,
+      enumerable: false,
+    });
     return tree;
   }
 
   _resolveEntityValue(stateObj, path) {
     if (!stateObj || !path) return undefined;
-    const tree = this._buildEntityValueTree(stateObj);
+    const tree = this._buildEntityValueTree(stateObj, metadataPathNeedsRegistry(path));
     return this._resolvePath(tree, path);
   }
 
@@ -723,7 +753,7 @@ class FlexCellsCardEditor extends LitElement {
     try {
       const id = this.config?.rows?.[rIdx]?.cells?.[cIdx]?.value;
       const st = this._getStateObject(id);
-      return this._buildEntityValueTree(st);
+      return this._buildEntityValueTree(st, true);
     } catch (_) { return {}; }
   }
 
@@ -768,7 +798,7 @@ class FlexCellsCardEditor extends LitElement {
 
 
   _buildAttrSuggestionsForEntity(entityId, inputValue) {
-    const tree = this._buildEntityValueTree(this._getStateObject(entityId));
+    const tree = this._buildEntityValueTree(this._getStateObject(entityId), true);
     const val = String(inputValue || '');
     if (val === '') return Object.keys(tree || {}).sort();
     const norm = val.replace(/\[(\d+)\]/g, '.$1');
@@ -4220,7 +4250,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.26.0
+        FCC v0.27.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

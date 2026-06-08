@@ -189,7 +189,7 @@
     "string": "Tekst do wyświetlenia",
     "icon": "mdi:nazwa-ikony",
     "datetime_format": "np. H[:]mm[:]ss, YYYY[-]MM[-]DD[ ]h[:]mm[ ]AMPM, REL, REL_SHORT_AGO lub [dowolny tekst]",
-    "attribute_path": "Ścieżka metadanych (np. a.b[0].c)"
+    "attribute_path": "Ścieżka metadanych (np. area.name lub a.b[0].c)"
   },
   "dynamic": {
     "operator": "Operator",

@@ -189,7 +189,7 @@
     "string": "Text to display",
     "icon": "mdi:icon-name",
     "datetime_format": "e.g. H[:]mm[:]ss, YYYY[-]MM[-]DD[ ]h[:]mm[ ]AMPM, REL, REL_SHORT_AGO or [Custom text]",
-    "attribute_path": "Metadata path (e.g. a.b[0].c)"
+    "attribute_path": "Metadata path (e.g. area.name or a.b[0].c)"
   },
   "dynamic": {
     "operator": "Operator",

@@ -3,6 +3,11 @@ import { t } from './localize/localize.js';
 import './flex-cells-card-editor.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { live } from 'lit/directives/live.js';
+import {
+  ensureHomeAssistantRegistryData,
+  metadataPathNeedsRegistry,
+  resolveEntityRegistryMeta,
+} from './ha-registry-utils.js';
 
 const SORT_LOCALE_OPTS = { numeric: true, sensitivity: 'base' };
 const RELATIVE_NOW_TOLERANCE_MS = 2000;
@@ -399,6 +404,10 @@ class FlexCellsCard extends LitElement {
     this._onGlobalClickCapture = this._onGlobalClickCapture.bind(this);
     this._ghostClickClearTid = null;
     this._snapshotNonceByEntity = new Map();
+    this._registryConnection = null;
+    this._registryData = null;
+    this._registryLoadPromise = null;
+    this._registrySource = null;
   }
 
   connectedCallback() {
@@ -469,11 +478,12 @@ class FlexCellsCard extends LitElement {
     return null;
   }
 
-  _resolveAutoEntityMeta(entry) {
+  _resolveAutoEntityMeta(entry, loadRegistry = false) {
     const normalized = this._normalizeAutoEntity(entry);
     if (!normalized?.entity) return null;
     const stateObj = this.hass?.states?.[normalized.entity];
     const attrs = { ...(stateObj?.attributes || {}), ...(normalized.attributes || {}) };
+    const registry = this._resolveRegistryMeta(stateObj || normalized.entity, loadRegistry);
     const friendlyName = normalized.name ?? attrs.friendly_name ?? normalized.entity;
     const icon = normalized.icon ?? attrs.icon ?? '';
     const state = normalized.state ?? stateObj?.state ?? '';
@@ -484,7 +494,24 @@ class FlexCellsCard extends LitElement {
       icon,
       state,
       attributes: attrs,
+      entity_registry: registry.entity_registry,
+      device: registry.device,
+      device_id: registry.device_id,
+      device_name: registry.device_name,
+      area: registry.area,
+      area_id: registry.area_id,
+      area_name: registry.area_name,
     };
+  }
+
+  _templateUsesRegistryTokens(tpl) {
+    if (!tpl || typeof tpl !== 'object') return false;
+    try {
+      const raw = JSON.stringify(tpl);
+      return raw.includes('@area_name') || raw.includes('@area_id');
+    } catch (_e) {
+      return false;
+    }
   }
 
   _normalizeEntityTemplate(rawTemplate) {
@@ -529,6 +556,8 @@ class FlexCellsCard extends LitElement {
     out = out.replace(/@entity/g, meta?.entity ?? '');
     out = out.replace(/@state/g, meta?.state ?? '');
     out = out.replace(/@icon/g, meta?.icon ?? '');
+    out = out.replace(/@area_name/g, meta?.area_name ?? meta?.area?.name ?? '');
+    out = out.replace(/@area_id/g, meta?.area_id ?? meta?.area?.area_id ?? '');
     return out;
   }
 
@@ -579,13 +608,14 @@ class FlexCellsCard extends LitElement {
     const entities = Array.isArray(cfg.entities) ? cfg.entities : [];
     if (!entities.length) return null;
     const tpl = this._normalizeEntityTemplate(cfg.entity_row_template);
+    const usesRegistryTokens = this._templateUsesRegistryTokens(tpl);
     const rows = [];
     const hasHeader = tpl.header.length > 0;
     if (hasHeader) {
       rows.push({ cells: tpl.header });
     }
     for (const ent of entities) {
-      const meta = this._resolveAutoEntityMeta(ent);
+      const meta = this._resolveAutoEntityMeta(ent, usesRegistryTokens);
       if (!meta?.entity) continue;
       const rowCells = tpl.cells.map((cell) => this._materializeTemplateCell(cell, meta));
       rows.push({ cells: rowCells });
@@ -669,6 +699,15 @@ class FlexCellsCard extends LitElement {
     } catch (_e) {
       return [];
     }
+  }
+
+  _ensureRegistryData() {
+    return ensureHomeAssistantRegistryData(this);
+  }
+
+  _resolveRegistryMeta(stateObjOrEntityId, load = false) {
+    const registryData = load ? this._ensureRegistryData() : this._registryData;
+    return resolveEntityRegistryMeta(registryData, stateObjOrEntityId);
   }
 
   updated(changedProps) {
@@ -781,9 +820,10 @@ class FlexCellsCard extends LitElement {
     return cur;
   }
 
-  _buildEntityValueTree(stateObj) {
+  _buildEntityValueTree(stateObj, includeRegistry = false) {
     if (!stateObj) return null;
     const attrs = stateObj.attributes || {};
+    const registry = this._resolveRegistryMeta(stateObj, includeRegistry);
     const tree = {
       ...attrs,
       attributes: attrs,
@@ -791,14 +831,28 @@ class FlexCellsCard extends LitElement {
       state: stateObj.state,
       last_changed: stateObj.last_changed,
       last_updated: stateObj.last_updated,
+      entity_registry: registry.entity_registry,
+      device: registry.device,
+      device_id: registry.device_id,
+      device_name: registry.device_name,
+      area: registry.area,
+      area_id: registry.area_id,
+      area_name: registry.area_name,
     };
     if (stateObj.context !== undefined) tree.context = stateObj.context;
+    Object.defineProperty(tree, '__fcc_registry_included', {
+      value: includeRegistry || !!this._registryData,
+      enumerable: false,
+    });
     return tree;
   }
 
   _resolveEntityValuePath(stateObj, path, cachedTree) {
     if (!stateObj || path === undefined || path === null) return undefined;
-    const tree = cachedTree || this._buildEntityValueTree(stateObj);
+    const needsRegistry = metadataPathNeedsRegistry(path);
+    const tree = (!cachedTree || (needsRegistry && !cachedTree.__fcc_registry_included))
+      ? this._buildEntityValueTree(stateObj, needsRegistry)
+      : cachedTree;
     if (!tree) return undefined;
     return this._getByPath(tree, String(path));
   }

@@ -69,6 +69,27 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Precedence: per-cell `camera_snapshot_ttl_ms` → if empty, use card-level `camera_snapshot_ttl_ms` → if neither set, default is 5000 ms.
   - TTL controls how often the card asks HA for a new snapshot (adds a cache-buster); it does **not** change how/when the camera itself captures frames.
 
+
+## Metadata paths
+For entity cells, the `attribute` field is a metadata path. It can read:
+
+- state-object fields such as `state`, `entity_id`, `last_changed`, `last_updated`, and `context`;
+- entity attributes directly, for example `friendly_name`, `unit_of_measurement`, or nested paths like `attributes.brightness`;
+- Home Assistant registry data: `area.*`, `device.*`, and `entity_registry.*`.
+
+This lets you display an entity's area without creating a template sensor:
+
+```yaml
+rows:
+  - cells:
+      - type: entity
+        value: sensor.bedroom_temperature
+        attribute: area.name
+        use_entity_unit: false
+```
+
+Common registry shortcuts are also exposed as `area_name`, `area_id`, `device_name`, and `device_id`.
+
 ## Templates
 ### Card-level (global) template
 - Templates, in addition to standard HTML tags, support their own tag:  
@@ -262,7 +283,7 @@ Experimental feature! I do not plan to evolve it to parity with full FCC. With [
 - mixed/multi-row layouts (e.g., custom headers, separators between groups),
 - the FCC visual editor (you see the [auto-entities](https://github.com/thomasloven/lovelace-auto-entities) editor; the row template is YAML-only).
 
-FCC accepts an `entities` array (e.g., from [auto-entities](https://github.com/thomasloven/lovelace-auto-entities)). If `entities` is present, FCC builds rows from it; classic `rows` keep working as before. Control the generated table with `entity_row_template` (optional `header` and `cells`). Tokens: `@entity`, `@friendly_name`, `@name`, `@state`, `@attr:<attribute>`, `@icon`.
+FCC accepts an `entities` array (e.g., from [auto-entities](https://github.com/thomasloven/lovelace-auto-entities)). If `entities` is present, FCC builds rows from it; classic `rows` keep working as before. Control the generated table with `entity_row_template` (optional `header` and `cells`). Tokens: `@entity`, `@friendly_name`, `@name`, `@state`, `@attr:<attribute>`, `@icon`, `@area_name`, `@area_id`.
 
 Example with auto-entities:
 ```yaml
@@ -330,6 +351,8 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.27.0 —
+  - Added Home Assistant registry metadata for entity cells, including `area.*`, `device.*`, `entity_registry.*`, plus `@area_name` / `@area_id` tokens for auto-entities.
 - v0.26.0 —
   - Added **step controls**: attribute-editing sliders and native `input_number` / `number` sliders can show optional `+/-` buttons with configurable button position; attribute editing also supports `control: stepper`, which renders `- value +` without a slider.
   - Added **number box for attribute editing**: `control: number` renders a numeric input and sends the value when the field is committed.
