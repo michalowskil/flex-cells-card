@@ -250,6 +250,7 @@ class FlexCellsCardEditor extends LitElement {
     .option.unit span.label { flex: 0 0 auto; }
     .option.unit fcc-textfield { flex: 1 1 auto; margin: 0; }
     .option.group { display:block; cursor: default; margin-bottom:12px; }
+    .option.group.dyn-ref { margin-top: 8px; margin-bottom: 0; }
     .option.full { width: 100%; box-sizing: border-box; }
     .option.option-stack { flex-direction: column; align-items: flex-start; gap: 8px; }
     .option.option-stack label { display: flex; align-items: center; gap: 10px; width: 100%; cursor: pointer; }
@@ -1580,7 +1581,20 @@ _styleValue(r,c,key,e){
   }
 
   _normalizeRuleConditions(rule) {
-    const fallback = { entity: rule?.entity || '', attr: rule?.attr || '', op: rule?.op || '=', val: rule?.val ?? '', val2: rule?.val2 ?? '', src: rule?.src };
+    const fallback = {
+      entity: rule?.entity || '',
+      attr: rule?.attr || '',
+      op: rule?.op || '=',
+      val: rule?.val ?? '',
+      val2: rule?.val2 ?? '',
+      val_entity: rule?.val_entity ?? '',
+      val_attr: rule?.val_attr ?? '',
+      val_offset: rule?.val_offset ?? '',
+      val2_entity: rule?.val2_entity ?? '',
+      val2_attr: rule?.val2_attr ?? '',
+      val2_offset: rule?.val2_offset ?? '',
+      src: rule?.src,
+    };
     if (!rule || typeof rule !== 'object') return [fallback];
     const conds = Array.isArray(rule.conditions) && rule.conditions.length ? rule.conditions : [fallback];
     return conds.map((c) => ({
@@ -1589,6 +1603,12 @@ _styleValue(r,c,key,e){
       op: c?.op || '=',
       val: c?.val ?? '',
       val2: c?.val2 ?? '',
+      val_entity: c?.val_entity ?? '',
+      val_attr: c?.val_attr ?? '',
+      val_offset: c?.val_offset ?? '',
+      val2_entity: c?.val2_entity ?? '',
+      val2_attr: c?.val2_attr ?? '',
+      val2_offset: c?.val2_offset ?? '',
       src: c?.src,
     }));
   }
@@ -1683,6 +1703,58 @@ _styleValue(r,c,key,e){
     if (val === undefined || Number.isFinite(val)) {
       this._updateRule(r,c,idx,{ [key]: val });
     }
+  }
+  _renderConditionReferenceEditor(cond, update, idBase, prefix = 'val', labelKey = null){
+    const isMax = prefix === 'val2';
+    const entityKey = isMax ? 'val2_entity' : 'val_entity';
+    const attrKey = isMax ? 'val2_attr' : 'val_attr';
+    const offsetKey = isMax ? 'val2_offset' : 'val_offset';
+    const entity = cond?.[entityKey] || '';
+    const attr = cond?.[attrKey] || '';
+    const offset = cond?.[offsetKey] ?? '';
+    const hasReference = !!entity || !!attr || offset !== '';
+    const listId = `${idBase}-${entityKey}-attrs`;
+    const title = labelKey
+      ? t(this.hass, labelKey)
+      : (isMax ? t(this.hass, 'dynamic.reference_max') : t(this.hass, 'dynamic.reference_value'));
+    return html`
+      <details class="option group full dyn-ref" ?open=${hasReference}>
+        <summary style="cursor:pointer;font-weight:600;">${title}</summary>
+        <div class="muted dyn-hint" style="margin-top:6px;">
+          ${t(this.hass, 'dynamic.reference_hint')}
+        </div>
+        <div class="cols1" style="margin-top:8px;">
+          <ha-entity-picker
+            .hass=${this.hass}
+            .value=${entity}
+            allow-custom-entity
+            @value-changed=${(e)=>update({ [entityKey]: e.detail?.value || e.target.value || '' })}>
+          </ha-entity-picker>
+        </div>
+        <div class="cols1">
+          <input
+            class="text-input attr-input"
+            list=${listId}
+            .value=${attr}
+            placeholder=${t(this.hass,"placeholder.attribute_path")}
+            @input=${(e)=> update({ [attrKey]: e.target.value || '' }) }
+          />
+          <datalist id=${listId}>
+            ${ (this._buildAttrSuggestionsForEntity(entity, attr) || [])
+                .map(opt => html`<option value="${opt}"></option>`) }
+          </datalist>
+        </div>
+        <div class="cols1">
+          <fcc-textfield
+            type="number"
+            step="any"
+            .label=${t(this.hass, 'dynamic.reference_offset')}
+            .value=${offset}
+            @input=${(e)=>update({ [offsetKey]: e.target.value })}>
+          </fcc-textfield>
+        </div>
+      </details>
+    `;
   }
   _getRowRules(r){
     try {
@@ -3717,11 +3789,13 @@ _styleValue(r,c,key,e){
                                       <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.min')}
                                         .value=${cond.val || ''}
+                                        ?disabled=${!!cond.val_entity}
                                         @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val: e.target.value })}>
                                       </fcc-textfield>
                                       <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.max')}
                                         .value=${cond.val2 || ''}
+                                        ?disabled=${!!cond.val2_entity}
                                         @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val2: e.target.value })}>
                                       </fcc-textfield>
                                     </div>
@@ -3729,10 +3803,32 @@ _styleValue(r,c,key,e){
                                     <fcc-textfield
                                       .label=${t(this.hass, 'editor.value')}
                                       .value=${cond.val || ''}
+                                      ?disabled=${!!cond.val_entity}
                                       @input=${(e)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,{ val: e.target.value })}>
                                     </fcc-textfield>
                                   ` }
                                 </div>
+
+                                ${ cond && cond.op === 'between' ? html`
+                                  ${this._renderConditionReferenceEditor(
+                                    cond,
+                                    (patch)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,patch),
+                                    `dynref-${rIdx}-${cIdx}-${ridx}-${condIdx}-min`,
+                                    'val',
+                                    'dynamic.reference_min'
+                                  )}
+                                  ${this._renderConditionReferenceEditor(
+                                    cond,
+                                    (patch)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,patch),
+                                    `dynref-${rIdx}-${cIdx}-${ridx}-${condIdx}-max`,
+                                    'val2'
+                                  )}
+                                ` : this._renderConditionReferenceEditor(
+                                  cond,
+                                  (patch)=>this._updateCondition(rIdx,cIdx,ridx,condIdx,patch),
+                                  `dynref-${rIdx}-${cIdx}-${ridx}-${condIdx}`,
+                                  'val'
+                                ) }
 
                                 ${ conditions.length > 1 ? html`
                                   <div class="cols1 right">
@@ -4023,11 +4119,13 @@ _styleValue(r,c,key,e){
                                       <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.min')}
                                         .value=${cond?.val || ''}
+                                        ?disabled=${!!cond?.val_entity}
                                         @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val: e.target.value })}>
                                       </fcc-textfield>
                                       <fcc-textfield
                                         .label=${t(this.hass, 'dynamic.max')}
                                         .value=${cond?.val2 || ''}
+                                        ?disabled=${!!cond?.val2_entity}
                                         @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val2: e.target.value })}>
                                       </fcc-textfield>
                                     </div>
@@ -4035,10 +4133,32 @@ _styleValue(r,c,key,e){
                                     <fcc-textfield
                                       .label=${t(this.hass, 'editor.value')}
                                       .value=${cond?.val || ''}
+                                      ?disabled=${!!cond?.val_entity}
                                       @input=${(e)=>this._updateRowCondition(rIdx,ridx,condIdx,{ val: e.target.value })}>
                                     </fcc-textfield>
                                   ` }
                                 </div>
+
+                                ${ cond && cond.op === 'between' ? html`
+                                  ${this._renderConditionReferenceEditor(
+                                    cond,
+                                    (patch)=>this._updateRowCondition(rIdx,ridx,condIdx,patch),
+                                    `rowdynref-${rIdx}-${ridx}-${condIdx}-min`,
+                                    'val',
+                                    'dynamic.reference_min'
+                                  )}
+                                  ${this._renderConditionReferenceEditor(
+                                    cond,
+                                    (patch)=>this._updateRowCondition(rIdx,ridx,condIdx,patch),
+                                    `rowdynref-${rIdx}-${ridx}-${condIdx}-max`,
+                                    'val2'
+                                  )}
+                                ` : this._renderConditionReferenceEditor(
+                                  cond,
+                                  (patch)=>this._updateRowCondition(rIdx,ridx,condIdx,patch),
+                                  `rowdynref-${rIdx}-${ridx}-${condIdx}`,
+                                  'val'
+                                ) }
 
                                 ${ conditions.length > 1 ? html`
                                   <div class="cols1 right">
@@ -4250,7 +4370,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.27.0
+        FCC v0.28.0-beta.1
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

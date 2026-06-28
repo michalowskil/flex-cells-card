@@ -351,6 +351,10 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.28.0-beta.1 (Pre-release) —
+  - Dynamic rules can now compare a value with another entity selected directly in the visual editor.
+  - The editor now shows **Reference value** for regular comparisons and separate **Reference min** / **Reference max** sections for `between`.
+  - Reference values can use metadata paths and offsets, for example comparing a room dew point with a supply temperature minus 2 degrees.
 - v0.27.0 —
   - Added Home Assistant registry metadata for entity cells, including `area.*`, `device.*`, `entity_registry.*`, plus `@area_name` / `@area_id` tokens for auto-entities.
 - v0.26.0 —

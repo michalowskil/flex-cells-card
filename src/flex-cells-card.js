@@ -3008,7 +3008,20 @@ class FlexCellsCard extends LitElement {
 
     const normalizeConditions = (rule) => {
       if (Array.isArray(rule?.conditions) && rule.conditions.length) return rule.conditions;
-      return [{ entity: rule?.entity, attr: rule?.attr, op: rule?.op, val: rule?.val, val2: rule?.val2, src: rule?.src }];
+      return [{
+        entity: rule?.entity,
+        attr: rule?.attr,
+        op: rule?.op,
+        val: rule?.val,
+        val2: rule?.val2,
+        val_entity: rule?.val_entity,
+        val_attr: rule?.val_attr,
+        val_offset: rule?.val_offset,
+        val2_entity: rule?.val2_entity,
+        val2_attr: rule?.val2_attr,
+        val2_offset: rule?.val2_offset,
+        src: rule?.src,
+      }];
     };
     const normalizeMatch = (rule) => {
       const raw = (rule?.match || rule?.condition_match || '').toLowerCase();
@@ -3021,12 +3034,30 @@ class FlexCellsCard extends LitElement {
       const matchMode = normalizeMatch(r);
 
       const evaluateCondition = (cond) => {
-        const op = (cond?.op || r.op || '=');
-        const condEntity = cond?.entity ?? r.entity;
-        const condAttr = cond?.attr ?? r.attr;
-        const condVal = cond?.val ?? r.val;
-        const condVal2 = cond?.val2 ?? r.val2;
-        const condSrc = cond?.src ?? r.src;
+        const hasOwn = (obj, key) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+        const field = (key) => hasOwn(cond, key) ? cond[key] : r?.[key];
+        const op = String(field('op') || '=').trim();
+        const condEntity = field('entity');
+        const condAttr = field('attr');
+        const condSrc = field('src');
+        const resolveReferenceValue = (valueKey, entityKey, attrKey, offsetKey) => {
+          let refVal = field(valueKey);
+          const refEntity = field(entityKey);
+          const refAttr = field(attrKey);
+          if (refEntity) {
+            const refObj = this.hass?.states?.[refEntity];
+            refVal = refAttr ? readAttr(refObj, refAttr) : refObj?.state;
+          }
+          const offset = field(offsetKey);
+          if (offset !== undefined && offset !== null && String(offset).trim() !== '') {
+            const base = this._coerceNumber(refVal);
+            const delta = this._coerceNumber(offset);
+            if (Number.isFinite(base) && Number.isFinite(delta)) return base + delta;
+          }
+          return refVal;
+        };
+        const condVal = resolveReferenceValue('val', 'val_entity', 'val_attr', 'val_offset');
+        const condVal2 = resolveReferenceValue('val2', 'val2_entity', 'val2_attr', 'val2_offset');
         let sourceVal;
         let isThisEntity = false; // for rescale
 
