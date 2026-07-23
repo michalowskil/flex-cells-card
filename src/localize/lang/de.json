@@ -208,7 +208,7 @@
     "reference_value": "Referenzwert",
     "reference_min": "Referenz min",
     "reference_max": "Referenz max",
-    "reference_offset": "Offset",
+    "reference_offset": "",
     "reference_hint": "Wähle eine Referenzentität, um den festen Wert oben zu ersetzen. Das feste Feld wird deaktiviert, sobald eine Referenzentität gewählt ist.",
     "bg": "Hintergrundfarbe",
     "fg": "Inhaltsfarbe",
