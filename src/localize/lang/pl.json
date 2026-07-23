@@ -208,7 +208,7 @@
     "reference_value": "Wartość referencyjna",
     "reference_min": "Referencja min.",
     "reference_max": "Referencja maks.",
-    "reference_offset": "Offset",
+    "reference_offset": "",
     "reference_hint": "Wybierz encję referencyjną, aby zastąpić stałą wartość powyżej. Pole stałe zostanie wyłączone po wybraniu encji referencyjnej.",
     "bg": "Kolor tła",
     "fg": "Kolor zawartości",
