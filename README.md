@@ -76,7 +76,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Duration sensors (`device_class: duration`) are not clock times. `0:01:30` is parsed as 00:01:30 if you compare it as time; compare durations as numbers instead.
   - Localized display strings (`24.08.2026`, `2 hours ago`) are not parsed. Type the raw HA value in the condition.
 
-  Example — highlight a row when last change is after 22:00:
+  Example — red cell when `last_changed` is after 22:00 local time (the date is ignored):
 
   ```yaml
   dyn_color:
@@ -100,7 +100,7 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
       visibility: hidden
   ```
 
-  Example — current time is at least 30 minutes after `input_datetime.alarm`:
+  Example — current clock is at least 30 minutes after a **time-only** alarm helper (the date part of a datetime helper is ignored here):
 
   ```yaml
   dyn_color:
