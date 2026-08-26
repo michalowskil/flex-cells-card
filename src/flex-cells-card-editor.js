@@ -232,7 +232,6 @@ class FlexCellsCardEditor extends LitElement {
     .cols2 > * { min-width: 0; }
     .muted { color: #888; font-size: 12px; margin-top: -4px; margin-bottom: 8px; }
     .datetime-token-help.no-bottom { margin-bottom: 0; }
-    .datetime-token-help a { color: var(--primary-color, #03a9f4); }
     .rulehdr { color: #888; font-size: 12px; margin: 0 0 4px; }
     .mini { width: 140px; padding: 6px 8px; font-size: 13px; margin: 0; }
     .mini-wide { width: 220px; padding: 6px 8px; font-size: 13px; margin: 0; }
@@ -1590,9 +1589,11 @@ _styleValue(r,c,key,e){
       val_entity: rule?.val_entity ?? '',
       val_attr: rule?.val_attr ?? '',
       val_offset: rule?.val_offset ?? '',
+      val_offset_unit: rule?.val_offset_unit ?? '',
       val2_entity: rule?.val2_entity ?? '',
       val2_attr: rule?.val2_attr ?? '',
       val2_offset: rule?.val2_offset ?? '',
+      val2_offset_unit: rule?.val2_offset_unit ?? '',
       src: rule?.src,
     };
     if (!rule || typeof rule !== 'object') return [fallback];
@@ -1606,9 +1607,11 @@ _styleValue(r,c,key,e){
       val_entity: c?.val_entity ?? '',
       val_attr: c?.val_attr ?? '',
       val_offset: c?.val_offset ?? '',
+      val_offset_unit: c?.val_offset_unit ?? '',
       val2_entity: c?.val2_entity ?? '',
       val2_attr: c?.val2_attr ?? '',
       val2_offset: c?.val2_offset ?? '',
+      val2_offset_unit: c?.val2_offset_unit ?? '',
       src: c?.src,
     }));
   }
@@ -1709,9 +1712,11 @@ _styleValue(r,c,key,e){
     const entityKey = isMax ? 'val2_entity' : 'val_entity';
     const attrKey = isMax ? 'val2_attr' : 'val_attr';
     const offsetKey = isMax ? 'val2_offset' : 'val_offset';
+    const offsetUnitKey = isMax ? 'val2_offset_unit' : 'val_offset_unit';
     const entity = cond?.[entityKey] || '';
     const attr = cond?.[attrKey] || '';
     const offset = cond?.[offsetKey] ?? '';
+    const offsetUnit = cond?.[offsetUnitKey] || 'number';
     const hasReference = !!entity || !!attr || offset !== '';
     const listId = `${idBase}-${entityKey}-attrs`;
     const title = labelKey
@@ -1744,7 +1749,7 @@ _styleValue(r,c,key,e){
                 .map(opt => html`<option value="${opt}"></option>`) }
           </datalist>
         </div>
-        <div class="cols1">
+        <div class="cols2">
           <fcc-textfield
             type="number"
             step="any"
@@ -1752,6 +1757,19 @@ _styleValue(r,c,key,e){
             .value=${offset}
             @input=${(e)=>update({ [offsetKey]: e.target.value })}>
           </fcc-textfield>
+          <ha-select
+            .label=${t(this.hass, 'dynamic.reference_offset_unit')}
+            .value=${offsetUnit}
+            .options=${[
+              { value: 'number', label: t(this.hass, 'dynamic.offset_unit_number') },
+              { value: 's', label: t(this.hass, 'dynamic.offset_unit_s') },
+              { value: 'min', label: t(this.hass, 'dynamic.offset_unit_min') },
+              { value: 'h', label: t(this.hass, 'dynamic.offset_unit_h') },
+              { value: 'd', label: t(this.hass, 'dynamic.offset_unit_d') },
+            ]}
+            @selected=${(e)=>update({ [offsetUnitKey]: e.detail?.value ?? e.target?.value ?? 'number' })}
+            @closed=${(e)=>e.stopPropagation()}>
+          </ha-select>
         </div>
       </details>
     `;
@@ -3716,7 +3734,10 @@ _styleValue(r,c,key,e){
                           ${t(this.hass, 'editor.dynamic_title')}
                         </summary>
 
-                        <div class="muted dyn-hint">${t(this.hass, 'editor.dynamic_hint')}</div>
+                        <div class="muted dyn-hint">
+                          ${t(this.hass, 'editor.dynamic_hint')}
+                          <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#tips--tricks">${t(this.hass, 'editor.tips_tricks')}</a>.
+                        </div>
 
                         ${ (Array.isArray(cell?.dyn_color) ? cell.dyn_color : []).map((rule, ridx) => {
                           const conditions = this._normalizeRuleConditions(rule);
@@ -4046,7 +4067,10 @@ _styleValue(r,c,key,e){
                           ${t(this.hass, 'editor.dynamic_row_title')}
                         </summary>
 
-                        <div class="muted dyn-hint">${t(this.hass, 'editor.dynamic_hint')}</div>
+                        <div class="muted dyn-hint">
+                          ${t(this.hass, 'editor.dynamic_hint')}
+                          <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#tips--tricks">${t(this.hass, 'editor.tips_tricks')}</a>.
+                        </div>
 
                         ${rowRules.map((rule, ridx) => {
                           const conditions = this._normalizeRuleConditions(rule);
@@ -4370,7 +4394,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.28.0
+        FCC v0.29.0-beta.1
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

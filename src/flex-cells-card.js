@@ -2988,6 +2988,227 @@ class FlexCellsCard extends LitElement {
     return Number.isFinite(n) ? n : NaN;
   }
 
+  _isTemporalValue(v) {
+    return !!v && typeof v === 'object' && (v.kind === 'time' || v.kind === 'date' || v.kind === 'datetime');
+  }
+
+  _asTemporalValue(v) {
+    if (this._isTemporalValue(v)) return v;
+    return this._classifyTemporalValue(v);
+  }
+
+  _classifyUnixTimestamp(n) {
+    if (!Number.isFinite(n)) return null;
+    const abs = Math.abs(n);
+    if (abs >= 1e12) return { kind: 'datetime', ms: n };
+    if (abs >= 1e9) return { kind: 'datetime', ms: n * 1000 };
+    return null;
+  }
+
+  _parseTimeOfDayString(trimmed) {
+    const m = String(trimmed || '').match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    const hours = Number(m[1]);
+    const minutes = Number(m[2]);
+    const seconds = Number(m[3] || '0');
+    if (hours > 23 || minutes > 59 || seconds > 59) return null;
+    return { kind: 'time', seconds: (hours * 3600) + (minutes * 60) + seconds };
+  }
+
+  _parseDateOnlyString(trimmed) {
+    const m = String(trimmed || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const month = Number(m[2]);
+    const d = Number(m[3]);
+    if (month < 1 || month > 12 || d < 1 || d > 31) return null;
+    const probe = new Date(y, month - 1, d);
+    if (probe.getFullYear() !== y || probe.getMonth() !== month - 1 || probe.getDate() !== d) return null;
+    return { kind: 'date', y, m: month, d };
+  }
+
+  _parseDateTimeString(trimmed) {
+    const m = String(trimmed || '').match(
+      /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:?\d{2})?$/i,
+    );
+    if (!m) return null;
+    const y = Number(m[1]);
+    const month = Number(m[2]);
+    const d = Number(m[3]);
+    const hours = Number(m[4]);
+    const minutes = Number(m[5]);
+    const seconds = Number(m[6] || '0');
+    const frac = m[7] || '';
+    const tz = m[8];
+    if (month < 1 || month > 12 || d < 1 || d > 31 || hours > 23 || minutes > 59 || seconds > 59) return null;
+    if (tz) {
+      const tzNorm = /^[+-]\d{4}$/.test(tz) ? `${tz.slice(0, 3)}:${tz.slice(3)}` : tz;
+      const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${String(seconds).padStart(2, '0')}${frac ? `.${frac}` : ''}${tzNorm}`;
+      const parsed = Date.parse(iso);
+      if (Number.isNaN(parsed)) return null;
+      return { kind: 'datetime', ms: parsed };
+    }
+    const date = new Date(y, month - 1, d, hours, minutes, seconds);
+    if (Number.isNaN(date.getTime())) return null;
+    if (frac) {
+      const ms = Number(String(frac).padEnd(3, '0').slice(0, 3));
+      if (Number.isFinite(ms)) date.setMilliseconds(ms);
+    }
+    return { kind: 'datetime', ms: date.getTime() };
+  }
+
+  _classifyTemporalValue(raw) {
+    if (raw === undefined || raw === null || raw === '') return null;
+    if (this._isTemporalValue(raw)) return raw;
+    if (raw instanceof Date) {
+      return Number.isNaN(raw.getTime()) ? null : { kind: 'datetime', ms: raw.getTime() };
+    }
+    if (typeof raw === 'number') return this._classifyUnixTimestamp(raw);
+    if (typeof raw === 'boolean') return null;
+    const trimmed = String(raw).trim();
+    if (!trimmed) return null;
+    const lower = trimmed.toLowerCase();
+    if (lower === 'unavailable' || lower === 'unknown' || lower === 'none' || lower === 'null') return null;
+    const time = this._parseTimeOfDayString(trimmed);
+    if (time) return time;
+    const dateOnly = this._parseDateOnlyString(trimmed);
+    if (dateOnly) return dateOnly;
+    const dateTime = this._parseDateTimeString(trimmed);
+    if (dateTime) return dateTime;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return this._classifyUnixTimestamp(Number(trimmed));
+    return null;
+  }
+
+  _normalizeTemporalOffsetUnit(unit) {
+    const raw = String(unit ?? '').trim().toLowerCase();
+    if (!raw || raw === 'number' || raw === 'num' || raw === 'n' || raw === 'raw' || raw === 'none' || raw === 'numeric') return 'number';
+    if (raw === 's' || raw === 'sec' || raw === 'secs' || raw === 'second' || raw === 'seconds') return 's';
+    if (raw === 'm' || raw === 'min' || raw === 'mins' || raw === 'minute' || raw === 'minutes') return 'min';
+    if (raw === 'h' || raw === 'hr' || raw === 'hrs' || raw === 'hour' || raw === 'hours') return 'h';
+    if (raw === 'd' || raw === 'day' || raw === 'days') return 'd';
+    return 'number';
+  }
+
+  _temporalOffsetToMs(offset, unit) {
+    const n = this._coerceNumber(offset);
+    if (!Number.isFinite(n)) return NaN;
+    switch (this._normalizeTemporalOffsetUnit(unit)) {
+      case 's': return n * 1000;
+      case 'min': return n * 60 * 1000;
+      case 'h': return n * 3600 * 1000;
+      case 'd': return n * 86400 * 1000;
+      default: return NaN;
+    }
+  }
+
+  _applyTemporalOffset(temporal, offset, unit) {
+    if (!this._isTemporalValue(temporal)) return temporal;
+    if (offset === undefined || offset === null || String(offset).trim() === '') return temporal;
+    if (this._normalizeTemporalOffsetUnit(unit) === 'number') return temporal;
+    const deltaMs = this._temporalOffsetToMs(offset, unit);
+    if (!Number.isFinite(deltaMs) || deltaMs === 0) return temporal;
+    if (temporal.kind === 'time') {
+      const day = 86400;
+      let seconds = temporal.seconds + Math.round(deltaMs / 1000);
+      seconds = ((seconds % day) + day) % day;
+      return { kind: 'time', seconds };
+    }
+    if (temporal.kind === 'date') {
+      const dt = new Date(temporal.y, temporal.m - 1, temporal.d);
+      if (this._normalizeTemporalOffsetUnit(unit) === 'd') {
+        dt.setDate(dt.getDate() + Math.round(this._coerceNumber(offset)));
+      } else {
+        dt.setTime(dt.getTime() + deltaMs);
+      }
+      return { kind: 'date', y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
+    }
+    return { kind: 'datetime', ms: temporal.ms + deltaMs };
+  }
+
+  _temporalToTimeOfDay(temporal) {
+    if (!this._isTemporalValue(temporal)) return null;
+    if (temporal.kind === 'time') return temporal;
+    if (temporal.kind === 'datetime') {
+      const date = new Date(temporal.ms);
+      if (Number.isNaN(date.getTime())) return null;
+      return {
+        kind: 'time',
+        seconds: (date.getHours() * 3600) + (date.getMinutes() * 60) + date.getSeconds(),
+      };
+    }
+    return null;
+  }
+
+  _temporalToDate(temporal) {
+    if (!this._isTemporalValue(temporal)) return null;
+    if (temporal.kind === 'date') return temporal;
+    if (temporal.kind === 'datetime') {
+      const date = new Date(temporal.ms);
+      if (Number.isNaN(date.getTime())) return null;
+      return { kind: 'date', y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() };
+    }
+    return null;
+  }
+
+  _alignTemporalPair(left, right) {
+    if (!this._isTemporalValue(left) || !this._isTemporalValue(right)) return null;
+    if (left.kind === right.kind) return { left, right, kind: left.kind };
+    if (left.kind === 'datetime' && right.kind === 'time') {
+      const converted = this._temporalToTimeOfDay(left);
+      return converted ? { left: converted, right, kind: 'time' } : null;
+    }
+    if (left.kind === 'time' && right.kind === 'datetime') {
+      const converted = this._temporalToTimeOfDay(right);
+      return converted ? { left, right: converted, kind: 'time' } : null;
+    }
+    if (left.kind === 'datetime' && right.kind === 'date') {
+      const converted = this._temporalToDate(left);
+      return converted ? { left: converted, right, kind: 'date' } : null;
+    }
+    if (left.kind === 'date' && right.kind === 'datetime') {
+      const converted = this._temporalToDate(right);
+      return converted ? { left, right: converted, kind: 'date' } : null;
+    }
+    return null;
+  }
+
+  _temporalRank(temporal) {
+    if (!this._isTemporalValue(temporal)) return NaN;
+    if (temporal.kind === 'time') return temporal.seconds;
+    if (temporal.kind === 'date') return (temporal.y * 10000) + (temporal.m * 100) + temporal.d;
+    if (temporal.kind === 'datetime') return temporal.ms;
+    return NaN;
+  }
+
+  _matchTemporalCondition(left, right, right2, op) {
+    if (!left) return null;
+    if (op === 'between') {
+      if (!right || !right2) return null;
+      const alignedMin = this._alignTemporalPair(left, right);
+      const alignedMax = this._alignTemporalPair(left, right2);
+      if (!alignedMin || !alignedMax || alignedMin.kind !== alignedMax.kind) return null;
+      const val = this._temporalRank(alignedMin.left);
+      const min = this._temporalRank(alignedMin.right);
+      const max = this._temporalRank(alignedMax.right);
+      if (![val, min, max].every(Number.isFinite)) return null;
+      if (alignedMin.kind === 'time' && min > max) return val >= min || val <= max;
+      return val >= min && val <= max;
+    }
+    if (!right) return null;
+    const aligned = this._alignTemporalPair(left, right);
+    if (!aligned) return null;
+    const lv = this._temporalRank(aligned.left);
+    const rv = this._temporalRank(aligned.right);
+    if (!Number.isFinite(lv) || !Number.isFinite(rv)) return null;
+    if (op === '>') return lv > rv;
+    if (op === '>=') return lv >= rv;
+    if (op === '<') return lv < rv;
+    if (op === '<=') return lv <= rv;
+    if (op === '!=') return lv !== rv;
+    if (op === '=' || op === '==') return lv === rv;
+    return null;
+  }
+
   _evaluateDynColor(cell, type, displayText) {
     const rules = Array.isArray(cell?.dyn_color) ? cell.dyn_color : [];
     if (!rules.length) return null;
@@ -3017,9 +3238,11 @@ class FlexCellsCard extends LitElement {
         val_entity: rule?.val_entity,
         val_attr: rule?.val_attr,
         val_offset: rule?.val_offset,
+        val_offset_unit: rule?.val_offset_unit,
         val2_entity: rule?.val2_entity,
         val2_attr: rule?.val2_attr,
         val2_offset: rule?.val2_offset,
+        val2_offset_unit: rule?.val2_offset_unit,
         src: rule?.src,
       }];
     };
@@ -3050,9 +3273,11 @@ class FlexCellsCard extends LitElement {
           }
           const offset = field(offsetKey);
           if (offset !== undefined && offset !== null && String(offset).trim() !== '') {
-            const base = this._coerceNumber(refVal);
-            const delta = this._coerceNumber(offset);
-            if (Number.isFinite(base) && Number.isFinite(delta)) return base + delta;
+            if (!this._classifyTemporalValue(refVal)) {
+              const base = this._coerceNumber(refVal);
+              const delta = this._coerceNumber(offset);
+              if (Number.isFinite(base) && Number.isFinite(delta)) return base + delta;
+            }
           }
           return refVal;
         };
@@ -3101,6 +3326,16 @@ class FlexCellsCard extends LitElement {
 
         const isNumOp = op === '>' || op === '>=' || op === '<' || op === '<=' || op === 'between';
         let match = false;
+
+        if (op !== 'contains' && op !== 'not_contains') {
+          const leftT = this._asTemporalValue(sourceVal);
+          let rightT = this._asTemporalValue(condVal);
+          let rightT2 = op === 'between' ? this._asTemporalValue(condVal2) : null;
+          if (rightT) rightT = this._applyTemporalOffset(rightT, field('val_offset'), field('val_offset_unit'));
+          if (rightT2) rightT2 = this._applyTemporalOffset(rightT2, field('val2_offset'), field('val2_offset_unit'));
+          const temporalMatch = this._matchTemporalCondition(leftT, rightT, rightT2, op);
+          if (temporalMatch !== null) return !!temporalMatch;
+        }
 
         if (isNumOp) {
           let num = this._coerceNumber(sourceVal);
