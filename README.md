@@ -55,63 +55,6 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Sorting works "after applying" dynamic rules, meaning what's visible is sorted.
   - Sorting works even if the column being sorted is hidden (breakpoint).
 
-- Dynamic rules
-  - If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
-  - If the condition selects an entity (and optional metadata path), the rule compares that **raw** state or attribute. If the entity field is empty, the rule compares the cell's visible value, including Date/Time format tokens. For date/time checks, point the condition at the helper/sensor state or a timestamp attribute, not at formatted display text such as `REL`.
-  - **Numbers** use `>`, `>=`, `<`, `<=`, `between`. **Text** uses `=`, `!=`, `contains`, `not_contains` (case-insensitive). If both sides of `=` / `!=` are numbers, the comparison is numeric; otherwise it is text.
-  - **Date / time** values also work with `>`, `>=`, `<`, `<=`, `=`, `!=`, and `between`. Supported raw formats:
-    - time: `HH:MM` or `HH:MM:SS` (`08:00`, `22:00:00`) — `input_datetime` time-only, `time` entities
-    - date: `YYYY-MM-DD` (`2026-08-24`) — `date` entities, date-only helpers
-    - datetime: Home Assistant `YYYY-MM-DD HH:MM:SS` or ISO-8601 (`2026-08-24T22:00:00`, with `Z` or `+02:00`) — `datetime` / `input_datetime`, `device_class: timestamp`, `last_changed`, `last_updated`
-    - unix timestamps (seconds or milliseconds) are treated as datetime
-  - How mixed types are compared:
-    - time vs time: time of day (seconds from midnight)
-    - date vs date: calendar day
-    - datetime vs datetime: exact instant
-    - datetime vs time: the datetime's **time of day** (so a timestamp `> 22:00` means “after 10 PM local time”)
-    - datetime vs date: the datetime's **calendar date**
-    - date vs time: not compared (the condition does not match)
-  - `between` for times wraps overnight: `22:00`–`06:00` matches 23:30 and 05:00, but not 12:00.
-  - Offset uses **Offset unit**: `number` (default) adds the raw amount to numeric values and does not shift date/time. `s` / `min` / `h` / `d` shift date/time by that duration. Time-of-day offsets wrap around midnight (`23:00` + 120 min → `01:00`). Numeric comparisons ignore time units and still add the raw number.
-  - Duration sensors (`device_class: duration`) are not clock times. `0:01:30` is parsed as 00:01:30 if you compare it as time; compare durations as numbers instead.
-  - Localized display strings (`24.08.2026`, `2 hours ago`) are not parsed. Type the raw HA value in the condition.
-
-  Example — red cell when `last_changed` is after 22:00 local time (the date is ignored):
-
-  ```yaml
-  dyn_color:
-    - conditions:
-        - entity: binary_sensor.front_door
-          attr: last_changed
-          op: ">"
-          val: "22:00"
-      bg: "#ff5722"
-  ```
-
-  Example — hide a row during a night window (wraps midnight):
-
-  ```yaml
-  dyn_row_rules:
-    - conditions:
-        - entity: sensor.time
-          op: between
-          val: "22:00"
-          val2: "06:00"
-      visibility: hidden
-  ```
-
-  Example — current clock is at least 30 minutes after a **time-only** alarm helper (the date part of a datetime helper is ignored here):
-
-  ```yaml
-  dyn_color:
-    - conditions:
-        - entity: sensor.time
-          op: ">="
-          val_entity: input_datetime.alarm
-          val_offset: 30
-          val_offset_unit: min
-  ```
-
 - Available colors
   - You can specify colors in various formats, one of which is variables, for example "var(--state-active-color)". You can find a list of variables at [this link](https://github.com/home-assistant/frontend/blob/dev/src/resources/theme/color/color.globals.ts).
 
@@ -123,9 +66,66 @@ Olli from the YouTube channel [@smarterkram](https://www.youtube.com/@smarterkra
   - Precedence: per-cell `camera_snapshot_ttl_ms` → if empty, use card-level `camera_snapshot_ttl_ms` → if neither set, default is 5000 ms.
   - TTL controls how often the card asks HA for a new snapshot (adds a cache-buster); it does **not** change how/when the camera itself captures frames.
 
+## Dynamic rules
+
+- If you see the value "null" for an attribute in developer tools and want to use it in dynamic rules, don't enter "null" but leave value input empty. Empty means "null".
+- If the condition selects an entity (and optional metadata path), the rule compares that **raw** state or attribute. If the entity field is empty, the rule compares the cell's visible value, including Date/Time format tokens. For date/time checks, point the condition at the helper/sensor state or a timestamp attribute, not at formatted display text such as `REL`.
+- **Numbers** use `>`, `>=`, `<`, `<=`, `between`. **Text** uses `=`, `!=`, `contains`, `not_contains` (case-insensitive). If both sides of `=` / `!=` are numbers, the comparison is numeric; otherwise it is text.
+- **Date / time** values also work with `>`, `>=`, `<`, `<=`, `=`, `!=`, and `between`. Supported raw formats:
+  - time: `HH:MM` or `HH:MM:SS` (`08:00`, `22:00:00`) — `input_datetime` time-only, `time` entities
+  - date: `YYYY-MM-DD` (`2026-08-24`) — `date` entities, date-only helpers
+  - datetime: Home Assistant `YYYY-MM-DD HH:MM:SS` or ISO-8601 (`2026-08-24T22:00:00`, with `Z` or `+02:00`) — `datetime` / `input_datetime`, `device_class: timestamp`, `last_changed`, `last_updated`
+  - unix timestamps (seconds or milliseconds) are treated as datetime
+- How mixed types are compared:
+  - time vs time: time of day (seconds from midnight)
+  - date vs date: calendar day
+  - datetime vs datetime: exact instant
+  - datetime vs time: the datetime's **time of day** (so a timestamp `> 22:00` means “after 10 PM local time”)
+  - datetime vs date: the datetime's **calendar date**
+  - date vs time: not compared (the condition does not match)
+- `between` for times wraps overnight: `22:00`–`06:00` matches 23:30 and 05:00, but not 12:00.
+- Offset uses **Offset unit**: `number` (default) adds the raw amount to numeric values and does not shift date/time. `s` / `min` / `h` / `d` shift date/time by that duration. Time-of-day offsets wrap around midnight (`23:00` + 120 min → `01:00`). Numeric comparisons ignore time units and still add the raw number.
+- Duration sensors (`device_class: duration`) are not clock times. `0:01:30` is parsed as 00:01:30 if you compare it as time; compare durations as numbers instead.
+- Localized display strings (`24.08.2026`, `2 hours ago`) are not parsed. Type the raw HA value in the condition.
+
+Example — red cell when `last_changed` is after 22:00 local time (the date is ignored):
+
+```yaml
+dyn_color:
+  - conditions:
+      - entity: binary_sensor.front_door
+        attr: last_changed
+        op: ">"
+        val: "22:00"
+    bg: "#ff5722"
+```
+
+Example — hide a row during a night window (wraps midnight):
+
+```yaml
+dyn_row_rules:
+  - conditions:
+      - entity: sensor.time
+        op: between
+        val: "22:00"
+        val2: "06:00"
+    visibility: hidden
+```
+
+Example — current clock is at least 30 minutes after a **time-only** alarm helper (the date part of a datetime helper is ignored here):
+
+```yaml
+dyn_color:
+  - conditions:
+      - entity: sensor.time
+        op: ">="
+        val_entity: input_datetime.alarm
+        val_offset: 30
+        val_offset_unit: min
+```
 
 ## Metadata paths
-For entity cells, the `attribute` field is a metadata path. It can read:
+Entity cells and rule conditions can use a metadata path. It is not limited to Home Assistant attributes:
 
 - state-object fields such as `state`, `entity_id`, `last_changed`, `last_updated`, and `context`;
 - entity attributes directly, for example `friendly_name`, `unit_of_measurement`, or nested paths like `attributes.brightness`;
@@ -405,7 +405,7 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
-- v0.29.0-beta.1 (Pre-release) —
+- v0.29.0 —
   - Dynamic rules can now compare **time**, **date**, and **datetime** values (`>`, `>=`, `<`, `<=`, `=`, `!=`, `between`), including Home Assistant `HH:MM[:SS]` / `YYYY-MM-DD` / `YYYY-MM-DD HH:MM:SS`, ISO-8601, and unix timestamps.
   - Datetime vs time compares the time of day; datetime vs date compares the calendar day. `between` for times wraps overnight (e.g. `22:00`–`06:00`).
   - Date/time reference offsets use an explicit unit (number, seconds, minutes, hours, days). **Number is the default**: it adds a raw numeric offset and leaves date/time unchanged. Time units wrap around midnight for time-of-day values.

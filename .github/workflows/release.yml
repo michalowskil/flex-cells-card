@@ -67,7 +67,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-beta') }}
           body: ${{ steps.tagbody.outputs.body }}
-          generate_release_notes: true
+          generate_release_notes: false
           files: dist/flex-cells-card.js
 
       # Utwórz release bez body (lightweight tag) – tylko auto-notes
@@ -77,5 +77,5 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-beta') }}
-          generate_release_notes: true
+          generate_release_notes: false
           files: dist/flex-cells-card.js

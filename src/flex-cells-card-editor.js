@@ -3736,7 +3736,7 @@ _styleValue(r,c,key,e){
 
                         <div class="muted dyn-hint">
                           ${t(this.hass, 'editor.dynamic_hint')}
-                          <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#tips--tricks">${t(this.hass, 'editor.tips_tricks')}</a>.
+                          <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#dynamic-rules">${t(this.hass, 'editor.dynamic_docs')}</a>.
                         </div>
 
                         ${ (Array.isArray(cell?.dyn_color) ? cell.dyn_color : []).map((rule, ridx) => {
@@ -4069,7 +4069,7 @@ _styleValue(r,c,key,e){
 
                         <div class="muted dyn-hint">
                           ${t(this.hass, 'editor.dynamic_hint')}
-                          <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#tips--tricks">${t(this.hass, 'editor.tips_tricks')}</a>.
+                          <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#dynamic-rules">${t(this.hass, 'editor.dynamic_docs')}</a>.
                         </div>
 
                         ${rowRules.map((rule, ridx) => {
@@ -4394,7 +4394,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.29.0-beta.1
+        FCC v0.29.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>
