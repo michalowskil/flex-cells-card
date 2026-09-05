@@ -179,7 +179,7 @@
     "dynamic_title": "Reguły dynamiczne (komórka): kolor i nadpisywanie treści",
     "dynamic_row_title": "Reguły dynamiczne (wiersz): kolor i ukrywanie wiersza",
     "dynamic_hint": "Reguły sprawdzane są od góry do dołu, ostatnia dopasowana wygrywa. Więcej szczegółów:",
-    "dynamic_docs": "Dynamic rules",
+    "dynamic_docs": "",
     "datetime_format": "Format daty/czasu i nadpisanie tekstu",
     "available_tokens": "Tokeny daty/czasu:",
     "token_reference": "Otwórz opis tokenów",
