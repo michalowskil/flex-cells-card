@@ -170,6 +170,8 @@ class FlexCellsCard extends LitElement {
       align-items: center;
       gap: 6px;
       flex-wrap: nowrap;
+      min-width: 0;
+      max-width: 100%;
     }
     .fcc-template-row {
       display: inline-flex;
@@ -241,7 +243,20 @@ class FlexCellsCard extends LitElement {
       gap: 6px;
     }
     /* === Simple HA input controls === */
-    .ctrl-wrap { display:inline-flex; align-items:center; gap:8px; touch-action: pan-y; }
+    .ctrl-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      vertical-align: middle;
+      touch-action: pan-y;
+    }
+    .ctrl-wrap:has(> .ctrl-select) {
+      display: inline-block;
+      vertical-align: middle;
+    }
     .ctrl-range { width: 160px; vertical-align: middle; touch-action: pan-y !important; }
     .ctrl-step-button {
       width: 28px;
@@ -366,7 +381,13 @@ class FlexCellsCard extends LitElement {
       border: 1px solid rgba(0,0,0,0.12);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
     }
-    .ctrl-select, .ctrl-input { padding: 4px 6px; border: 1px solid var(--divider-color,#ddd); border-radius: 6px; background: var(--card-background-color,#fff); }
+    .ctrl-select, .ctrl-input {
+      padding: 4px 6px;
+      border: 1px solid var(--divider-color,#ddd);
+      border-radius: 6px;
+      background: var(--card-background-color,#fff);
+      box-sizing: border-box;
+    }
     .ctrl-button {
       padding: 6px 10px;
       border-radius: 8px;
@@ -383,9 +404,14 @@ class FlexCellsCard extends LitElement {
     .ctrl-switch { vertical-align: middle; }
     .ctrl-input[type="date"],
     .ctrl-input[type="time"],
-    .ctrl-input[type="datetime-local"],
+    .ctrl-input[type="datetime-local"] {
+      width: auto;
+    }
     .ctrl-select {
-      width: auto !important;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 `;
 
@@ -814,7 +840,7 @@ class FlexCellsCard extends LitElement {
     let cur = obj;
     for (const key of norm) {
       const k = (Array.isArray(cur) && /^\d+$/.test(key)) ? Number(key) : key;
-      if (cur == null || !(k in cur)) return undefined;
+      if (cur == null || typeof cur !== 'object' || !(k in cur)) return undefined;
       cur = cur[k];
     }
     return cur;

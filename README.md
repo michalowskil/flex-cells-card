@@ -405,6 +405,9 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.30.0 —
+  - The **Metadata path** field in the visual editor now shows a suggestion list on all devices. Tested on Windows (Firefox, Chrome, Edge) and Android (Companion App, Firefox, Chrome).
+  - Select lists on the card (Show control and Attribute editing) stay inside the cell when an option name is very long, instead of overflowing off the card.
 - v0.29.0 —
   - Dynamic rules can now compare **time**, **date**, and **datetime** values (`>`, `>=`, `<`, `<=`, `=`, `!=`, `between`), including Home Assistant `HH:MM[:SS]` / `YYYY-MM-DD` / `YYYY-MM-DD HH:MM:SS`, ISO-8601, and unix timestamps.
   - Datetime vs time compares the time of day; datetime vs date compares the calendar day. `between` for times wraps overnight (e.g. `22:00`–`06:00`).

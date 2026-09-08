@@ -170,17 +170,436 @@ if (!customElements.get('fcc-textfield')) {
   customElements.define('fcc-textfield', FccTextfield);
 }
 
+class FccCombobox extends LitElement {
+  static properties = {
+    disabled: { type: Boolean, reflect: true },
+    label: { type: String },
+    name: { type: String },
+    placeholder: { type: String },
+    readonly: { type: Boolean, reflect: true },
+    required: { type: Boolean, reflect: true },
+    value: {},
+    suggestions: { type: Array },
+    _open: { state: true },
+    _activeIndex: { state: true },
+  };
+
+  constructor() {
+    super();
+    this.disabled = false;
+    this.label = '';
+    this.placeholder = '';
+    this.readonly = false;
+    this.required = false;
+    this.value = '';
+    this.suggestions = [];
+    this._open = false;
+    this._activeIndex = -1;
+    this._listId = `fcc-combobox-list-${Math.random().toString(36).slice(2, 10)}`;
+    this._listening = false;
+    this._pointer = null;
+    this._touchTap = null;
+    this._suppressClick = false;
+    this._onDocPointerDown = (ev) => this._handleDocPointerDown(ev);
+  }
+
+  static styles = css`
+    :host {
+      --fcc-textfield-height: 56px;
+      display: block;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      color: var(--primary-text-color);
+    }
+    :host([hidden]) {
+      display: none;
+    }
+    :host([disabled]) {
+      opacity: 0.65;
+    }
+    :host(.mini) {
+      --fcc-textfield-height: 48px;
+    }
+    .field {
+      display: block;
+      position: relative;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    .label {
+      position: absolute;
+      inset: 7px 12px auto 12px;
+      z-index: 1;
+      color: var(--secondary-text-color);
+      font-size: 12px;
+      line-height: 16px;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    input {
+      width: 100%;
+      min-width: 0;
+      height: var(--fcc-textfield-height);
+      box-sizing: border-box;
+      border: 0;
+      border-radius: 4px 4px 0 0;
+      background: var(--ha-color-form-background, var(--secondary-background-color, var(--card-background-color, #fff)));
+      box-shadow: inset 0 -1px var(--divider-color, #ccc);
+      color: var(--primary-text-color);
+      font: inherit;
+      font-size: 16px;
+      outline: none;
+      padding: 20px 12px 4px;
+      transition: background 0.2s, box-shadow 0.2s;
+      user-select: text;
+      -webkit-user-select: text;
+      touch-action: pan-y;
+    }
+    :host(.mini) input {
+      font-size: 13px;
+      padding: 17px 8px 3px;
+    }
+    :host(.mini) .label {
+      inset: 5px 8px auto 8px;
+      font-size: 11px;
+      line-height: 14px;
+    }
+    .field:not(.has-label) input {
+      height: 40px;
+      padding-top: 4px;
+    }
+    input:hover:not(:disabled) {
+      background: var(--ha-color-form-background-hover, var(--secondary-background-color, var(--card-background-color, #fff)));
+    }
+    input:focus {
+      box-shadow: inset 0 -2px var(--primary-color, #03a9f4);
+    }
+    input:disabled {
+      background: var(--ha-color-form-background-disabled, var(--disabled-color, var(--secondary-background-color, #f5f5f5)));
+      color: var(--disabled-text-color, var(--secondary-text-color, #999));
+      cursor: not-allowed;
+    }
+    input::placeholder {
+      color: var(--secondary-text-color);
+      opacity: 0.75;
+    }
+    :host {
+      position: relative;
+    }
+    .menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      max-height: min(280px, 40vh);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px;
+      border: 1px solid var(--divider-color, #ccc);
+      background: var(--card-background-color, var(--secondary-background-color, #fff));
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      padding: 4px 0;
+      color: var(--primary-text-color);
+    }
+    .option {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.3;
+      text-align: left;
+      padding: 10px 12px;
+      cursor: pointer;
+      touch-action: pan-y;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .option.active {
+      background: var(--primary-color, #03a9f4);
+      color: var(--text-primary-color, #fff);
+    }
+  `;
+
+  get _suggestionList() {
+    if (!Array.isArray(this.suggestions)) return [];
+    return this.suggestions.map((opt) => {
+      if (opt && typeof opt === 'object') return String(opt.value ?? '');
+      return String(opt ?? '');
+    });
+  }
+
+  render() {
+    const value = this.value == null ? '' : String(this.value);
+    const label = this.label || '';
+    const placeholder = this.placeholder || '';
+    const ariaLabel = label || placeholder || nothing;
+    return html`
+      <label class=${label ? 'field has-label' : 'field'}>
+        ${label ? html`<span part="label" class="label">${label}</span>` : nothing}
+        <input
+          part="input"
+          type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded=${this._open ? 'true' : 'false'}
+          aria-controls=${this._listId}
+          aria-activedescendant=${this._open && this._activeIndex >= 0 ? `${this._listId}-${this._activeIndex}` : nothing}
+          .value=${value}
+          name=${this.name || nothing}
+          placeholder=${placeholder || nothing}
+          aria-label=${ariaLabel}
+          autocomplete="off"
+          autocapitalize="none"
+          autocorrect="off"
+          spellcheck="false"
+          ?disabled=${this.disabled}
+          ?readonly=${this.readonly}
+          ?required=${this.required}
+          @input=${this._onInput}
+          @change=${this._onChange}
+          @click=${this._onInputClick}
+          @keydown=${this._onKeydown}
+        />
+        ${this._open ? this._renderMenu() : nothing}
+      </label>
+    `;
+  }
+
+  _renderMenu() {
+    const items = this._suggestionList;
+    const current = String(this.value ?? '');
+    return html`
+      <div
+        class="menu"
+        id=${this._listId}
+        role="listbox"
+      >
+        ${items.map((opt, idx) => html`
+          <div
+            class=${idx === this._activeIndex ? 'option active' : 'option'}
+            id=${`${this._listId}-${idx}`}
+            role="option"
+            aria-selected=${opt === current || idx === this._activeIndex}
+            @pointerdown=${(ev) => this._onOptionPointerDown(ev, opt)}
+            @pointerup=${(ev) => this._onOptionPointerUp(ev)}
+            @pointercancel=${() => { this._pointer = null; this._touchTap = null; }}
+            @click=${(ev) => this._onOptionClick(ev, opt)}
+          >${opt}</div>
+        `)}
+      </div>
+    `;
+  }
+
+  focus(options) {
+    this.renderRoot?.querySelector('input')?.focus(options);
+  }
+
+  select() {
+    this.renderRoot?.querySelector('input')?.select();
+  }
+
+  updated(changed) {
+    const items = this._suggestionList;
+    if (this._open && !items.length) {
+      this._closeMenu();
+      return;
+    }
+    if (this._open && this._activeIndex >= items.length) {
+      this._activeIndex = items.length ? 0 : -1;
+    }
+    if (this._open) {
+      this._addMenuListeners();
+      if (changed.has('_open') || changed.has('_activeIndex')) this._scrollActiveIntoView();
+    } else if (changed.has('_open')) {
+      this._removeMenuListeners();
+    }
+  }
+
+  disconnectedCallback() {
+    this._open = false;
+    this._activeIndex = -1;
+    this._removeMenuListeners();
+    super.disconnectedCallback();
+  }
+
+  _onInputClick() {
+    if (this.disabled || this.readonly) return;
+    this._openMenu();
+  }
+
+  _onInput(ev) {
+    ev.stopPropagation();
+    this.value = ev.target.value;
+    this._openMenu();
+    this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  }
+
+  _onChange(ev) {
+    ev.stopPropagation();
+    this.value = ev.target.value;
+    this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  }
+
+  _onKeydown(ev) {
+    if (this.disabled || this.readonly || ev.isComposing) return;
+    const items = this._suggestionList;
+    if (ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      this._openMenu();
+      if (!items.length) return;
+      this._activeIndex = Math.min((this._activeIndex < 0 ? -1 : this._activeIndex) + 1, items.length - 1);
+    } else if (ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      this._openMenu();
+      if (!items.length) return;
+      this._activeIndex = Math.max((this._activeIndex < 0 ? items.length : this._activeIndex) - 1, 0);
+    } else if (ev.key === 'Enter') {
+      if (this._open && this._activeIndex >= 0 && items[this._activeIndex] != null) {
+        ev.preventDefault();
+        this._selectOption(items[this._activeIndex]);
+      }
+    } else if (ev.key === 'Escape' && this._open) {
+      ev.preventDefault();
+      this._closeMenu();
+    } else if (ev.key === 'Tab') {
+      this._closeMenu();
+    }
+  }
+
+  _openMenu() {
+    if (this.disabled || this.readonly) return;
+    const items = this._suggestionList;
+    if (!items.length) {
+      if (this._open) this._closeMenu();
+      return;
+    }
+    const current = String(this.value ?? '');
+    const idx = items.indexOf(current);
+    this._activeIndex = idx >= 0 ? idx : (this._activeIndex >= 0 && this._activeIndex < items.length ? this._activeIndex : 0);
+    this._open = true;
+  }
+
+  _closeMenu() {
+    this._open = false;
+    this._activeIndex = -1;
+  }
+
+  _onOptionPointerDown(ev, opt) {
+    this._pointer = {
+      id: ev.pointerId,
+      opt,
+      x: ev.clientX,
+      y: ev.clientY,
+      type: ev.pointerType || 'mouse',
+    };
+    this._touchTap = null;
+    this._suppressClick = false;
+    if (this._pointer.type === 'mouse') {
+      ev.preventDefault();
+      this._pointer = null;
+      this._selectOption(opt);
+    }
+  }
+
+  _onOptionPointerUp(ev) {
+    const start = this._pointer;
+    this._pointer = null;
+    if (!start || start.type === 'mouse') return;
+    if (start.id != null && ev.pointerId != null && start.id !== ev.pointerId) return;
+    const isTap = Math.abs(ev.clientX - start.x) <= 10 && Math.abs(ev.clientY - start.y) <= 10;
+    this._touchTap = isTap ? start.opt : null;
+    this._suppressClick = !isTap;
+  }
+
+  _onOptionClick(ev, opt) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (this._suppressClick) {
+      this._suppressClick = false;
+      this._touchTap = null;
+      return;
+    }
+    const value = this._touchTap || opt;
+    this._touchTap = null;
+    this._selectOption(value);
+  }
+
+  _selectOption(next) {
+    const value = next == null ? '' : String(next);
+    const input = this.renderRoot?.querySelector('input');
+    if (input) input.value = value;
+    const changed = value !== String(this.value ?? '');
+    this.value = value;
+    if (changed) {
+      this.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      this.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    }
+    this._closeMenu();
+    input?.focus();
+  }
+
+  get _menuEl() {
+    return this.renderRoot?.querySelector('.menu') || null;
+  }
+
+  _handleDocPointerDown(ev) {
+    const path = ev.composedPath();
+    if (path.includes(this) || (this._menuEl && path.includes(this._menuEl))) return;
+    this._closeMenu();
+  }
+
+  _addMenuListeners() {
+    if (this._listening) return;
+    this._listening = true;
+    document.addEventListener('pointerdown', this._onDocPointerDown, true);
+  }
+
+  _removeMenuListeners() {
+    if (!this._listening) return;
+    this._listening = false;
+    document.removeEventListener('pointerdown', this._onDocPointerDown, true);
+  }
+
+  _scrollActiveIntoView() {
+    const menu = this._menuEl;
+    const active = menu?.querySelector('.option.active');
+    if (!menu || !active) return;
+    const menuRect = menu.getBoundingClientRect();
+    const optRect = active.getBoundingClientRect();
+    if (optRect.bottom > menuRect.bottom) menu.scrollTop += optRect.bottom - menuRect.bottom;
+    else if (optRect.top < menuRect.top) menu.scrollTop -= menuRect.top - optRect.top;
+  }
+}
+
+if (!customElements.get('fcc-combobox')) {
+  customElements.define('fcc-combobox', FccCombobox);
+}
+
 class FlexCellsCardEditor extends LitElement {
   static properties = { config: {}, hass: {} };
 
   static styles = css`
     .row { margin-bottom: 16px; }
-    fcc-textfield, ha-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; min-width: 0; }
+    fcc-textfield, fcc-combobox, ha-select { width: 100%; box-sizing: border-box; margin-bottom: 8px; min-width: 0; }
+    fcc-combobox { overflow: visible; }
     :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > fcc-textfield,
+    :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > fcc-combobox,
     :is(.cols1, .cols2, .cols3, .cols4, .cols21, .cell-grid) > ha-select {
       margin-bottom: 0;
     }
-    fcc-textfield::part(label) {
+    fcc-textfield::part(label),
+    fcc-combobox::part(label) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -231,6 +650,7 @@ class FlexCellsCardEditor extends LitElement {
     .inline { display: inline-flex; align-items: center; gap: 8px; }
     .cols2 > * { min-width: 0; }
     .muted { color: #888; font-size: 12px; margin-top: -4px; margin-bottom: 8px; }
+    .muted.after-box { margin-top: 8px; }
     .datetime-token-help.no-bottom { margin-bottom: 0; }
     .rulehdr { color: #888; font-size: 12px; margin: 0 0 4px; }
     .mini { width: 140px; padding: 6px 8px; font-size: 13px; margin: 0; }
@@ -497,7 +917,7 @@ class FlexCellsCardEditor extends LitElement {
     .rowhdr > *:not(.handle),
     .rowbody * { touch-action: pan-y; }
     .handle, .colhandle { touch-action: none; }
-    .rowbox *:not(input):not(textarea):not(select) {
+    .rowbox *:not(input):not(textarea):not(select):not(fcc-combobox) {
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
@@ -764,7 +1184,7 @@ class FlexCellsCardEditor extends LitElement {
     let cur = obj;
     for (const raw of parts) {
       const key = (Array.isArray(cur) && /^\d+$/.test(raw)) ? Number(raw) : raw;
-      if (cur == null || !(key in cur)) return undefined;
+      if (cur == null || typeof cur !== 'object' || !(key in cur)) return undefined;
       cur = cur[key];
     }
     return cur;
@@ -1707,7 +2127,7 @@ _styleValue(r,c,key,e){
       this._updateRule(r,c,idx,{ [key]: val });
     }
   }
-  _renderConditionReferenceEditor(cond, update, idBase, prefix = 'val', labelKey = null){
+  _renderConditionReferenceEditor(cond, update, _idBase, prefix = 'val', labelKey = null){
     const isMax = prefix === 'val2';
     const entityKey = isMax ? 'val2_entity' : 'val_entity';
     const attrKey = isMax ? 'val2_attr' : 'val_attr';
@@ -1718,7 +2138,6 @@ _styleValue(r,c,key,e){
     const offset = cond?.[offsetKey] ?? '';
     const offsetUnit = cond?.[offsetUnitKey] || 'number';
     const hasReference = !!entity || !!attr || offset !== '';
-    const listId = `${idBase}-${entityKey}-attrs`;
     const title = labelKey
       ? t(this.hass, labelKey)
       : (isMax ? t(this.hass, 'dynamic.reference_max') : t(this.hass, 'dynamic.reference_value'));
@@ -1737,17 +2156,13 @@ _styleValue(r,c,key,e){
           </ha-entity-picker>
         </div>
         <div class="cols1">
-          <input
-            class="text-input attr-input"
-            list=${listId}
+          <fcc-combobox
+            class="attr-input"
+            .label=${t(this.hass,"placeholder.attribute_path")}
             .value=${attr}
-            placeholder=${t(this.hass,"placeholder.attribute_path")}
-            @input=${(e)=> update({ [attrKey]: e.target.value || '' }) }
-          />
-          <datalist id=${listId}>
-            ${ (this._buildAttrSuggestionsForEntity(entity, attr) || [])
-                .map(opt => html`<option value="${opt}"></option>`) }
-          </datalist>
+            .suggestions=${this._buildAttrSuggestionsForEntity(entity, attr) || []}
+            @input=${(e)=> update({ [attrKey]: e.target.value || '' })}>
+          </fcc-combobox>
         </div>
         <div class="cols2">
           <fcc-textfield
@@ -3027,19 +3442,12 @@ _styleValue(r,c,key,e){
                           `}
                         </div>
                         <div class="cell-grid cell-wide">
-                          <input
-                            class="text-input mini-wide"
-                            list=${`attr-list-${rIdx}-${cIdx}`}
+                          <fcc-combobox
+                            .label=${t(this.hass,"placeholder.attribute_path")}
                             .value=${cell.attribute || ''}
-                            placeholder=${t(this.hass,"placeholder.attribute_path")}
-                            @input=${(e)=>{ this._cellAttributeChanged(rIdx,cIdx,e); }}
-                          />
-                          <datalist id=${`attr-list-${rIdx}-${cIdx}`}>
-                            ${
-                              (this._buildAttrSuggestions(rIdx, cIdx, (this.config?.rows?.[rIdx]?.cells?.[cIdx]?.attribute || '')) || [])
-                                .map(opt => html`<option value="${opt}"></option>`)
-                            }
-                          </datalist>
+                            .suggestions=${this._buildAttrSuggestions(rIdx, cIdx, (this.config?.rows?.[rIdx]?.cells?.[cIdx]?.attribute || '')) || []}
+                            @input=${(e)=>{ this._cellAttributeChanged(rIdx,cIdx,e); }}>
+                          </fcc-combobox>
 
                           <div class="cell-wide">
                             <fcc-textfield
@@ -3237,19 +3645,13 @@ _styleValue(r,c,key,e){
                             ${(attrEditControl === 'select' || attrEditControl === 'buttons') ? html`
                               <div class="cell-grid cell-wide muted" style="margin: 0;">${t(this.hass,"editor.attr_edit_select_hint")}</div>
                               <div class="cols1">
-                                <input
-                                  class="text-input"
-                                  list=${`attr-edit-options-list-${rIdx}-${cIdx}`}
+                                <fcc-combobox
+                                  .label=${t(this.hass,"editor.attr_edit_select_options")}
                                   .value=${attrEditOptionsPath}
-                                  placeholder=${t(this.hass,"editor.attr_edit_select_options")}
+                                  .suggestions=${this._buildAttrSuggestions(rIdx, cIdx, attrEditOptionsPath) || []}
                                   ?disabled=${!attrEditEnabled}
-                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'options',e)} />
-                                <datalist id=${`attr-edit-options-list-${rIdx}-${cIdx}`}>
-                                  ${
-                                    (this._buildAttrSuggestions(rIdx, cIdx, attrEditOptionsPath) || [])
-                                      .map(opt => html`<option value="${opt}"></option>`)
-                                  }
-                                </datalist>
+                                  @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'options',e)}>
+                                </fcc-combobox>
                               </div>
                             ` : nothing}
 
@@ -3773,17 +4175,13 @@ _styleValue(r,c,key,e){
                                 </div>
 
                                 <div class="cols1">
-                                  <input
-                                    class="text-input attr-input"
-                                    list=${`dynattr-list-${rIdx}-${cIdx}-${ridx}-${condIdx}`}
+                                  <fcc-combobox
+                                    class="attr-input"
+                                    .label=${t(this.hass,"placeholder.attribute_path")}
                                     .value=${cond.attr || ''}
-                                    placeholder=${t(this.hass,"placeholder.attribute_path")}
-                                    @input=${(e)=> this._updateCondition(rIdx,cIdx,ridx,condIdx,{ attr: (e.target.value||'') }) }
-                                  />
-                                  <datalist id=${`dynattr-list-${rIdx}-${cIdx}-${ridx}-${condIdx}`}>
-                                    ${ (this._buildAttrSuggestionsForEntity(cond.entity, cond.attr || '') || [])
-                                        .map(opt => html`<option value="${opt}"></option>`) }
-                                  </datalist>
+                                    .suggestions=${this._buildAttrSuggestionsForEntity(cond.entity, cond.attr || '') || []}
+                                    @input=${(e)=> this._updateCondition(rIdx,cIdx,ridx,condIdx,{ attr: (e.target.value||'') })}>
+                                  </fcc-combobox>
                                 </div>
 
                                 <div class="cols2">
@@ -3921,18 +4319,13 @@ _styleValue(r,c,key,e){
                                 </ha-entity-picker>
                               </div>
                               <div class="cols1">
-                                <input
-                                  class="text-input attr-input"
-                                  style="margin-bottom: 0;"
-                                  list=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}
+                                <fcc-combobox
+                                  class="attr-input"
+                                  .label=${t(this.hass,"placeholder.attribute_path")}
                                   .value=${rule.overwrite_attr || ''}
-                                  placeholder=${t(this.hass,"placeholder.attribute_path")}
-                                  @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ overwrite_attr: (e.target.value||'') }) }
-                                />
-                                  <datalist id=${`dynoverwriteattr-${rIdx}-${cIdx}-${ridx}`}>
-                                  ${ (this._buildAttrSuggestionsForEntity(rule.overwrite_entity || conditions?.[0]?.entity, rule.overwrite_attr || '') || [])
-                                      .map(opt => html`<option value="${opt}"></option>`) }
-                                </datalist>
+                                  .suggestions=${this._buildAttrSuggestionsForEntity(rule.overwrite_entity || conditions?.[0]?.entity, rule.overwrite_attr || '') || []}
+                                  @input=${(e)=> this._updateRule(rIdx,cIdx,ridx,{ overwrite_attr: (e.target.value||'') })}>
+                                </fcc-combobox>
                               </div>
                               <div class="cols1">
                                 <fcc-textfield class="mask-input"
@@ -4106,17 +4499,13 @@ _styleValue(r,c,key,e){
                                 </div>
 
                                 <div class="cols1">
-                                  <input
-                                    class="text-input attr-input"
-                                    list=${`rowdynattr-list-${rIdx}-${ridx}-${condIdx}`}
+                                  <fcc-combobox
+                                    class="attr-input"
+                                    .label=${t(this.hass,"placeholder.attribute_path")}
                                     .value=${cond?.attr || ''}
-                                    placeholder=${t(this.hass,"placeholder.attribute_path")}
-                                    @input=${(e)=> this._updateRowCondition(rIdx,ridx,condIdx,{ attr: (e.target.value||'') }) }
-                                  />
-                                  <datalist id=${`rowdynattr-list-${rIdx}-${ridx}-${condIdx}`}>
-                                    ${ (this._buildAttrSuggestionsForEntity(cond?.entity, cond?.attr || '') || [])
-                                        .map(opt => html`<option value="${opt}"></option>`) }
-                                  </datalist>
+                                    .suggestions=${this._buildAttrSuggestionsForEntity(cond?.entity, cond?.attr || '') || []}
+                                    @input=${(e)=> this._updateRowCondition(rIdx,ridx,condIdx,{ attr: (e.target.value||'') })}>
+                                  </fcc-combobox>
                                 </div>
 
                                 <div class="cols2">
@@ -4387,14 +4776,14 @@ _styleValue(r,c,key,e){
             .value=${this.config.custom_template_html || ''}
             @input=${(e)=>this._updateCustomTemplateHtml(e)}>
           </textarea>
-          <div class="muted">
+          <div class="muted after-box">
             ${t(this.hass,"editor.custom_template_hint")}
           </div>
         ` : ''}
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.29.0
+        FCC v0.30.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>
