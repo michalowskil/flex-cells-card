@@ -405,6 +405,17 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.31.0-beta.1 —
+  - On sliders, the +/- buttons are chosen from one list: none, on both sides of the slider, left of the slider, or right of the slider. This applies to **attribute editing** and to **Show control** for `input_number` and `number`.
+  - **Show value** replaces the old "show the number on the right" checkbox. You can put the number on either side of the slider, next to the +/- buttons, between the buttons, or hide it. With no +/- buttons, **Show value** only offers left of the slider, right of the slider, or hidden.
+  - **Show control** for `input_number` and `number` can hide the slider. The + and − buttons stay, and **Show value** then offers only visible or hidden. The button layout appears only when that number is visible.
+  - In box mode, **Show control** can add + and − buttons around the number field: none, on both sides of the field, left of the field, or right of the field.
+  - For a checkbox in **Show control** (`input_boolean` and `switch`), **Show value** can put the state on the left or the right of the checkbox. Leave it hidden to keep the checkbox alone.
+  - Attribute editing uses the same **Show value** list for the number box, hue slider, saturation slider, and switch: left, right, or hidden.
+  - A stepper can hide the number and leave only the + and − buttons.
+  - The **Service field** suggestions now look the same as the **Metadata path** list.
+  - A cell template now lines up an inserted cell with the text around it, the same way the card template does.
+  - The button that removes a dynamic rule now says which rule it removes, for example **Delete rule 1**.
 - v0.30.0 —
   - The **Metadata path** field in the visual editor now shows a suggestion list on all devices. Tested on Windows (Firefox, Chrome, Edge) and Android (Companion App, Firefox, Chrome).
   - Select lists on the card (Show control and Attribute editing) stay inside the cell when an option name is very long, instead of overflowing off the card.

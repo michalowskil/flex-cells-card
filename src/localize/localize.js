@@ -18,6 +18,15 @@ if (hasPreloaded) {
 
 const lookup = (dict, parts) => parts.reduce((n, p) => n?.[p], dict);
 
+const format = (value, vars) => {
+  if (!vars || typeof value !== 'string') return value;
+  return value.replace(/\{(\w+)\}/g, (match, name) =>
+    Object.prototype.hasOwnProperty.call(vars, name) && vars[name] != null
+      ? String(vars[name])
+      : match,
+  );
+};
+
 const loadLang = (lang) => {
   if (!lang || hasPreloaded || DICTS[lang] || pending.has(lang)) return;
   pending.add(lang);
@@ -40,7 +49,7 @@ const loadLang = (lang) => {
 // Preload fallback so EN is available first (dev, no build).
 loadLang(fallback);
 
-export function t(hass, key) {
+export function t(hass, key, vars) {
   const langCode = (hass?.locale?.language || fallback).toLowerCase();
   const lang = langCode.split('-')[0];
 
@@ -48,9 +57,9 @@ export function t(hass, key) {
 
   const parts = key.split('.');
   const val = lookup(DICTS[lang], parts);
-  if (val !== undefined && val !== '') return val;
+  if (val !== undefined && val !== '') return format(val, vars);
 
   const fallbackVal = lookup(DICTS[fallback], parts);
-  if (fallbackVal !== undefined && fallbackVal !== '') return fallbackVal;
+  if (fallbackVal !== undefined && fallbackVal !== '') return format(fallbackVal, vars);
   return key;
 }

@@ -965,57 +965,224 @@ class FlexCellsCardEditor extends LitElement {
   }
   _cellShowControlChanged(r, c, e) {
     const val = !!(e?.target?.checked);
-    const rows = [ ...(this.config.rows || []) ];
-    const row = { ...(rows[r] || {}) };
-    const cells = [ ...(row.cells || []) ];
-    const cell = { ...(cells[c] || {}) };
+    const cell = { ...(this.config?.rows?.[r]?.cells?.[c] || {}) };
     if (val) {
       cell.show_control = true;
     } else {
       delete cell.show_control;
       delete cell.show_control_value_right;
+      delete cell.control_value_position;
       delete cell.step_buttons;
       delete cell.step_buttons_position;
+      delete cell.show_slider;
     }
-    cells[c] = cell; rows[r] = { ...row, cells };
-    this.config = { ...this.config, rows };
-    this._fireConfigChanged?.();
+    this._writeCell(r, c, cell);
   }
 
-  _cellShowControlValueRightChanged(r, c, e) {
-    const val = !!(e?.target?.checked);
-    const rows = [ ...(this.config.rows || []) ];
-    const row = { ...(rows[r] || {}) };
-    const cells = [ ...(row.cells || []) ];
-    const cell = { ...(cells[c] || {}) };
-    cell.show_control_value_right = val;
-    cells[c] = cell; rows[r] = { ...row, cells };
-    this.config = { ...this.config, rows };
-    this._fireConfigChanged?.();
+  _isNumberSliderCell(cell) {
+    const entityId = cell?.value || '';
+    const domain = entityId.split('.')[0];
+    if (domain !== 'input_number' && domain !== 'number') return false;
+    const modeRaw = this._getStateObject(entityId)?.attributes?.mode;
+    const entityMode = typeof modeRaw === 'string' ? modeRaw.trim().toLowerCase() : '';
+    return !entityMode || entityMode === 'slider' || entityMode === 'auto';
   }
-
-  _cellStepButtonsChanged(r, c, e) {
-    const val = !!(e?.target?.checked);
-    const rows = [ ...(this.config.rows || []) ];
-    const row = { ...(rows[r] || {}) };
-    const cells = [ ...(row.cells || []) ];
-    const cell = { ...(cells[c] || {}) };
-    if (val) {
-      cell.step_buttons = true;
-      if (!cell.step_buttons_position) cell.step_buttons_position = 'sides';
+  _numberControlConfig(cell) {
+    const position = this._normalizeAttrSliderValuePosition(cell?.control_value_position);
+    return {
+      step_buttons: cell?.step_buttons === true,
+      step_buttons_position: ['sides', 'left', 'right'].includes(cell?.step_buttons_position)
+        ? cell.step_buttons_position
+        : 'sides',
+      ...(position ? { value_position: position } : {}),
+    };
+  }
+  _cellShowSliderChanged(r, c, e) {
+    const show = !!(e?.target?.checked);
+    const cell = { ...(this.config?.rows?.[r]?.cells?.[c] || {}) };
+    if (show) {
+      if (cell.show_slider === undefined) return;
+      delete cell.show_slider;
     } else {
-      delete cell.step_buttons;
-      delete cell.step_buttons_position;
+      cell.show_slider = false;
+      cell.step_buttons = true;
+      if (!['sides', 'left', 'right'].includes(cell.step_buttons_position)) {
+        cell.step_buttons_position = 'sides';
+      }
     }
-    cells[c] = cell; rows[r] = { ...row, cells };
-    this.config = { ...this.config, rows };
-    this._fireConfigChanged?.();
+    this._writeCell(r, c, cell);
   }
-
-  _cellStepButtonsPositionChanged(r, c, e) {
-    const raw = e?.detail?.value ?? e?.target?.value;
-    const value = ['sides', 'left', 'right'].includes(raw) ? raw : 'sides';
-    this._patchCell(r, c, { step_buttons_position: value });
+  _shownNumberStepLayout(cell) {
+    return ['sides', 'left', 'right'].includes(cell?.step_buttons_position)
+      ? cell.step_buttons_position
+      : 'sides';
+  }
+  _shownNumberButtonsValue(cell) {
+    const position = this._normalizeAttrSliderValuePosition(cell?.control_value_position);
+    if (position === 'hidden' || (!position && cell?.show_control_value_right === false)) return 'hidden';
+    return 'shown';
+  }
+  _cellNumberStepLayoutChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const sliderHidden = this._isNumberSliderCell(cell) && cell?.show_slider === false;
+    const shown = sliderHidden
+      ? this._shownNumberStepLayout(cell)
+      : this._shownAttrSliderStepLayout(this._numberControlConfig(cell));
+    if (value === shown) return;
+    if (value === 'none') {
+      if (sliderHidden) return;
+      this._patchCell(r, c, { step_buttons: false });
+      return;
+    }
+    if (!['sides', 'left', 'right'].includes(value)) return;
+    this._patchCell(r, c, { step_buttons: true, step_buttons_position: value });
+  }
+  _cellNumberButtonsValueChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    if (value !== 'shown' && value !== 'hidden') return;
+    const cell = { ...(this.config?.rows?.[r]?.cells?.[c] || {}) };
+    if (value === this._shownNumberButtonsValue(cell)) return;
+    if (value === 'hidden') {
+      cell.control_value_position = 'hidden';
+      cell.show_control_value_right = false;
+    } else {
+      delete cell.control_value_position;
+      cell.show_control_value_right = true;
+    }
+    this._writeCell(r, c, cell);
+  }
+  _renderShowControlNumberOptions(r, c, cell, isNumberSlider) {
+    const stepLabel = t(this.hass, 'editor.attr_edit_step_buttons_position');
+    const valueLabel = t(this.hass, 'editor.attr_edit_value_position');
+    if (isNumberSlider && cell?.show_slider === false) {
+      const valueShown = this._shownNumberButtonsValue(cell) !== 'hidden';
+      return html`
+        <label>
+          <input type="checkbox"
+            .checked=${false}
+            @change=${(e) => this._cellShowSliderChanged(r, c, e)} />
+          <span>${t(this.hass, 'editor.show_slider')}</span>
+        </label>
+        <ha-select
+          .label=${valueLabel}
+          .value=${valueShown ? 'shown' : 'hidden'}
+          naturalMenuWidth
+          fixedMenuPosition
+          .options=${[
+            { value: 'shown', label: t(this.hass, 'editor.attr_edit_value_position_visible') },
+            { value: 'hidden', label: t(this.hass, 'editor.attr_edit_value_position_hidden') },
+          ]}
+          @selected=${(e) => this._cellNumberButtonsValueChanged(r, c, e)}
+          @closed=${(e) => e.stopPropagation()}>
+        </ha-select>
+        ${valueShown ? html`
+          <ha-select
+            .label=${stepLabel}
+            .value=${this._shownNumberStepLayout(cell)}
+            naturalMenuWidth
+            fixedMenuPosition
+            .options=${[
+              { value: 'sides', label: t(this.hass, 'editor.attr_edit_step_buttons_position_sides') },
+              { value: 'left', label: t(this.hass, 'editor.attr_edit_step_buttons_position_left') },
+              { value: 'right', label: t(this.hass, 'editor.attr_edit_step_buttons_position_right') },
+            ]}
+            @selected=${(e) => this._cellNumberStepLayoutChanged(r, c, e)}
+            @closed=${(e) => e.stopPropagation()}>
+          </ha-select>
+        ` : nothing}
+      `;
+    }
+    if (isNumberSlider) {
+      const numberConfig = this._numberControlConfig(cell);
+      return html`
+        <label>
+          <input type="checkbox"
+            .checked=${true}
+            @change=${(e) => this._cellShowSliderChanged(r, c, e)} />
+          <span>${t(this.hass, 'editor.show_slider')}</span>
+        </label>
+        <ha-select
+          .label=${stepLabel}
+          .value=${this._shownAttrSliderStepLayout(numberConfig)}
+          naturalMenuWidth
+          fixedMenuPosition
+          .options=${[
+            { value: 'none', label: t(this.hass, 'editor.attr_edit_step_buttons_position_none') },
+            { value: 'sides', label: t(this.hass, 'editor.attr_edit_step_buttons_position_slider_sides') },
+            { value: 'left', label: t(this.hass, 'editor.attr_edit_step_buttons_position_slider_left') },
+            { value: 'right', label: t(this.hass, 'editor.attr_edit_step_buttons_position_slider_right') },
+          ]}
+          @selected=${(e) => this._cellNumberStepLayoutChanged(r, c, e)}
+          @closed=${(e) => e.stopPropagation()}>
+        </ha-select>
+        <ha-select
+          .label=${valueLabel}
+          .value=${this._shownAttrSliderValuePosition(cell, numberConfig)}
+          naturalMenuWidth
+          fixedMenuPosition
+          .options=${this._attrSliderValuePositionOptions(numberConfig)}
+          @selected=${(e) => this._cellNumberValuePositionChanged(r, c, e)}
+          @closed=${(e) => e.stopPropagation()}>
+        </ha-select>
+      `;
+    }
+    return html`
+      <ha-select
+        .label=${stepLabel}
+        .value=${this._shownAttrSliderStepLayout(this._numberControlConfig(cell))}
+        naturalMenuWidth
+        fixedMenuPosition
+        .options=${[
+          { value: 'none', label: t(this.hass, 'editor.attr_edit_step_buttons_position_none') },
+          { value: 'sides', label: t(this.hass, 'editor.attr_edit_step_buttons_position_field_sides') },
+          { value: 'left', label: t(this.hass, 'editor.attr_edit_step_buttons_position_field_left') },
+          { value: 'right', label: t(this.hass, 'editor.attr_edit_step_buttons_position_field_right') },
+        ]}
+        @selected=${(e) => this._cellNumberStepLayoutChanged(r, c, e)}
+        @closed=${(e) => e.stopPropagation()}>
+      </ha-select>
+    `;
+  }
+  _shownBooleanValuePosition(cell) {
+    const position = this._normalizeAttrSliderValuePosition(cell?.control_value_position);
+    if (position === 'slider_left' || position === 'buttons_left') return 'slider_left';
+    if (position === 'slider_right' || position === 'buttons_right') return 'slider_right';
+    return 'hidden';
+  }
+  _cellBooleanValuePositionChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    if (!['slider_right', 'slider_left', 'hidden'].includes(value)) return;
+    const cell = { ...(this.config?.rows?.[r]?.cells?.[c] || {}) };
+    if (value === this._shownBooleanValuePosition(cell)) return;
+    if (value === 'hidden') delete cell.control_value_position;
+    else cell.control_value_position = value;
+    this._writeCell(r, c, cell);
+  }
+  _renderShowControlBooleanOptions(r, c, cell) {
+    return html`
+      <ha-select
+        .label=${t(this.hass, 'editor.attr_edit_value_position')}
+        .value=${this._shownBooleanValuePosition(cell)}
+        naturalMenuWidth
+        fixedMenuPosition
+        .options=${this._attrSimpleValuePositionOptions('switch')}
+        @selected=${(e) => this._cellBooleanValuePositionChanged(r, c, e)}
+        @closed=${(e) => e.stopPropagation()}>
+      </ha-select>
+    `;
+  }
+  _cellNumberValuePositionChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    if (!this._normalizeAttrSliderValuePosition(value)) return;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._numberControlConfig(cell);
+    if (current.value_position === value) return;
+    if (value === this._shownAttrSliderValuePosition(cell, current)) return;
+    this._patchCell(r, c, {
+      show_control_value_right: value !== 'hidden',
+      control_value_position: value,
+    });
   }
 
   _defaultRowCss() {
@@ -1783,6 +1950,23 @@ class FlexCellsCardEditor extends LitElement {
       full[c]=this._clone(next); this._fullCells[r]=full;
     }
   }
+  _writeCell(r, c, next) {
+    const rows = [ ...(this.config?.rows || []) ];
+    const row = { ...(rows[r] || {}) };
+    const cells = [ ...(row.cells || []) ];
+    cells[c] = next;
+    rows[r] = { ...row, cells };
+    this.config = { ...this.config, rows };
+    this._fireConfigChanged();
+    if (Array.isArray(this._fullCells) && this._fullCells[r]) {
+      const full = [...this._fullCells[r]];
+      if (c >= full.length) {
+        for (let i = full.length; i <= c; i++) full[i] = { type: 'string', value: '', align: 'right' };
+      }
+      full[c] = this._clone(next);
+      this._fullCells[r] = full;
+    }
+  }
   _patchCellStyle(r,c,stylePatch){
     const rows=[...this.config.rows]; const row={...rows[r]}; const cells=[...row.cells];
     const current={...(cells[c]||{})}; const style={...(current.style||{}), ...stylePatch};
@@ -1937,7 +2121,116 @@ _cellAlignChanged(r,c,e){
       sat_fallback: Number.isFinite(satFallbackNum) ? satFallbackNum : undefined,
       step_buttons: raw.step_buttons === true,
       step_buttons_position,
+      ...(this._normalizeAttrSliderValuePosition(raw.value_position)
+        ? { value_position: this._normalizeAttrSliderValuePosition(raw.value_position) }
+        : {}),
     };
+  }
+  _normalizeAttrSliderValuePosition(position) {
+    const raw = typeof position === 'string' ? position.trim().toLowerCase() : '';
+    return ['hidden', 'slider_right', 'slider_left', 'buttons_right', 'buttons_left', 'between_buttons'].includes(raw)
+      ? raw
+      : '';
+  }
+  _legacyAttrSliderValuePosition(cell, attrEdit) {
+    if (cell?.show_control_value_right === false) return 'hidden';
+    if (attrEdit?.step_buttons && (attrEdit?.step_buttons_position || 'sides') === 'sides') return 'buttons_right';
+    return 'slider_right';
+  }
+  _attrSliderValuePositionOptions(attrEdit) {
+    const options = [
+      ['slider_right', 'editor.attr_edit_value_position_slider_right'],
+      ['slider_left', 'editor.attr_edit_value_position_slider_left'],
+    ];
+    if (attrEdit?.step_buttons) {
+      options.push(
+        ['buttons_right', 'editor.attr_edit_value_position_buttons_right'],
+        ['buttons_left', 'editor.attr_edit_value_position_buttons_left'],
+        ['between_buttons', 'editor.attr_edit_value_position_between_buttons'],
+      );
+    }
+    options.push(['hidden', 'editor.attr_edit_value_position_hidden']);
+    return options.map(([value, key]) => ({ value, label: t(this.hass, key) }));
+  }
+  _shownAttrSliderValuePosition(cell, attrEdit) {
+    const position = attrEdit?.value_position || this._legacyAttrSliderValuePosition(cell, attrEdit);
+    if (attrEdit?.step_buttons) return position;
+    if (position === 'hidden') return 'hidden';
+    if (position === 'slider_left' || position === 'buttons_left') return 'slider_left';
+    return 'slider_right';
+  }
+  _shownAttrSliderStepLayout(attrEdit) {
+    return attrEdit?.step_buttons ? (attrEdit.step_buttons_position || 'sides') : 'none';
+  }
+  _attrSliderStepLayoutChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._getAttrEditConfig(cell);
+    if (value === this._shownAttrSliderStepLayout(current)) return;
+    if (value === 'none') {
+      this._patchAttrEdit(r, c, { step_buttons: false });
+      return;
+    }
+    if (!['sides', 'left', 'right'].includes(value)) return;
+    this._patchAttrEdit(r, c, { step_buttons: true, step_buttons_position: value });
+  }
+  _shownAttrSimpleValuePosition(cell, attrEdit) {
+    if (attrEdit?.value_position === 'hidden' || (!attrEdit?.value_position && cell?.show_control_value_right === false)) return 'hidden';
+    if (attrEdit?.value_position === 'slider_left' || attrEdit?.value_position === 'buttons_left') return 'slider_left';
+    return 'slider_right';
+  }
+  _attrSimpleValuePositionOptions(control) {
+    const pair = control === 'switch'
+      ? ['switch_right', 'switch_left']
+      : control === 'number'
+        ? ['field_right', 'field_left']
+        : ['slider_right', 'slider_left'];
+    return [
+      { value: 'slider_right', label: t(this.hass, `editor.attr_edit_value_position_${pair[0]}`) },
+      { value: 'slider_left', label: t(this.hass, `editor.attr_edit_value_position_${pair[1]}`) },
+      { value: 'hidden', label: t(this.hass, 'editor.attr_edit_value_position_hidden') },
+    ];
+  }
+  _attrSimpleValuePositionChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    if (!['slider_right', 'slider_left', 'hidden'].includes(value)) return;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._getAttrEditConfig(cell);
+    if (value === this._shownAttrSimpleValuePosition(cell, current)) return;
+    this._patchCell(r, c, {
+      show_control_value_right: value !== 'hidden',
+      attr_edit: { ...current, value_position: value },
+    });
+  }
+  _attrStepperValueChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    if (value !== 'shown' && value !== 'hidden') return;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._getAttrEditConfig(cell);
+    const shown = current.value_position === 'hidden' ? 'hidden' : 'shown';
+    if (value === shown) return;
+    if (value === 'hidden') {
+      this._patchCell(r, c, {
+        show_control_value_right: false,
+        attr_edit: { ...current, value_position: 'hidden' },
+      });
+      return;
+    }
+    const next = { ...current };
+    delete next.value_position;
+    this._patchCell(r, c, { show_control_value_right: true, attr_edit: next });
+  }
+  _attrSliderValuePositionChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    if (!this._normalizeAttrSliderValuePosition(value)) return;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._getAttrEditConfig(cell);
+    if (current.value_position === value) return;
+    if (value === this._shownAttrSliderValuePosition(cell, current)) return;
+    this._patchCell(r, c, {
+      show_control_value_right: value !== 'hidden',
+      attr_edit: { ...current, value_position: value },
+    });
   }
   _patchAttrEdit(r,c,patch){
     const cell = this.config?.rows?.[r]?.cells?.[c] || {};
@@ -3378,8 +3671,8 @@ _styleValue(r,c,key,e){
                     const entityModeRaw = entityState?.attributes?.mode;
                     const entityMode = typeof entityModeRaw === 'string' ? entityModeRaw.trim().toLowerCase() : '';
                     const isNumberEntity = entityDomain === 'input_number' || entityDomain === 'number';
+                    const isBooleanEntity = entityDomain === 'input_boolean' || entityDomain === 'switch';
                     const isNumberSlider = isNumberEntity && (!entityMode || entityMode === 'slider' || entityMode === 'auto');
-                    const showValueRightChecked = cell.show_control_value_right !== false;
                     const rowRules = Array.isArray(row?.dyn_row_rules) ? row.dyn_row_rules : [];
                     const rowCustomCssEnabled = !!row.custom_css_enabled;
                     const rowCustomCssValue =
@@ -3401,6 +3694,10 @@ _styleValue(r,c,key,e){
                     const attrEditOptionsPath = typeof attrEdit.options === 'string' ? attrEdit.options : '';
                     const serviceOptions = this._listServiceNames();
                     const serviceFieldOptions = this._listServiceFields(attrEdit.service);
+                    const serviceFieldQuery = String(attrEdit.field || '').trim().toLowerCase();
+                    const serviceFieldSuggestions = serviceFieldQuery
+                      ? serviceFieldOptions.filter((opt) => opt.toLowerCase().startsWith(serviceFieldQuery))
+                      : serviceFieldOptions;
 
                     // selektory akcji (dla icon/string z ograniczoną listą)
                     const allowed = this._allowedUiActionsForCellType(cell.type);
@@ -3513,35 +3810,8 @@ _styleValue(r,c,key,e){
                                       @change=${(e)=> this._cellShowControlChanged(rIdx, cIdx, e)} />
                                 <span>${t(this.hass,"editor.show_control")}</span>
                               </label>
-                              ${(cell.show_control && isNumberSlider) ? html`
-                                <label>
-                                  <input type="checkbox"
-                                        .checked=${showValueRightChecked}
-                                        @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
-                                  <span>${t(this.hass,"editor.show_value_on_right")}</span>
-                                </label>
-                                <label>
-                                  <input type="checkbox"
-                                        .checked=${cell.step_buttons === true}
-                                        @change=${(e)=> this._cellStepButtonsChanged(rIdx, cIdx, e)} />
-                                  <span>${t(this.hass,"editor.attr_edit_step_buttons")}</span>
-                                </label>
-                                ${(cell.step_buttons === true) ? html`
-                                  <ha-select
-                                    .label=${t(this.hass,"editor.attr_edit_step_buttons_position")}
-                                    .value=${cell.step_buttons_position || 'sides'}
-                                    naturalMenuWidth
-                                    fixedMenuPosition
-                                    .options=${[
-                                      { value: "sides", label: t(this.hass,"editor.attr_edit_step_buttons_position_sides") },
-                                      { value: "left", label: t(this.hass,"editor.attr_edit_step_buttons_position_left") },
-                                      { value: "right", label: t(this.hass,"editor.attr_edit_step_buttons_position_right") },
-                                    ]}
-                                    @selected=${(e)=> this._cellStepButtonsPositionChanged(rIdx, cIdx, e)}
-                                    @closed=${(e)=>e.stopPropagation()}>
-                                  </ha-select>
-                                ` : nothing}
-                              ` : nothing}
+                              ${(cell.show_control && isNumberEntity) ? this._renderShowControlNumberOptions(rIdx, cIdx, cell, isNumberSlider) : nothing}
+                              ${(cell.show_control && isBooleanEntity) ? this._renderShowControlBooleanOptions(rIdx, cIdx, cell) : nothing}
                             </div>
                           </div>
                         ` : html`` }
@@ -3595,16 +3865,13 @@ _styleValue(r,c,key,e){
                             </div>
 
                             <div class="cols1">
-                              <input
-                                class="text-input"
-                                list=${`attr-service-field-${rIdx}-${cIdx}`}
+                              <fcc-combobox
+                                .label=${t(this.hass,"editor.attr_edit_service_field")}
                                 .value=${attrEdit.field || ''}
-                                placeholder=${t(this.hass,"editor.attr_edit_service_field")}
+                                .suggestions=${serviceFieldSuggestions}
                                 ?disabled=${!attrEditEnabled}
-                                @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'field',e)} />
-                              <datalist id=${`attr-service-field-${rIdx}-${cIdx}`}>
-                                ${serviceFieldOptions.map(opt => html`<option value="${opt}"></option>`)}
-                              </datalist>
+                                @input=${(e)=> this._updateAttrEditText(rIdx,cIdx,'field',e)}>
+                              </fcc-combobox>
                             </div>
 
                             <div class="cell-grid cell-wide" style="margin-bottom: 0;">
@@ -3630,17 +3897,50 @@ _styleValue(r,c,key,e){
                             </ha-select>
                           </div>
 
-                            ${attrEditControl === 'slider' || attrEditControl === 'number' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
+                            ${attrEditControl === 'slider' ? html`
                               <div class="cell-grid cell-wide" style="margin-bottom: 0;">
-                                <label class="option full">
-                                  <input type="checkbox"
-                                    .checked=${showValueRightChecked}
-                                    ?disabled=${!attrEditEnabled}
-                                    @change=${(e)=> this._cellShowControlValueRightChanged(rIdx, cIdx, e)} />
-                                  ${t(this.hass,"editor.show_value_on_right")}
-                                </label>
+                                <ha-select
+                                  .label=${t(this.hass,"editor.attr_edit_step_buttons_position")}
+                                  .value=${this._shownAttrSliderStepLayout(attrEdit)}
+                                  ?disabled=${!attrEditEnabled}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${[
+                                    { value: "none", label: t(this.hass,"editor.attr_edit_step_buttons_position_none") },
+                                    { value: "sides", label: t(this.hass,"editor.attr_edit_step_buttons_position_slider_sides") },
+                                    { value: "left", label: t(this.hass,"editor.attr_edit_step_buttons_position_slider_left") },
+                                    { value: "right", label: t(this.hass,"editor.attr_edit_step_buttons_position_slider_right") },
+                                  ]}
+                                  @selected=${(e)=> this._attrSliderStepLayoutChanged(rIdx,cIdx,e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
                               </div>
-                            ` : nothing}
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
+                                <ha-select
+                                  .label=${t(this.hass,"editor.attr_edit_value_position")}
+                                  .value=${this._shownAttrSliderValuePosition(cell, attrEdit)}
+                                  ?disabled=${!attrEditEnabled}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${this._attrSliderValuePositionOptions(attrEdit)}
+                                  @selected=${(e)=> this._attrSliderValuePositionChanged(rIdx, cIdx, e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
+                              </div>
+                            ` : (attrEditControl === 'number' || attrEditControl === 'switch' || attrEditControl === 'color' || attrEditControl === 'color_sat' ? html`
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
+                                <ha-select
+                                  .label=${t(this.hass,"editor.attr_edit_value_position")}
+                                  .value=${this._shownAttrSimpleValuePosition(cell, attrEdit)}
+                                  ?disabled=${!attrEditEnabled}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${this._attrSimpleValuePositionOptions(attrEditControl)}
+                                  @selected=${(e)=> this._attrSimpleValuePositionChanged(rIdx, cIdx, e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
+                              </div>
+                            ` : nothing)}
 
                             ${(attrEditControl === 'select' || attrEditControl === 'buttons') ? html`
                               <div class="cell-grid cell-wide muted" style="margin: 0;">${t(this.hass,"editor.attr_edit_select_hint")}</div>
@@ -3655,19 +3955,7 @@ _styleValue(r,c,key,e){
                               </div>
                             ` : nothing}
 
-                            ${attrEditControl === 'slider' ? html`
-                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
-                                <label class="option full">
-                                  <input type="checkbox"
-                                    .checked=${attrEdit.step_buttons === true}
-                                    ?disabled=${!attrEditEnabled}
-                                    @change=${(e)=> this._patchAttrEdit(rIdx,cIdx,{ step_buttons: !!e.target.checked })} />
-                                  ${t(this.hass,"editor.attr_edit_step_buttons")}
-                                </label>
-                              </div>
-                            ` : nothing}
-
-                            ${(attrEditControl === 'stepper' || (attrEditControl === 'slider' && attrEdit.step_buttons === true)) ? html`
+                            ${attrEditControl === 'stepper' ? html`
                               <div class="cell-grid cell-wide" style="margin-bottom: 0;">
                                 <ha-select
                                   .label=${t(this.hass,"editor.attr_edit_step_buttons_position")}
@@ -3681,6 +3969,21 @@ _styleValue(r,c,key,e){
                                     { value: "right", label: t(this.hass,"editor.attr_edit_step_buttons_position_right") },
                                   ]}
                                   @selected=${(e)=> this._updateAttrEditText(rIdx,cIdx,'step_buttons_position',e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
+                              </div>
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
+                                <ha-select
+                                  .label=${t(this.hass,"editor.attr_edit_value_position")}
+                                  .value=${attrEdit.value_position === 'hidden' ? 'hidden' : 'shown'}
+                                  ?disabled=${!attrEditEnabled}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${[
+                                    { value: "shown", label: t(this.hass,"editor.attr_edit_value_position_visible") },
+                                    { value: "hidden", label: t(this.hass,"editor.attr_edit_value_position_hidden") },
+                                  ]}
+                                  @selected=${(e)=> this._attrStepperValueChanged(rIdx,cIdx,e)}
                                   @closed=${(e)=>e.stopPropagation()}>
                                 </ha-select>
                               </div>
@@ -4441,7 +4744,7 @@ _styleValue(r,c,key,e){
 
                             <div class="cols1 right">
                               <button class="danger mini" @click=${()=>this._removeRule(rIdx,cIdx,ridx)}>
-                                ${t(this.hass, 'dynamic.delete_rule')}
+                                ${t(this.hass, 'dynamic.delete_rule', { n: ridx + 1 })}
                               </button>
                             </div>
                           </div>
@@ -4631,7 +4934,7 @@ _styleValue(r,c,key,e){
 
                             <div class="cols1 right">
                               <button class="danger mini" @click=${()=>this._removeRowRule(rIdx,ridx)}>
-                                ${t(this.hass, 'dynamic.delete_rule')}
+                                ${t(this.hass, 'dynamic.delete_rule', { n: ridx + 1 })}
                               </button>
                             </div>
                           </div>
@@ -4783,7 +5086,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.30.0
+        FCC v0.31.0-beta.1
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

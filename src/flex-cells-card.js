@@ -323,6 +323,10 @@ class FlexCellsCard extends LitElement {
       flex: 1 1 0;
       min-width: 0;
     }
+    .ctrl-step-buttons .ctrl-input[type="number"] {
+      width: 7em;
+      flex: 0 0 auto;
+    }
     .ctrl-range-color {
       width: 160px;
       height: 12px;
@@ -1627,8 +1631,12 @@ class FlexCellsCard extends LitElement {
     const domain = (entityId || '').split('.')[0];
     if (domain === 'input_boolean' || domain === 'switch') {
       const checked = stateObj?.state === 'on';
-      return html`<label class="ctrl-wrap"><input class="ctrl-switch" type="checkbox" .checked=${checked}
-        @change=${(e) => this._onToggleBoolean(entityId, !!e.target.checked)} /></label>`;
+      const controlNode = html`<input class="ctrl-switch" type="checkbox" .checked=${checked}
+        @change=${(e) => this._onToggleBoolean(entityId, !!e.target.checked)} />`;
+      const side = this._booleanControlValueSide(cell);
+      if (side === 'hidden') return html`<label class="ctrl-wrap">${controlNode}</label>`;
+      const valueNode = html`<span class="ctrl-value">${this._formatEntityCell(cell, stateObj, true)}</span>`;
+      return html`<label class="ctrl-wrap">${side === 'left' ? valueNode : nothing}${controlNode}${side === 'right' ? valueNode : nothing}</label>`;
     }
     if (domain === 'input_number' || domain === 'number') {
       const attrs = stateObj?.attributes || {};
@@ -1668,6 +1676,14 @@ class FlexCellsCard extends LitElement {
         if (Number.isFinite(draftNum)) controlValue = draftNum;
       }
       controlValue = this._clampNumber(controlValue, min, max);
+      const stepForButtons = this._numberStepForButtons(min, max, stepForCalc);
+      const epsilon = Math.max(stepForButtons * 1e-6, 1e-9);
+      const minusButton = this._renderNumberStepButton(
+        entityId, -1, controlValue <= min + epsilon, min, max, stepForButtons);
+      const plusButton = this._renderNumberStepButton(
+        entityId, 1, controlValue >= max - epsilon, min, max, stepForButtons);
+      const stepPosition = this._normalizeStepButtonsPosition(cell?.step_buttons_position);
+      const buttonsOn = cell?.step_buttons === true;
       if (effectiveMode === 'box') {
         const inputValueRaw = draft !== undefined && draft !== null ? draft : (stateObj?.state ?? '');
         let inputValue = String(inputValueRaw);
@@ -1677,44 +1693,47 @@ class FlexCellsCard extends LitElement {
             inputValue = String(Math.round(num));
           }
         }
-        return html`<span class="ctrl-wrap">
-          <input class="ctrl-input" type="number" min="${min}" max="${max}" step="${stepAttr}"
+        const numberInput = html`<input class="ctrl-input" type="number" min="${min}" max="${max}" step="${stepAttr}"
             .value=${live(String(inputValue))}
             @focus=${() => this._onNumberFocus(entityId)}
             @blur=${() => this._onNumberBlur(entityId)}
             @input=${(e) => this._onNumberInput(e, entityId)}
-            @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />
-        </span>`;
+            @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />`;
+        if (!buttonsOn) return html`<span class="ctrl-wrap">${numberInput}</span>`;
+        const order = this._attrSliderValueOrder(stepPosition, 'hidden');
+        const parts = { minus: minusButton, plus: plusButton, slider: numberInput, value: nothing };
+        return html`<span class=${`ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`}>${order.map((key) => parts[key])}</span>`;
       }
-      const showValue = cell?.show_control_value_right !== false;
+      const showSlider = cell?.show_slider !== false;
       const displayState = stateObj
         ? { ...stateObj, state: String(controlValue) }
         : { state: String(controlValue), attributes: {}, entity_id: entityId };
+      const valuePosition = this._resolveNumberSliderValuePosition(cell);
+      const valueNode = valuePosition === 'hidden'
+        ? nothing
+        : html`<span class=${showSlider ? 'ctrl-value' : 'ctrl-stepper-value'}>${this._formatEntityCell(cell, displayState)}</span>`;
+      if (!showSlider) {
+        return html`<span class=${`ctrl-wrap ctrl-stepper ctrl-stepper-${stepPosition}`}>
+          ${this._stepButtonLayout(stepPosition, minusButton, valueNode, plusButton)}
+        </span>`;
+      }
       const rangeInput = html`<input class="ctrl-range" type="range" min="${min}" max="${max}" step="${stepAttr}"
           .value=${String(controlValue)}
           @focus=${() => this._onNumberFocus(entityId)}
           @blur=${() => this._onNumberBlur(entityId)}
           @input=${(e) => this._onNumberInput(e, entityId)}
           @change=${(e) => this._onNumberChange(e, entityId, min, max, stepForCalc)} />`;
-      const valueDisplay = showValue
-        ? html`<span class="ctrl-value">${this._formatEntityCell(cell, displayState)}</span>`
-        : nothing;
-      if (cell?.step_buttons === true) {
-        const stepForButtons = this._numberStepForButtons(min, max, stepForCalc);
-        const epsilon = Math.max(stepForButtons * 1e-6, 1e-9);
-        const minusDisabled = controlValue <= min + epsilon;
-        const plusDisabled = controlValue >= max - epsilon;
-        const minusButton = this._renderNumberStepButton(entityId, -1, minusDisabled, min, max, stepForButtons);
-        const plusButton = this._renderNumberStepButton(entityId, 1, plusDisabled, min, max, stepForButtons);
-        const stepPosition = this._normalizeStepButtonsPosition(cell?.step_buttons_position);
-        return html`<span class=${`ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`}>
-          ${this._stepButtonLayout(stepPosition, minusButton, rangeInput, plusButton, valueDisplay)}
-        </span>`;
-      }
-      return html`<span class="ctrl-wrap">
-        ${rangeInput}
-        ${valueDisplay}
-      </span>`;
+      const order = this._attrSliderValueOrder(buttonsOn ? stepPosition : 'none', valuePosition);
+      const parts = {
+        minus: buttonsOn ? minusButton : nothing,
+        plus: buttonsOn ? plusButton : nothing,
+        slider: rangeInput,
+        value: valueNode,
+      };
+      const wrapClass = buttonsOn
+        ? `ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`
+        : 'ctrl-wrap';
+      return html`<span class=${wrapClass}>${order.map((key) => parts[key])}</span>`;
     }
     if (domain === 'input_select' || domain === 'select') {
       const rawOpts = stateObj?.attributes?.options;
@@ -1845,13 +1864,12 @@ class FlexCellsCard extends LitElement {
         : this._attrValuesEqual(raw, attrEdit.checked) || (!this._attrValuesEqual(raw, attrEdit.unchecked) && !!raw);
       const valueSource = draft && draft.actual !== undefined ? draft.actual : raw;
       const formatted = this._formatAttrDisplayValue(valueSource, cell);
-      return html`<span class="ctrl-wrap">
-        <input class="ctrl-switch" type="checkbox"
+      const valueNode = html`<span class="ctrl-value">${formatted || ''}</span>`;
+      const controlNode = html`<input class="ctrl-switch" type="checkbox"
           .checked=${!!isChecked}
           ?disabled=${disabled}
-          @change=${(e) => this._onAttrSwitchChange(e, cell)} />
-        ${showValueRight ? html`<span class="ctrl-value">${formatted || ''}</span>` : nothing}
-      </span>`;
+          @change=${(e) => this._onAttrSwitchChange(e, cell)} />`;
+      return this._renderAttrControlWithValue(controlNode, valueNode, this._attrControlValueSide(cell, attrEdit));
     }
 
     if (attrEdit.control === 'text') {
@@ -1877,8 +1895,8 @@ class FlexCellsCard extends LitElement {
       let inputValue = draft && draft.display !== undefined ? draft.display : stateDisplay;
       if (inputValue === null || inputValue === undefined || !Number.isFinite(Number(inputValue))) inputValue = '';
       const formattedValue = inputValue === '' ? '' : this._formatAttrDisplayValue(inputValue, cell);
-      return html`<span class="ctrl-wrap">
-        <input class="ctrl-input" type="number"
+      const valueNode = html`<span class="ctrl-value">${formattedValue}</span>`;
+      const controlNode = html`<input class="ctrl-input" type="number"
           min=${Number.isFinite(numberRange.min) ? numberRange.min : nothing}
           max=${Number.isFinite(numberRange.max) ? numberRange.max : nothing}
           step=${Number.isFinite(numberRange.step) && numberRange.step > 0 ? numberRange.step : 'any'}
@@ -1888,9 +1906,8 @@ class FlexCellsCard extends LitElement {
           @blur=${() => this._onAttrNumberBlur(cell)}
           @input=${(e) => this._onAttrNumberInput(e, cell)}
           @change=${(e) => this._onAttrNumberChange(e, cell)}
-          @keydown=${(e) => this._onAttrNumberKeydown(e, cell)} />
-        ${showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing}
-      </span>`;
+          @keydown=${(e) => this._onAttrNumberKeydown(e, cell)} />`;
+      return this._renderAttrControlWithValue(controlNode, valueNode, this._attrControlValueSide(cell, attrEdit));
     }
 
     const rawNum = Number(raw);
@@ -1909,8 +1926,9 @@ class FlexCellsCard extends LitElement {
     const hue = attrEdit.control === 'color'
       ? Number(controlValue)
       : (attrEdit.control === 'color_sat' ? this._resolveColorHue(cell, attrEdit, stateObj, tree) : null);
-    const showColorSwatch = (attrEdit.control === 'color' || attrEdit.control === 'color_sat') && showValueRight;
-    const colorSwatch = showColorSwatch ? html`<span class="ctrl-color-swatch" title="${hue ?? ''} / ${satValue ?? ''}%" style="background: hsl(${hue}, ${satValue}%, 50%);"></span>` : nothing;
+    const colorSwatch = (attrEdit.control === 'color' || attrEdit.control === 'color_sat')
+      ? html`<span class="ctrl-color-swatch" title="${hue ?? ''} / ${satValue ?? ''}%" style="background: hsl(${hue}, ${satValue}%, 50%);"></span>`
+      : nothing;
     const rangeClass = (attrEdit.control === 'color' || attrEdit.control === 'color_sat') ? 'ctrl-range ctrl-range-color' : 'ctrl-range';
     const satGradient = attrEdit.control === 'color_sat'
       ? `background: linear-gradient(90deg, hsl(${hue || 0},0%,50%) 0%, hsl(${hue || 0},100%,50%) 100%);`
@@ -1924,12 +1942,14 @@ class FlexCellsCard extends LitElement {
     const minusButton = this._renderAttrStepButton(cell, -1, minusDisabled);
     const plusButton = this._renderAttrStepButton(cell, 1, plusDisabled);
     const stepPosition = attrEdit.step_buttons_position || 'sides';
-    const valueDisplay = showColorSwatch
+    const valueDisplay = colorSwatch !== nothing
       ? colorSwatch
       : (showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing);
 
     if (attrEdit.control === 'stepper') {
-      const valueContent = html`<span class="ctrl-stepper-value">${formattedValue}</span>`;
+      const valueContent = attrEdit.value_position === 'hidden'
+        ? nothing
+        : html`<span class="ctrl-stepper-value">${formattedValue}</span>`;
       return html`<span class=${`ctrl-wrap ctrl-stepper ctrl-stepper-${stepPosition}`}>
         ${this._stepButtonLayout(stepPosition, minusButton, valueContent, plusButton)}
       </span>`;
@@ -1946,16 +1966,53 @@ class FlexCellsCard extends LitElement {
         @input=${(e) => this._onAttrSliderInput(e, cell)}
         @change=${(e) => this._onAttrSliderChange(e, cell)} />`;
 
-    if (attrEdit.control === 'slider' && attrEdit.step_buttons) {
-      return html`<span class=${`ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`}>
-        ${this._stepButtonLayout(stepPosition, minusButton, rangeInput, plusButton, valueDisplay)}
-      </span>`;
+    if (attrEdit.control === 'slider') {
+      const valuePosition = this._resolveAttrSliderValuePosition(cell, attrEdit);
+      const valueNode = valuePosition === 'hidden'
+        ? nothing
+        : html`<span class="ctrl-value">${formattedValue}</span>`;
+      const buttonPosition = attrEdit.step_buttons ? stepPosition : 'none';
+      const order = this._attrSliderValueOrder(buttonPosition, valuePosition);
+      const parts = {
+        minus: attrEdit.step_buttons ? minusButton : nothing,
+        plus: attrEdit.step_buttons ? plusButton : nothing,
+        slider: rangeInput,
+        value: valueNode,
+      };
+      const wrapClass = attrEdit.step_buttons
+        ? `ctrl-wrap ctrl-step-buttons ctrl-step-buttons-${stepPosition}`
+        : 'ctrl-wrap';
+      return html`<span class=${wrapClass}>${order.map((key) => parts[key])}</span>`;
+    }
+
+    if (attrEdit.control === 'color' || attrEdit.control === 'color_sat') {
+      return this._renderAttrControlWithValue(rangeInput, colorSwatch, this._attrControlValueSide(cell, attrEdit));
     }
 
     return html`<span class="ctrl-wrap">
       ${rangeInput}
       ${valueDisplay}
     </span>`;
+  }
+
+  _booleanControlValueSide(cell) {
+    const position = this._normalizeAttrSliderValuePosition(cell?.control_value_position);
+    if (position === 'slider_left' || position === 'buttons_left') return 'left';
+    if (position === 'slider_right' || position === 'buttons_right') return 'right';
+    return 'hidden';
+  }
+
+  _attrControlValueSide(cell, attrEdit) {
+    const position = attrEdit?.value_position;
+    if (position === 'hidden' || (!position && cell?.show_control_value_right === false)) return 'hidden';
+    if (position === 'slider_left' || position === 'buttons_left') return 'left';
+    return 'right';
+  }
+
+  _renderAttrControlWithValue(controlNode, valueNode, side) {
+    if (side === 'hidden') return html`<span class="ctrl-wrap">${controlNode}</span>`;
+    if (side === 'left') return html`<span class="ctrl-wrap">${valueNode}${controlNode}</span>`;
+    return html`<span class="ctrl-wrap">${controlNode}${valueNode}</span>`;
   }
 
   _onToggleBoolean(entityId, isOn) {
@@ -2232,7 +2289,60 @@ class FlexCellsCard extends LitElement {
       sat_fallback,
       step_buttons: raw.step_buttons === true,
       step_buttons_position,
+      value_position: this._normalizeAttrSliderValuePosition(raw.value_position),
     };
+  }
+
+  _normalizeAttrSliderValuePosition(position) {
+    const raw = typeof position === 'string' ? position.trim().toLowerCase() : '';
+    return ['hidden', 'slider_right', 'slider_left', 'buttons_right', 'buttons_left', 'between_buttons'].includes(raw)
+      ? raw
+      : undefined;
+  }
+
+  _resolveNumberSliderValuePosition(cell) {
+    const explicit = this._normalizeAttrSliderValuePosition(cell?.control_value_position);
+    if (explicit) return explicit;
+    if (cell?.show_control_value_right === false) return 'hidden';
+    if (cell?.step_buttons === true && this._normalizeStepButtonsPosition(cell?.step_buttons_position) === 'sides') {
+      return 'buttons_right';
+    }
+    return 'slider_right';
+  }
+
+  _resolveAttrSliderValuePosition(cell, attrEdit) {
+    if (attrEdit?.value_position) return attrEdit.value_position;
+    if (cell?.show_control_value_right === false) return 'hidden';
+    if (attrEdit?.step_buttons && (attrEdit.step_buttons_position || 'sides') === 'sides') return 'buttons_right';
+    return 'slider_right';
+  }
+
+  _attrSliderValueOrder(buttonPosition, valuePosition) {
+    const hidden = valuePosition === 'hidden';
+    if (buttonPosition === 'left') {
+      if (hidden) return ['minus', 'plus', 'slider'];
+      if (valuePosition === 'buttons_left') return ['value', 'minus', 'plus', 'slider'];
+      if (valuePosition === 'between_buttons') return ['minus', 'value', 'plus', 'slider'];
+      if (valuePosition === 'slider_right') return ['minus', 'plus', 'slider', 'value'];
+      return ['minus', 'plus', 'value', 'slider'];
+    }
+    if (buttonPosition === 'right') {
+      if (hidden) return ['slider', 'minus', 'plus'];
+      if (valuePosition === 'slider_left') return ['value', 'slider', 'minus', 'plus'];
+      if (valuePosition === 'buttons_right') return ['slider', 'minus', 'plus', 'value'];
+      if (valuePosition === 'between_buttons') return ['slider', 'minus', 'value', 'plus'];
+      return ['slider', 'value', 'minus', 'plus'];
+    }
+    if (buttonPosition === 'sides') {
+      if (hidden) return ['minus', 'slider', 'plus'];
+      if (valuePosition === 'slider_left') return ['minus', 'value', 'slider', 'plus'];
+      if (valuePosition === 'buttons_left') return ['value', 'minus', 'slider', 'plus'];
+      if (valuePosition === 'buttons_right') return ['minus', 'slider', 'plus', 'value'];
+      return ['minus', 'slider', 'value', 'plus'];
+    }
+    if (hidden) return ['slider'];
+    if (valuePosition === 'slider_left' || valuePosition === 'buttons_left') return ['value', 'slider'];
+    return ['slider', 'value'];
   }
 
   _stripIndexFromPath(path) {
@@ -4591,33 +4701,23 @@ class FlexCellsCard extends LitElement {
     }
     const alignment = typeof align === 'string' ? align : 'left';
     const styleSegments = [];
-    const embed = !!opts.embed;
     if (style) {
       const cleaned = style.replace(/text-align:[^;]+;?/gi, '');
       if (cleaned.trim()) styleSegments.push(cleaned.trim().replace(/;$/, ''));
     }
-    if (embed) {
-      styleSegments.push('display:inline-block');
-      if (alignment === 'right') styleSegments.push('text-align:right');
-      else if (alignment === 'center') styleSegments.push('text-align:center');
-      else styleSegments.push('text-align:left');
-      styleSegments.push('white-space:normal');
-      styleSegments.push('vertical-align:top');
+    styleSegments.push('display:inline-flex');
+    styleSegments.push('align-items:center');
+    if (alignment === 'right') {
+      styleSegments.push('justify-content:flex-end');
+      styleSegments.push('text-align:right');
+    } else if (alignment === 'center') {
+      styleSegments.push('justify-content:center');
+      styleSegments.push('text-align:center');
     } else {
-      styleSegments.push('display:inline-flex');
-      styleSegments.push('align-items:center');
-      if (alignment === 'right') {
-        styleSegments.push('justify-content:flex-end');
-        styleSegments.push('text-align:right');
-      } else if (alignment === 'center') {
-        styleSegments.push('justify-content:center');
-        styleSegments.push('text-align:center');
-      } else {
-        styleSegments.push('justify-content:flex-start');
-        styleSegments.push('text-align:left');
-      }
-      styleSegments.push('white-space:nowrap');
+      styleSegments.push('justify-content:flex-start');
+      styleSegments.push('text-align:left');
     }
+    styleSegments.push('white-space:nowrap');
     if (extraStyle && typeof extraStyle === 'string') {
       const appended = extraStyle.trim().replace(/;+$/, '');
       if (appended) styleSegments.push(appended);
