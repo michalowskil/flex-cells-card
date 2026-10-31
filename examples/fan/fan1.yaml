@@ -8,9 +8,16 @@ rows:
         custom_css_enabled: true
         custom_css: |-
           td {
-            border-radius: 70px;
+            box-sizing: border-box;
+            width: 39px !important;
+            min-width: 39px !important;
+            height: 39px !important;
             padding: 8px !important;
-            height: 23px;
+            border-radius: 50% !important;
+
+          }
+          td ha-state-icon {
+            margin-top: -2px;
           }
         dyn_color:
           - conditions:

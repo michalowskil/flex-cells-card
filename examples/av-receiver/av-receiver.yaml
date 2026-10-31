@@ -1,0 +1,592 @@
+rows:
+  - cells:
+      - type: string
+        value: Movie/TV
+        align: center
+        style:
+          text_transform: ''
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          data:
+            device: Amplituner
+            command: Movie/Tv
+          target:
+            entity_id: remote.allmighty_hub
+      - type: string
+        value: Music
+        align: center
+        style:
+          text_transform: ''
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          data:
+            device: Amplituner
+            command: Music
+          target:
+            entity_id: remote.allmighty_hub
+      - type: string
+        value: Game
+        align: center
+        style:
+          text_transform: ''
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          data:
+            device: Amplituner
+            command: Game
+          target:
+            entity_id: remote.allmighty_hub
+      - type: string
+        value: Stereo
+        align: center
+        style:
+          text_transform: ''
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          data:
+            device: Amplituner
+            command: Stereo
+          target:
+            entity_id: remote.allmighty_hub
+      - type: string
+        value: ''
+        align: right
+  - cells:
+      - type: string
+        value: 'Off'
+        align: left
+        style:
+          text_transform: ''
+          color: ''
+        tap_action:
+          action: perform-action
+          perform_action: switch.toggle
+          target:
+            entity_id: switch.subwoofer
+        dyn_color:
+          - conditions:
+              - entity: switch.subwoofer
+                attr: ''
+                op: '='
+                val: 'on'
+                val2: ''
+                val_entity: ''
+                val_attr: ''
+                val_offset: ''
+                val_offset_unit: ''
+                val2_entity: ''
+                val2_attr: ''
+                val2_offset: ''
+                val2_offset_unit: ''
+            match: all
+            bg: var(--state-active-color)
+            fg: var(--text-light-primary-color)
+            overwrite: text
+            overwrite_entity: ''
+            overwrite_attr: ''
+            text: 'On'
+          - conditions:
+              - entity: switch.subwoofer
+                attr: ''
+                op: '='
+                val: 'off'
+                val2: ''
+                val_entity: ''
+                val_attr: ''
+                val_offset: ''
+                val_offset_unit: ''
+                val2_entity: ''
+                val2_attr: ''
+                val2_offset: ''
+                val2_offset_unit: ''
+            match: all
+            bg: ''
+            fg: ''
+            overwrite: ''
+            overwrite_entity: ''
+            overwrite_attr: ''
+      - type: string
+        value: ''
+        align: right
+      - type: string
+        value: ''
+        align: right
+      - type: string
+        value: ''
+        align: right
+      - type: string
+        value: ''
+        align: right
+  - cells:
+      - type: entity
+        value: media_player.tx_nr646
+        align: right
+        use_entity_unit: true
+        style:
+          text_transform: ''
+          font_size: 12px
+        attr_edit:
+          enabled: false
+          service: ''
+          field: sound_mode
+          control: slider
+          checked: true
+          unchecked: false
+          hue_path: ''
+          sat_path: ''
+        dyn_color: []
+        unit: ''
+        attribute: video_information.output_color_depth
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.select_sound_mode
+          field: sound_mode
+          control: select
+          checked: true
+          unchecked: false
+          options: sound_mode_list
+          hue_path: ''
+          sat_path: ''
+          step_buttons: false
+          step_buttons_position: sides
+      - type: entity
+        value: media_player.tx_nr646
+        align: right
+        use_entity_unit: true
+        attr_edit:
+          enabled: true
+          service: media_player.select_source
+          field: source
+          control: select
+          checked: true
+          unchecked: false
+          options: source_list
+          hue_path: ''
+          sat_path: ''
+          step_buttons: false
+          step_buttons_position: sides
+      - type: string
+        value: ''
+        align: right
+      - type: string
+        value: ''
+        align: right
+  - cells:
+      - type: entity
+        value: media_player.tx_nr646
+        align: left
+        use_entity_unit: false
+        attr_edit:
+          enabled: true
+          service: media_player.volume_set
+          field: volume_level
+          control: slider
+          checked: true
+          unchecked: false
+          options: ''
+          hue_path: ''
+          sat_path: ''
+          step_buttons: false
+          step_buttons_position: sides
+          value_position: slider_right
+        show_control_value_right: true
+        scale_in_min: 0
+        scale_in_max: 1
+        scale_out_min: 0
+        scale_out_max: 100
+        attribute: volume_level
+        precision: 0
+        unit: '%'
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+        tap_action:
+          action: none
+      - type: icon
+        value: mdi:volume-plus
+        align: right
+        tap_action:
+          action: perform-action
+          perform_action: media_player.volume_up
+          target:
+            entity_id: media_player.tx_nr646
+        style:
+          color: var(--primary-text-color)
+      - type: icon
+        value: mdi:volume-minus
+        align: right
+        tap_action:
+          action: perform-action
+          perform_action: media_player.volume_down
+          target:
+            entity_id:
+              - media_player.tx_nr646
+        style:
+          color: var(--primary-text-color)
+      - type: icon
+        value: mdi:volume-high
+        align: right
+        tap_action:
+          action: perform-action
+          perform_action: script.turn_on
+          target:
+            entity_id: script.mute_unmute_tx_nr646
+        style:
+          color: var(--primary-text-color)
+        dyn_color:
+          - conditions:
+              - entity: media_player.tx_nr646
+                attr: is_volume_muted
+                op: '='
+                val: 'true'
+                val2: ''
+                val_entity: ''
+                val_attr: ''
+                val_offset: ''
+                val_offset_unit: ''
+                val2_entity: ''
+                val2_attr: ''
+                val2_offset: ''
+                val2_offset_unit: ''
+            match: all
+            bg: ''
+            fg: var(--accent-color)
+            overwrite: icon
+            overwrite_entity: ''
+            overwrite_attr: ''
+            icon: mdi:volume-mute
+      - type: string
+        value: 'display: none;'
+        align: right
+        dyn_color:
+          - conditions:
+              - entity: media_player.tx_nr646
+                attr: ''
+                op: '='
+                val: 'on'
+                val2: ''
+                val_entity: ''
+                val_attr: ''
+                val_offset: ''
+                val_offset_unit: ''
+                val2_entity: ''
+                val2_attr: ''
+                val2_offset: ''
+                val2_offset_unit: ''
+            match: all
+            bg: ''
+            fg: ''
+            overwrite: text
+            overwrite_entity: ''
+            overwrite_attr: ''
+            text: ''
+  - cells:
+      - type: entity
+        value: media_player.tx_nr646
+        align: center
+        custom_css_enabled: true
+        custom_css: |
+          td {
+             border-radius: 120px;
+             height: 40px;
+             width: 40px;
+          }
+        style:
+          background: var(--divider-color)
+        dyn_color:
+          - conditions:
+              - entity: ''
+                attr: ''
+                op: '='
+                val: 'on'
+                val2: ''
+                val_entity: ''
+                val_attr: ''
+                val_offset: ''
+                val_offset_unit: ''
+                val2_entity: ''
+                val2_attr: ''
+                val2_offset: ''
+                val2_offset_unit: ''
+            match: all
+            bg: '#ff980033'
+            fg: ''
+            overwrite: ''
+            overwrite_entity: ''
+            overwrite_attr: ''
+        use_entity_unit: true
+        entity_display: icon
+      - type: entity
+        value: media_player.tx_nr646
+        align: right
+        datetime_format: '[Amplituner - Salon]'
+        style:
+          bold: false
+        custom_css_enabled: true
+        custom_css: |
+          th, td {
+             font-weight: 500;
+          }
+        use_entity_unit: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: right
+        style:
+          font_size: 12px
+        use_entity_unit: true
+      - type: entity
+        value: media_player.tx_nr646
+        align: right
+        use_entity_unit: true
+        attribute: audio_information.output_channels
+        style:
+          bold: false
+          font_size: 12px
+      - type: entity
+        value: media_player.tx_nr646
+        align: right
+        dyn_color:
+          - conditions:
+              - entity: ''
+                attr: ''
+                op: '!='
+                val: ''
+                val2: ''
+                val_entity: ''
+                val_attr: ''
+                val_offset: ''
+                val_offset_unit: ''
+                val2_entity: ''
+                val2_attr: ''
+                val2_offset: ''
+                val2_offset_unit: ''
+            match: all
+            bg: ''
+            fg: ''
+            overwrite: icon
+            overwrite_entity: ''
+            overwrite_attr: ''
+            icon: mdi:power
+        tap_action:
+          action: toggle
+        use_entity_unit: true
+column_count: 5
+card_padding: 10
+overflow_x: true
+header_from_first_row: false
+zebra: false
+narrow_breakpoint: ''
+text_size: ''
+cell_padding:
+  top: 4
+  right: 0
+  bottom: 4
+  left: 0
+custom_template_enabled: true
+custom_template_html: |-
+  <style>
+    .presets,
+    .subwoofer,
+    .sourceAndMode {
+      font-size: 12px;
+      display: flex;
+      overflow: auto;
+    }
+    .sourceAndMode {
+      display: block;
+    }
+    .presets > .fcc-template-cell,
+    .subwoofer > .fcc-template-cell {
+      border: 1px solid grey;
+      padding: 0 10px !important;
+    }
+    .presets > .fcc-template-cell:not(:first-child, :last-child),
+    .subwoofer > .fcc-template-cell:not(:first-child, :last-child){
+      border-left: none;
+      padding: 0 10px;
+    }
+    .presets > .fcc-template-cell:nth-child(2),
+    .subwoofer > .fcc-template-cell:nth-child(2) {
+      border-top-left-radius: 10px;
+      border-bottom-left-radius: 10px;
+      border-left-width: 1px !important;
+      border-left: solid grey;
+      margin-left: 4px;
+    }
+    .subwoofer > .fcc-template-cell:nth-child(2) {
+      margin-left: 4px;
+      border-left: 1px solid grey !important;
+    }
+    .presets > .fcc-template-cell:last-child,
+    .subwoofer > .fcc-template-cell:last-child {
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;    
+      border-left: none;
+    }
+    .title {
+      width: 70px !important;
+    }
+    .sourceAndMode .title {
+      display: inline-block;
+    }
+    .sourceCell {
+      padding-bottom: 0 !important;
+    }
+    .modeCell {
+      max-width: calc(100% - 75px) !important;
+    }
+    /* Target Input */
+    .slider-input {
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+    .slider-input input{
+      -webkit-appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    /* --- Webkit Browsers --- */
+    .slider-input input::-webkit-slider-runnable-track {
+      height: 40px;
+      background: #0c4a6e;
+      border-radius: 20px;
+      border: 0px solid #cbd5e1;
+      box-shadow: 0px 2px 0px rgba(0, 0, 0, 0.1);
+    }
+    .slider-input input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 30px;
+      width: 30px;
+      background: #ffffff;
+      border-radius: 30px;
+      border: 4px solid #0284c7;
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+      margin-top: 5px;
+    }
+    /* --- Firefox --- */
+    .slider-input input::-moz-range-track {
+      height: 40px;
+      background: #0c4a6e;
+      border-radius: 20px;
+      border: 0px solid #cbd5e1;
+      box-shadow: 0px 2px 0px rgba(0, 0, 0, 0.1);
+    }
+    .slider-input input::-moz-range-thumb {
+      height: 30px;
+      width: 30px;
+      background: #ffffff;
+      border-radius: 30px;
+      border: 4px solid #0284c7;
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+      background-color: var(--card-background-color);
+    }
+    .slider-input .ctrl-value {
+      font-size: 12px;
+      min-width: 35px;
+      text-align: center;
+    }
+    .slider {
+      display: flex;
+      align-items: center;
+    }
+    .element1 {
+      flex: 1;
+      min-width: 0;
+    }
+    .slider .ctrl-wrap,
+    .slider .ctrl-wrap input {
+      width: 100% !important;
+    }
+    .vol-buttons {
+      background-color: var(--secondary-background-color);
+      border-radius: 10px;
+      padding: 8px !important;
+      margin-left: 10px
+    }
+    .header {
+      display: grid;
+      grid-template-columns: 45px; 
+      grid-template-rows: 20px 20px; 
+      gap: 0px;
+    }
+    .col-1 .fcc-template-cell {
+      padding: 0 !important;
+    }
+    .col-1 .fcc-template-cell ha-state-icon {
+      margin-top: -2px !important;
+    }
+    .col-1 {
+      grid-row: span 2;
+    }
+    .col-2 {
+      grid-column: 2;
+      grid-row: 1;
+      font-size: 14px
+    }
+    .col-2 .fcc-template-cell,
+    .col-3 .fcc-template-cell {
+      padding: 0 !important;
+    }
+    .col-3 {
+      margin-top: -5px;
+      grid-column: 2;
+      grid-row: 2;
+    }
+    .col-4 {
+      grid-column: 3;
+      text-align: right
+    }
+  </style>
+
+  <div class="header">
+    <div class="col-1">
+      <fcc row="5" col="1"" />
+    </div>
+    <div class="col-2">
+      <fcc row="5" col="2" />
+    </div>
+    <div class="col-3">
+      <fcc row="5" col="3" />
+      <span style="<fcc mode='text' row='4' col='5' />"> &#x2027; <fcc row="5" col="4" /></span>
+      <span style="<fcc mode='text' row='4' col='5' />"> &#x2027; <fcc row="3" col="1" /></span>
+    </div>
+    <div class="col-4">
+      <fcc row="5" col="5" />
+    </div>
+  </div>
+  <div style="<fcc mode='text' row='4' col='5' />">
+    <div class="slider">
+      <fcc row="4" col="1" class="slider-input element1" />
+      <fcc row="4" col="4" class="slider-input vol-buttons" />
+      <fcc row="4" col="3" class="slider-input vol-buttons" />
+      <fcc row="4" col="2" class="slider-input vol-buttons" />
+    </div>
+    <div class="presets">
+      <span class="title">Preset:</span>
+      <fcc row="1" col="1" /> 
+      <fcc row="1" col="2" />
+      <fcc row="1" col="3" />
+      <fcc row="1" col="4" />
+    </div>
+    <div class="sourceAndMode">
+      <span class="title">Source:</span>
+      <fcc row="3" col="3" class="sourceCell" />
+      <br/>
+      <span class="title">Mode:</span>
+      <fcc row="3" col="2" class="modeCell" />
+    </div>
+    <div class="subwoofer">
+      <span class="title">Subwoofer:</span>
+      <fcc row="2" col="1" />
+    </div>
+  </div>
+type: custom:flex-cells-card

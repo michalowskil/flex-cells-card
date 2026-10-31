@@ -321,6 +321,10 @@ type: custom:flex-cells-card
 
     ![Select](examples/select/images/dark-300.png)
     ![Select](examples/select/images/light-300.png)
+  - [AV receiver (global template & custom CSS)](https://github.com/michalowskil/flex-cells-card/blob/main/examples/av-receiver/av-receiver.md) - media player card for an AV receiver, with power, volume, source, sound mode, presets, and a subwoofer switch. The controls below the header are hidden when the receiver is off. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/av-receiver/av-receiver.md)  
+
+    ![AV receiver](examples/av-receiver/images/dark-300.png)
+    ![AV receiver](examples/av-receiver/images/light-300.png)
 
 ## Translations
 If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one string will do - and it's not difficult.
@@ -405,7 +409,7 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
-- v0.31.0-beta.1 —
+- v0.31.0 —
   - On sliders, the +/- buttons are chosen from one list: none, on both sides of the slider, left of the slider, or right of the slider. This applies to **attribute editing** and to **Show control** for `input_number` and `number`.
   - **Show value** replaces the old "show the number on the right" checkbox. You can put the number on either side of the slider, next to the +/- buttons, between the buttons, or hide it. With no +/- buttons, **Show value** only offers left of the slider, right of the slider, or hidden.
   - **Show control** for `input_number` and `number` can hide the slider. The + and − buttons stay, and **Show value** then offers only visible or hidden. The button layout appears only when that number is visible.
