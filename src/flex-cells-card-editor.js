@@ -2124,7 +2124,77 @@ _cellAlignChanged(r,c,e){
       ...(this._normalizeAttrSliderValuePosition(raw.value_position)
         ? { value_position: this._normalizeAttrSliderValuePosition(raw.value_position) }
         : {}),
+      ...((control === 'color' || control === 'color_sat') && this._normalizeSwatchView(raw.swatch_view) !== 'color'
+        ? { swatch_view: this._normalizeSwatchView(raw.swatch_view) }
+        : {}),
     };
+  }
+  _normalizeSwatchView(value) {
+    const raw = typeof value === 'string' ? value.trim().toLowerCase().replace(/-/g, '_') : '';
+    if (raw === 'brightness') return 'brightness';
+    if (raw === 'color_temp' || raw === 'temperature' || raw === 'temp') return 'color_temp';
+    if (raw === 'color' || raw === 'color_wheel' || raw === 'wheel') return 'color';
+    return 'color';
+  }
+  _attrSwatchViewChanged(r, c, e) {
+    const value = this._normalizeSwatchView(e?.detail?.value ?? e?.target?.value);
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const current = this._getAttrEditConfig(cell);
+    const shown = current.swatch_view || 'color';
+    if (value === shown) return;
+    if (value === 'color') {
+      const next = { ...current };
+      delete next.swatch_view;
+      this._patchCell(r, c, { attr_edit: next });
+      return;
+    }
+    this._patchAttrEdit(r, c, { swatch_view: value });
+  }
+  _lightMoreInfoViewChoices(entityId) {
+    const modes = this._getStateObject(entityId)?.attributes?.supported_color_modes;
+    const list = Array.isArray(modes) ? modes.map((mode) => String(mode)) : [];
+    if (!list.length) return ['brightness', 'color', 'color_temp'];
+    const choices = [];
+    if (list.some((mode) => ['brightness', 'color_temp', 'hs', 'xy', 'rgb', 'rgbw', 'rgbww', 'white'].includes(mode))) {
+      choices.push('brightness');
+    }
+    if (list.some((mode) => ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'].includes(mode))) choices.push('color');
+    if (list.includes('color_temp')) choices.push('color_temp');
+    return choices;
+  }
+  _showLightMoreInfoView(cell) {
+    const entityId = String(cell?.value || '');
+    if (entityId.split('.')[0] !== 'light') return false;
+    if (cell?.show_control) return false;
+    if (cell?.attr_edit?.enabled) return false;
+    const choices = this._lightMoreInfoViewChoices(entityId);
+    return choices.includes('color') || choices.includes('color_temp');
+  }
+  _shownLightMoreInfoView(cell) {
+    return cell?.more_info_view === 'color' || cell?.more_info_view === 'color_temp'
+      ? cell.more_info_view
+      : 'brightness';
+  }
+  _lightMoreInfoViewOptions(cell) {
+    const labels = {
+      brightness: 'editor.attr_edit_swatch_view_brightness',
+      color: 'editor.attr_edit_swatch_view_color',
+      color_temp: 'editor.attr_edit_swatch_view_color_temp',
+    };
+    const choices = this._lightMoreInfoViewChoices(cell?.value);
+    const shown = this._shownLightMoreInfoView(cell);
+    const values = choices.includes(shown) ? choices : [shown, ...choices];
+    return values.map((value) => ({ value, label: t(this.hass, labels[value]) }));
+  }
+  _cellMoreInfoViewChanged(r, c, e) {
+    const raw = e?.detail?.value ?? e?.target?.value;
+    const value = raw === 'color' || raw === 'color_temp' ? raw : 'brightness';
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    if (this._shownLightMoreInfoView(cell) === value) return;
+    const next = { ...cell };
+    if (value === 'brightness') delete next.more_info_view;
+    else next.more_info_view = value;
+    this._writeCell(r, c, next);
   }
   _normalizeAttrSliderValuePosition(position) {
     const raw = typeof position === 'string' ? position.trim().toLowerCase() : '';
@@ -3769,6 +3839,19 @@ _styleValue(r,c,key,e){
                             @closed=${(e)=>e.stopPropagation()}>
                           </ha-select>
                         </div>
+                        ${this._showLightMoreInfoView(cell) ? html`
+                          <div class="cell-grid cell-wide">
+                            <ha-select
+                              .label=${t(this.hass, 'editor.more_info_view')}
+                              .value=${this._shownLightMoreInfoView(cell)}
+                              naturalMenuWidth
+                              fixedMenuPosition
+                              .options=${this._lightMoreInfoViewOptions(cell)}
+                              @selected=${(e)=> this._cellMoreInfoViewChanged(rIdx, cIdx, e)}
+                              @closed=${(e)=> e.stopPropagation()}>
+                            </ha-select>
+                          </div>
+                        ` : nothing}
                         ${ this._isCameraDisplay(this._initialEntityDisplay(cell)) ? html`
                           <div class="option group camera-size full">
                             <fcc-textfield class="mini"
@@ -3985,6 +4068,25 @@ _styleValue(r,c,key,e){
                                   ]}
                                   @selected=${(e)=> this._attrStepperValueChanged(rIdx,cIdx,e)}
                                   @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
+                              </div>
+                            ` : nothing}
+
+                            ${(attrEditControl === 'color' || attrEditControl === 'color_sat') ? html`
+                              <div class="cell-grid cell-wide" style="margin-bottom: 0;">
+                                <ha-select
+                                  .label=${t(this.hass, 'editor.attr_edit_swatch_view')}
+                                  .value=${attrEdit.swatch_view || 'color'}
+                                  ?disabled=${!attrEditEnabled}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${[
+                                    { value: 'brightness', label: t(this.hass, 'editor.attr_edit_swatch_view_brightness') },
+                                    { value: 'color', label: t(this.hass, 'editor.attr_edit_swatch_view_color') },
+                                    { value: 'color_temp', label: t(this.hass, 'editor.attr_edit_swatch_view_color_temp') },
+                                  ]}
+                                  @selected=${(e)=> this._attrSwatchViewChanged(rIdx, cIdx, e)}
+                                  @closed=${(e)=> e.stopPropagation()}>
                                 </ha-select>
                               </div>
                             ` : nothing}
@@ -5086,7 +5188,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.31.0
+        FCC v0.32.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

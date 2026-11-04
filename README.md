@@ -409,6 +409,11 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.32.0 —
+  - Vertical swipes leave slider values unchanged. On some sliders this already worked, on others a vertical swipe still changed the value. Taps without movement still set them.
+  - When a control shows its value as a separate text, that text is clickable. With no tap action it opens the entity more-info. Setting hold and/or double-tap does not remove that tap. On a switch, the label still toggles the checkbox unless tap or hold is set; then the label runs those actions, and the checkbox itself still toggles.
+  - Hue and saturation swatches can open one of three views, when the entity supports it: brightness, the color wheel, or color temperature.
+  - Light entities can open more-info on one of three views, when the light supports it: brightness, the color wheel, or color temperature.
 - v0.31.0 —
   - On sliders, the +/- buttons are chosen from one list: none, on both sides of the slider, left of the slider, or right of the slider. This applies to **attribute editing** and to **Show control** for `input_number` and `number`.
   - **Show value** replaces the old "show the number on the right" checkbox. You can put the number on either side of the slider, next to the +/- buttons, between the buttons, or hide it. With no +/- buttons, **Show value** only offers left of the slider, right of the slider, or hidden.

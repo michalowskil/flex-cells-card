@@ -258,6 +258,8 @@ class FlexCellsCard extends LitElement {
       vertical-align: middle;
     }
     .ctrl-range { width: 160px; vertical-align: middle; touch-action: pan-y !important; }
+    .ctrl-range::-webkit-slider-thumb,
+    .ctrl-range::-moz-range-thumb { touch-action: pan-y; }
     .ctrl-step-button {
       width: 28px;
       height: 28px;
@@ -406,6 +408,10 @@ class FlexCellsCard extends LitElement {
       --mdc-icon-size: 18px;
     }
     .ctrl-switch { vertical-align: middle; }
+    label.ctrl-check {
+      display: inline-flex;
+      align-items: center;
+    }
     .ctrl-input[type="date"],
     .ctrl-input[type="time"],
     .ctrl-input[type="datetime-local"] {
@@ -498,6 +504,12 @@ class FlexCellsCard extends LitElement {
     // don't tear down ghost guard if a navigation suppression window is active;
     // it will auto-clean after its timeout.
     if (!this._ghostClickUntil) this._teardownGhostClickGuard();
+    this._clearSliderGuards();
+    this._lightViewToken = (this._lightViewToken || 0) + 1;
+    if (this._lightViewTimer) {
+      clearTimeout(this._lightViewTimer);
+      this._lightViewTimer = null;
+    }
     super.disconnectedCallback();
   }
 
@@ -747,6 +759,7 @@ class FlexCellsCard extends LitElement {
       let mutated = false;
       for (const [entityId, draft] of [...this._numberControlDrafts.entries()]) {
         if (this._activeNumberInputs && this._activeNumberInputs.has(entityId)) continue;
+        if (this._numberSliderHolds && this._numberSliderHolds.has(entityId)) continue;
         const stateObj = hassStates[entityId];
         if (!stateObj) {
           this._numberControlDrafts.delete(entityId);
@@ -831,8 +844,210 @@ class FlexCellsCard extends LitElement {
       detail: { entityId }, bubbles: true, composed: true,
     }));
   }
-  _onEntityKeydown(e, entityId) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._openMoreInfo(entityId); }
+
+  _openEntityMoreInfo(entityId, view) {
+    if (!entityId) return;
+    const control = typeof view === 'string' ? view.trim().toLowerCase().replace(/-/g, '_') : '';
+    if (control === 'color' || control === 'color_wheel' || control === 'wheel') {
+      this._openSwatchView(entityId, 'color');
+      return;
+    }
+    if (control === 'color_temp' || control === 'temperature' || control === 'temp') {
+      this._openSwatchView(entityId, 'color_temp');
+      return;
+    }
+    this._openMoreInfo(entityId);
+  }
+
+  _normalizeSwatchView(value) {
+    const raw = typeof value === 'string' ? value.trim().toLowerCase().replace(/-/g, '_') : '';
+    if (raw === 'brightness') return 'brightness';
+    if (raw === 'color_temp' || raw === 'temperature' || raw === 'temp') return 'color_temp';
+    if (raw === 'color' || raw === 'color_wheel' || raw === 'wheel') return 'color';
+    return 'color';
+  }
+
+  _lightSupportsMainControl(entityId, control) {
+    const stateObj = this.hass?.states?.[entityId];
+    if (!stateObj || String(entityId).split('.')[0] !== 'light') return false;
+    const attrs = stateObj.attributes || {};
+    const modes = Array.isArray(attrs.supported_color_modes)
+      ? attrs.supported_color_modes.map((mode) => String(mode))
+      : [];
+    const hasModes = modes.length > 0;
+    if (control === 'color') {
+      if (hasModes) return modes.some((mode) => ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'].includes(mode));
+      return Array.isArray(attrs.hs_color) || Array.isArray(attrs.rgb_color) || Array.isArray(attrs.xy_color);
+    }
+    if (control === 'color_temp') {
+      if (hasModes) return modes.includes('color_temp');
+      return attrs.color_temp_kelvin != null || attrs.min_color_temp_kelvin != null;
+    }
+    if (control === 'brightness') {
+      if (hasModes) {
+        return modes.some((mode) => ['brightness', 'color_temp', 'hs', 'xy', 'rgb', 'rgbw', 'rgbww', 'white'].includes(mode));
+      }
+      return attrs.brightness != null;
+    }
+    return false;
+  }
+
+  // Próbka otwiera jeden z widoków more-info światła. Gdy światło go nie ma, zostaje sam dialog.
+  _openSwatchView(entityId, view) {
+    if (!entityId) return;
+    const control = this._normalizeSwatchView(view);
+    this._openMoreInfo(entityId);
+    if (!this._lightSupportsMainControl(entityId, control)) return;
+    this._scheduleLightMainControl(entityId, control);
+  }
+
+  _scheduleLightMainControl(entityId, control) {
+    this._lightViewToken = (this._lightViewToken || 0) + 1;
+    const token = this._lightViewToken;
+    if (this._lightViewTimer) {
+      clearTimeout(this._lightViewTimer);
+      this._lightViewTimer = null;
+    }
+    const delays = [0, 40, 100, 200, 400, 700, 1100, 1600];
+    const attempt = (index) => {
+      if (this._lightViewToken !== token) return;
+      if (this._activateLightMainControl(entityId, control)) return;
+      const next = index + 1;
+      if (next >= delays.length) return;
+      this._lightViewTimer = window.setTimeout(() => attempt(next), delays[next] - delays[index]);
+    };
+    attempt(0);
+  }
+
+  _queryShadow(root, predicate, depth = 0) {
+    if (!root?.querySelectorAll || depth > 8) return null;
+    const nodes = root.querySelectorAll('*');
+    for (const el of nodes) {
+      if (predicate(el)) return el;
+      if (el.shadowRoot) {
+        const inner = this._queryShadow(el.shadowRoot, predicate, depth + 1);
+        if (inner) return inner;
+      }
+    }
+    return null;
+  }
+
+  _findOpenLightMoreInfo(entityId) {
+    const roots = [];
+    const ha = document.querySelector('home-assistant');
+    if (ha?.shadowRoot) roots.push(ha.shadowRoot);
+    if (document.body) roots.push(document.body);
+    const matchLight = (dialog) => {
+      if (!dialog || (dialog._entityId && dialog._entityId !== entityId)) return null;
+      const light = this._queryShadow(dialog.shadowRoot || dialog, (el) => el.localName === 'more-info-light');
+      if (!light) return null;
+      const lightId = light.stateObj?.entity_id;
+      if (lightId && lightId !== entityId) return null;
+      if (!lightId && dialog._entityId !== entityId) return null;
+      return light;
+    };
+    for (const root of roots) {
+      const dialogs = root.querySelectorAll?.('ha-more-info-dialog') || [];
+      for (const dialog of dialogs) {
+        const light = matchLight(dialog);
+        if (light) return light;
+      }
+      const hosts = root.querySelectorAll?.('*') || [];
+      for (const host of hosts) {
+        if (!host.shadowRoot) continue;
+        const nested = host.shadowRoot.querySelectorAll('ha-more-info-dialog');
+        for (const dialog of nested) {
+          const light = matchLight(dialog);
+          if (light) return light;
+        }
+      }
+    }
+    return null;
+  }
+
+  _findLightControlButton(light, control) {
+    const root = light?.shadowRoot;
+    if (!root) return null;
+    const toggles = root.querySelectorAll('ha-icon-button-toggle, ha-icon-button, button');
+    for (const toggle of toggles) {
+      if (toggle.control === control) return toggle;
+    }
+    const wheelClass = control === 'color'
+      ? '.wheel.color'
+      : (control === 'color_temp' ? '.wheel.color-temp' : '');
+    if (!wheelClass) return null;
+    const wheel = root.querySelector(wheelClass);
+    const host = wheel?.parentElement;
+    if (host?.control === control) return host;
+    return null;
+  }
+
+  _activateLightMainControl(entityId, control) {
+    const light = this._findOpenLightMoreInfo(entityId);
+    if (!light) return false;
+    if (light._mainControl === control) return true;
+    if (typeof light._changeMainControl === 'function') {
+      try { light._changeMainControl(control); } catch (_) { /* starszy widok more-info */ }
+      if (light._mainControl === control) return true;
+    }
+    const button = this._findLightControlButton(light, control);
+    if (!button || button.disabled) return false;
+    button.click();
+    return light._mainControl === control;
+  }
+
+  // Osobny napis wartości. Domyślny tap zostaje, dopóki tap_action nie jest ustawione;
+  // samo hold albo double-tap go nie zdejmuje.
+  _renderValueInscription(cell, entityId, className, content, defaultTap, extras = {}) {
+    const actions = this._getSanitizedActions(cell);
+    const tapNone = this._tapActionIsExplicitNone(cell);
+    const hasGesture = this._hasAction(actions.tap) || this._hasAction(actions.hold) || this._hasAction(actions.dbl);
+    const title = extras.title ?? nothing;
+    const style = extras.style ?? nothing;
+    if (tapNone && !hasGesture) {
+      return html`<span class=${className} title=${title} style=${style}>${content}</span>`;
+    }
+    const aria = extras.ariaLabel ?? (typeof content === 'string' && content ? content : nothing);
+    return html`<span
+      class=${`${className} clickable`}
+      role="button"
+      tabindex="0"
+      title=${title}
+      style=${style}
+      aria-label=${aria}
+      @pointerdown=${(e) => this._onCellPointerDown(e, cell, entityId)}
+      @pointerup=${(e) => this._onCellPointerUp(e, cell, entityId, defaultTap)}
+      @pointercancel=${(e) => this._onCellPointerCancel(e)}
+      @mouseleave=${(e) => this._onCellPointerCancel(e)}
+      @keydown=${(e) => this._onCellKeydown(e, cell, entityId, defaultTap)}
+      @click=${(e) => { e.preventDefault(); e.stopPropagation(); }}
+    >${content}</span>`;
+  }
+
+  _switchValueIsNativeToggle(cell) {
+    if (this._tapActionIsExplicitNone(cell)) return false;
+    const actions = this._getSanitizedActions(cell);
+    return !this._hasAction(actions.tap) && !this._hasAction(actions.hold) && !this._hasAction(actions.dbl);
+  }
+
+  _renderSwitchWithValue(cell, entityId, controlNode, valueContent, side, toggleValue) {
+    if (side === 'hidden') return html`<label class="ctrl-wrap">${controlNode}</label>`;
+    if (this._switchValueIsNativeToggle(cell)) {
+      const valueNode = html`<span class="ctrl-value">${valueContent}</span>`;
+      return html`<label class="ctrl-wrap">${side === 'left' ? valueNode : nothing}${controlNode}${side === 'right' ? valueNode : nothing}</label>`;
+    }
+    const valueNode = this._renderValueInscription(cell, entityId, 'ctrl-value', valueContent, () => {
+      const actions = this._getSanitizedActions(cell);
+      if (!this._hasAction(actions.hold)) {
+        toggleValue();
+        return;
+      }
+      this._openMoreInfo(entityId);
+    });
+    return html`<span class="ctrl-wrap">${side === 'left' ? valueNode : nothing}<label class="ctrl-check">${controlNode}</label>${side === 'right' ? valueNode : nothing}</span>`;
+  }
+  _onEntityKeydown(e, entityId, view) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._openEntityMoreInfo(entityId, view); }
   }
 
   _isNumericState(state) { const n = Number(state); return Number.isFinite(n); }
@@ -1634,9 +1849,10 @@ class FlexCellsCard extends LitElement {
       const controlNode = html`<input class="ctrl-switch" type="checkbox" .checked=${checked}
         @change=${(e) => this._onToggleBoolean(entityId, !!e.target.checked)} />`;
       const side = this._booleanControlValueSide(cell);
-      if (side === 'hidden') return html`<label class="ctrl-wrap">${controlNode}</label>`;
-      const valueNode = html`<span class="ctrl-value">${this._formatEntityCell(cell, stateObj, true)}</span>`;
-      return html`<label class="ctrl-wrap">${side === 'left' ? valueNode : nothing}${controlNode}${side === 'right' ? valueNode : nothing}</label>`;
+      return this._renderSwitchWithValue(cell, entityId, controlNode, this._formatEntityCell(cell, stateObj, true), side, () => {
+        const isOn = this.hass?.states?.[entityId]?.state === 'on';
+        this._onToggleBoolean(entityId, !isOn);
+      });
     }
     if (domain === 'input_number' || domain === 'number') {
       const attrs = stateObj?.attributes || {};
@@ -1711,7 +1927,13 @@ class FlexCellsCard extends LitElement {
       const valuePosition = this._resolveNumberSliderValuePosition(cell);
       const valueNode = valuePosition === 'hidden'
         ? nothing
-        : html`<span class=${showSlider ? 'ctrl-value' : 'ctrl-stepper-value'}>${this._formatEntityCell(cell, displayState)}</span>`;
+        : this._renderValueInscription(
+          cell,
+          entityId,
+          showSlider ? 'ctrl-value' : 'ctrl-stepper-value',
+          this._formatEntityCell(cell, displayState),
+          () => this._openMoreInfo(entityId),
+        );
       if (!showSlider) {
         return html`<span class=${`ctrl-wrap ctrl-stepper ctrl-stepper-${stepPosition}`}>
           ${this._stepButtonLayout(stepPosition, minusButton, valueNode, plusButton)}
@@ -1719,6 +1941,10 @@ class FlexCellsCard extends LitElement {
       }
       const rangeInput = html`<input class="ctrl-range" type="range" min="${min}" max="${max}" step="${stepAttr}"
           .value=${String(controlValue)}
+          @pointerdown=${(e) => this._onNumberSliderPointerDown(e, entityId)}
+          @pointermove=${(e) => this._onNumberSliderPointerMove(e, entityId)}
+          @pointerup=${(e) => this._onNumberSliderPointerUp(e, entityId)}
+          @pointercancel=${(e) => this._onNumberSliderPointerUp(e, entityId)}
           @focus=${() => this._onNumberFocus(entityId)}
           @blur=${() => this._onNumberBlur(entityId)}
           @input=${(e) => this._onNumberInput(e, entityId)}
@@ -1864,12 +2090,18 @@ class FlexCellsCard extends LitElement {
         : this._attrValuesEqual(raw, attrEdit.checked) || (!this._attrValuesEqual(raw, attrEdit.unchecked) && !!raw);
       const valueSource = draft && draft.actual !== undefined ? draft.actual : raw;
       const formatted = this._formatAttrDisplayValue(valueSource, cell);
-      const valueNode = html`<span class="ctrl-value">${formatted || ''}</span>`;
       const controlNode = html`<input class="ctrl-switch" type="checkbox"
           .checked=${!!isChecked}
           ?disabled=${disabled}
           @change=${(e) => this._onAttrSwitchChange(e, cell)} />`;
-      return this._renderAttrControlWithValue(controlNode, valueNode, this._attrControlValueSide(cell, attrEdit));
+      return this._renderSwitchWithValue(
+        cell,
+        entityId,
+        controlNode,
+        formatted || '',
+        this._attrControlValueSide(cell, attrEdit),
+        () => this._toggleAttrSwitch(cell),
+      );
     }
 
     if (attrEdit.control === 'text') {
@@ -1895,7 +2127,13 @@ class FlexCellsCard extends LitElement {
       let inputValue = draft && draft.display !== undefined ? draft.display : stateDisplay;
       if (inputValue === null || inputValue === undefined || !Number.isFinite(Number(inputValue))) inputValue = '';
       const formattedValue = inputValue === '' ? '' : this._formatAttrDisplayValue(inputValue, cell);
-      const valueNode = html`<span class="ctrl-value">${formattedValue}</span>`;
+      const valueNode = this._renderValueInscription(
+        cell,
+        entityId,
+        'ctrl-value',
+        formattedValue,
+        () => this._openMoreInfo(entityId),
+      );
       const controlNode = html`<input class="ctrl-input" type="number"
           min=${Number.isFinite(numberRange.min) ? numberRange.min : nothing}
           max=${Number.isFinite(numberRange.max) ? numberRange.max : nothing}
@@ -1926,8 +2164,16 @@ class FlexCellsCard extends LitElement {
     const hue = attrEdit.control === 'color'
       ? Number(controlValue)
       : (attrEdit.control === 'color_sat' ? this._resolveColorHue(cell, attrEdit, stateObj, tree) : null);
+    const swatchLabel = `${hue ?? ''} / ${satValue ?? ''}%`;
     const colorSwatch = (attrEdit.control === 'color' || attrEdit.control === 'color_sat')
-      ? html`<span class="ctrl-color-swatch" title="${hue ?? ''} / ${satValue ?? ''}%" style="background: hsl(${hue}, ${satValue}%, 50%);"></span>`
+      ? this._renderValueInscription(
+        cell,
+        entityId,
+        'ctrl-color-swatch',
+        '',
+        () => this._openSwatchView(entityId, attrEdit.swatch_view),
+        { title: swatchLabel, ariaLabel: swatchLabel, style: `background: hsl(${hue}, ${satValue}%, 50%);` },
+      )
       : nothing;
     const rangeClass = (attrEdit.control === 'color' || attrEdit.control === 'color_sat') ? 'ctrl-range ctrl-range-color' : 'ctrl-range';
     const satGradient = attrEdit.control === 'color_sat'
@@ -1944,12 +2190,20 @@ class FlexCellsCard extends LitElement {
     const stepPosition = attrEdit.step_buttons_position || 'sides';
     const valueDisplay = colorSwatch !== nothing
       ? colorSwatch
-      : (showValueRight ? html`<span class="ctrl-value">${formattedValue}</span>` : nothing);
+      : (showValueRight
+        ? this._renderValueInscription(cell, entityId, 'ctrl-value', formattedValue, () => this._openMoreInfo(entityId))
+        : nothing);
 
     if (attrEdit.control === 'stepper') {
       const valueContent = attrEdit.value_position === 'hidden'
         ? nothing
-        : html`<span class="ctrl-stepper-value">${formattedValue}</span>`;
+        : this._renderValueInscription(
+          cell,
+          entityId,
+          'ctrl-stepper-value',
+          formattedValue,
+          () => this._openMoreInfo(entityId),
+        );
       return html`<span class=${`ctrl-wrap ctrl-stepper ctrl-stepper-${stepPosition}`}>
         ${this._stepButtonLayout(stepPosition, minusButton, valueContent, plusButton)}
       </span>`;
@@ -1970,7 +2224,13 @@ class FlexCellsCard extends LitElement {
       const valuePosition = this._resolveAttrSliderValuePosition(cell, attrEdit);
       const valueNode = valuePosition === 'hidden'
         ? nothing
-        : html`<span class="ctrl-value">${formattedValue}</span>`;
+        : this._renderValueInscription(
+          cell,
+          entityId,
+          'ctrl-value',
+          formattedValue,
+          () => this._openMoreInfo(entityId),
+        );
       const buttonPosition = attrEdit.step_buttons ? stepPosition : 'none';
       const order = this._attrSliderValueOrder(buttonPosition, valuePosition);
       const parts = {
@@ -2028,11 +2288,245 @@ class FlexCellsCard extends LitElement {
     const serviceDomain = domain === 'number' ? 'number' : 'input_number';
     try { this.hass?.callService(serviceDomain, 'set_value', { entity_id: entityId, value }); } catch (e) { /* noop */ }
   }
+  _numberSliderKey(entityId) {
+    return entityId ? `number:${entityId}` : '';
+  }
+
+  _holdNumberSlider(entityId) {
+    if (!entityId) return;
+    if (!this._numberSliderHolds) this._numberSliderHolds = new Set();
+    this._numberSliderHolds.add(entityId);
+  }
+
+  _releaseNumberSlider(entityId) {
+    this._numberSliderHolds?.delete(entityId);
+  }
+
+  // touch-action: pan-y jest oficjalnym sposobem. Gdy WebView i tak odda gest suwakowi,
+  // pointercancel znaczy „to scroll” i wartość z tego gestu nie może zostać zapisana.
+  _beginSliderGuard(key, event, startValue, onExpire, onReject) {
+    if (!key) return null;
+    const existing = this._sliderGuards?.get(key);
+    if (existing?.timer) clearTimeout(existing.timer);
+    existing?.unbindWindow?.();
+    const pointerType = event?.pointerType || '';
+    const touch = pointerType === 'touch' || pointerType === 'pen';
+    const numericStart = Number(startValue);
+    const guard = {
+      startX: event?.clientX ?? null,
+      startY: event?.clientY ?? null,
+      startValue: Number.isFinite(numericStart) ? numericStart : undefined,
+      pendingValue: undefined,
+      allow: !touch,
+      blocked: false,
+      reject: false,
+      accepted: !touch,
+      pointerEnded: !touch,
+      deferredChange: false,
+      touch,
+      restoring: false,
+      pointerId: event?.pointerId ?? null,
+      input: event?.target || null,
+      timer: 0,
+      unbindWindow: null,
+      onExpire: typeof onExpire === 'function' ? onExpire : null,
+      onReject: typeof onReject === 'function' ? onReject : null,
+    };
+    if (!this._sliderGuards) this._sliderGuards = new Map();
+    this._sliderGuards.set(key, guard);
+    if (touch) this._bindSliderGuardWindow(key, guard);
+    return guard;
+  }
+
+  _bindSliderGuardWindow(key, guard) {
+    const pointerId = guard?.pointerId;
+    if (pointerId == null || typeof window === 'undefined') return;
+    const move = (event) => {
+      if (event.pointerId !== pointerId) return;
+      const current = this._sliderGuards?.get(key);
+      if (!current || current !== guard || !current.touch || current.reject || current.allow) return;
+      this._considerSliderGuardDirection(current, event);
+    };
+    const stop = (event) => {
+      if (event.pointerId !== pointerId) return;
+      if (event.type === 'pointercancel') this._noteSliderGuardPointerEnd(key, event);
+      guard.unbindWindow?.();
+    };
+    guard.unbindWindow = () => {
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', stop, true);
+      window.removeEventListener('pointercancel', stop, true);
+      guard.unbindWindow = null;
+    };
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', stop, true);
+    window.addEventListener('pointercancel', stop, true);
+  }
+
+  _restoreSliderGuardValue(guard, target) {
+    const el = guard?.input || target;
+    if (!guard || guard.startValue === undefined || !el || guard.restoring) return;
+    guard.restoring = true;
+    try { el.value = String(guard.startValue); }
+    finally { guard.restoring = false; }
+  }
+
+  _considerSliderGuardDirection(guard, event) {
+    if (!guard || !guard.touch || guard.allow || guard.reject) return;
+    const x = event?.clientX;
+    const y = event?.clientY;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (!Number.isFinite(guard.startX) || !Number.isFinite(guard.startY)) return;
+    const dx = x - guard.startX;
+    const dy = y - guard.startY;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    // Poniżej tego progu stuknięcie (z drganiem palca) nie jest jeszcze gestem.
+    const slop = 18;
+    if (ady >= slop && ady >= adx) {
+      guard.blocked = true;
+      guard.allow = false;
+      guard.reject = true;
+      guard.pendingValue = undefined;
+      this._restoreSliderGuardValue(guard, event?.target);
+      return;
+    }
+    if (adx >= slop && adx > ady) guard.allow = true;
+  }
+
+  _sliderGuardForEvent(key, event) {
+    const guard = key && this._sliderGuards ? this._sliderGuards.get(key) : null;
+    if (!guard) return null;
+    if (guard.pointerId != null && event?.pointerId != null && guard.pointerId !== event.pointerId) return null;
+    return guard;
+  }
+
+  _sliderGuardBlocksInput(guard) {
+    return !!(guard && (guard.reject || guard.blocked));
+  }
+
+  _sliderGuardBlocksCommit(guard) {
+    return !!(guard && (guard.reject || guard.blocked));
+  }
+
+  _noteSliderGuardPointerEnd(key, event) {
+    const guard = this._sliderGuardForEvent(key, event);
+    if (!guard) return null;
+    if (guard.pointerEnded) return guard;
+    const cancel = event?.type === 'pointercancel';
+    if (!cancel) this._considerSliderGuardDirection(guard, event);
+    guard.pointerEnded = true;
+    if (cancel || guard.reject) {
+      // pointercancel: przeglądarka zabrała gest na scroll. To nie jest stuknięcie.
+      guard.reject = true;
+      guard.blocked = true;
+      guard.allow = false;
+      guard.accepted = false;
+      guard.deferredChange = false;
+      guard.pendingValue = undefined;
+      this._restoreSliderGuardValue(guard, event?.target);
+      guard.onReject?.();
+    } else {
+      guard.accepted = true;
+      const flush = guard.deferredChange;
+      guard.deferredChange = false;
+      const el = guard.input || event?.target;
+      if (flush && el) {
+        if (guard.pendingValue !== undefined) el.value = String(guard.pendingValue);
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    if (this._sliderGuards?.get(key) !== guard) return guard;
+    if (guard.timer) clearTimeout(guard.timer);
+    guard.timer = setTimeout(() => {
+      if (this._sliderGuards?.get(key) !== guard) return;
+      guard.unbindWindow?.();
+      this._sliderGuards.delete(key);
+      guard.onExpire?.();
+    }, 3000);
+    return guard;
+  }
+
+  _endSliderGuard(key) {
+    const guard = key && this._sliderGuards ? this._sliderGuards.get(key) : null;
+    if (!guard) return;
+    if (guard.timer) clearTimeout(guard.timer);
+    guard.unbindWindow?.();
+    this._sliderGuards.delete(key);
+  }
+
+  _clearSliderGuards() {
+    if (!this._sliderGuards) return;
+    for (const guard of this._sliderGuards.values()) {
+      if (guard?.timer) clearTimeout(guard.timer);
+      guard?.unbindWindow?.();
+    }
+    this._sliderGuards.clear();
+  }
+
+  _onNumberSliderPointerDown(event, entityId) {
+    if (!entityId) return;
+    const stateNum = Number(this.hass?.states?.[entityId]?.state);
+    const fromTarget = Number(event?.target?.value);
+    const startValue = Number.isFinite(stateNum) ? stateNum : (Number.isFinite(fromTarget) ? fromTarget : undefined);
+    this._holdNumberSlider(entityId);
+    const touch = event?.pointerType === 'touch' || event?.pointerType === 'pen';
+    if (!touch && startValue !== undefined) this._setNumberDraft(entityId, String(startValue));
+    this._beginSliderGuard(
+      this._numberSliderKey(entityId),
+      event,
+      startValue,
+      () => this._releaseNumberSlider(entityId),
+      () => {
+        this._clearNumberDraft(entityId);
+        this._releaseNumberSlider(entityId);
+      },
+    );
+  }
+
+  _onNumberSliderPointerMove(event, entityId) {
+    if (!event || !entityId) return;
+    const guard = this._sliderGuardForEvent(this._numberSliderKey(entityId), event);
+    if (!guard || !guard.touch) return;
+    this._considerSliderGuardDirection(guard, event);
+    if (guard.reject || guard.blocked) {
+      event.stopPropagation?.();
+      this._restoreSliderGuardValue(guard, event.target);
+      this._clearNumberDraft(entityId);
+      return;
+    }
+    if (guard.allow && guard.pendingValue !== undefined) {
+      this._setNumberDraft(entityId, String(guard.pendingValue));
+    }
+  }
+
+  _onNumberSliderPointerUp(event, entityId) {
+    if (!entityId) return;
+    const guard = this._noteSliderGuardPointerEnd(this._numberSliderKey(entityId), event);
+    if (!guard || guard.reject) {
+      this._releaseNumberSlider(entityId);
+      if (guard?.reject) {
+        this._restoreSliderGuardValue(guard, event?.target);
+        this._clearNumberDraft(entityId);
+      }
+    }
+  }
+
   _onNumberInput(event, entityId) {
     if (!event || !entityId) return;
     event.stopPropagation?.();
     const target = event.target;
     if (!target) return;
+    if (target.type === 'range') {
+      const guard = this._sliderGuards?.get(this._numberSliderKey(entityId)) || null;
+      if (guard?.restoring) return;
+      if (guard?.touch && !guard.allow) {
+        if (guard.reject || guard.blocked) this._restoreSliderGuardValue(guard, target);
+        else guard.pendingValue = target.value;
+        return;
+      }
+      if (guard?.touch) guard.pendingValue = target.value;
+    }
     this._setNumberDraft(entityId, target.value ?? '');
   }
   _onNumberFocus(entityId) {
@@ -2049,6 +2543,27 @@ class FlexCellsCard extends LitElement {
     event.stopPropagation?.();
     const target = event.target;
     if (!target) return;
+    if (target.type === 'range') {
+      const key = this._numberSliderKey(entityId);
+      const guard = this._sliderGuards?.get(key) || null;
+      if (this._sliderGuardBlocksCommit(guard)) {
+        this._restoreSliderGuardValue(guard, target);
+        this._clearNumberDraft(entityId);
+        this._releaseNumberSlider(entityId);
+        this._endSliderGuard(key);
+        return;
+      }
+      if (guard?.touch && !guard.pointerEnded) {
+        guard.pendingValue = target.value;
+        guard.deferredChange = true;
+        return;
+      }
+      if (guard && !guard.allow && guard.pendingValue !== undefined) {
+        target.value = String(guard.pendingValue);
+      }
+      this._releaseNumberSlider(entityId);
+      this._endSliderGuard(key);
+    }
     const raw = target.value ?? '';
     const normalized = this._normalizeNumberValue(raw, min, max, step);
     if (normalized === null) {
@@ -2290,6 +2805,7 @@ class FlexCellsCard extends LitElement {
       step_buttons: raw.step_buttons === true,
       step_buttons_position,
       value_position: this._normalizeAttrSliderValuePosition(raw.value_position),
+      swatch_view: this._normalizeSwatchView(raw.swatch_view),
     };
   }
 
@@ -2520,57 +3036,58 @@ class FlexCellsCard extends LitElement {
     const rawState = attrPath && stateObj ? this._resolveEntityValuePath(stateObj, attrPath, tree) : undefined;
     const stateDisplay = Number.isFinite(Number(rawState)) ? this._rescaleIfConfigured(cell, Number(rawState)) : undefined;
     const val = Number.isFinite(stateDisplay) ? stateDisplay : Number(event?.target?.value);
-    this._setAttrDraft(key, {
-      display: Number.isFinite(val) ? val : undefined,
-      actual: Number.isFinite(val) ? this._rescaleOutputToInput(cell, val) : undefined,
-    });
+    const touch = event?.pointerType === 'touch' || event?.pointerType === 'pen';
+    if (!touch) {
+      this._setAttrDraft(key, {
+        display: Number.isFinite(val) ? val : undefined,
+        actual: Number.isFinite(val) ? this._rescaleOutputToInput(cell, val) : undefined,
+      });
+    }
     if (!this._attrActivePointers) this._attrActivePointers = new Set();
     this._attrActivePointers.add(key);
     const guardVal = Number.isFinite(val) ? val : undefined;
-    const guard = {
-      startX: event?.clientX ?? null,
-      startY: event?.clientY ?? null,
-      startValue: Number.isFinite(stateDisplay) ? stateDisplay : guardVal,
-      allow: false,
-      blocked: false,
-    };
-    if (event?.target && guard.startValue !== undefined) {
-      event.target.value = String(guard.startValue);
-    }
-    if (!this._attrPointerGuards) this._attrPointerGuards = new Map();
-    this._attrPointerGuards.set(key, guard);
+    const startValue = Number.isFinite(stateDisplay) ? stateDisplay : guardVal;
+    this._beginSliderGuard(
+      key,
+      event,
+      startValue,
+      () => this._attrActivePointers?.delete(key),
+      () => {
+        this._clearAttrDraft(key);
+        this._attrActivePointers?.delete(key);
+      },
+    );
   }
 
-  _onAttrSliderPointerUp(_event, cell) {
+  _onAttrSliderPointerUp(event, cell) {
     const key = this._attrEditKey(cell);
-    if (!key || !this._attrActivePointers) return;
-    this._attrActivePointers.delete(key);
-    if (this._attrPointerGuards) this._attrPointerGuards.delete(key);
+    if (!key) return;
+    const guard = this._noteSliderGuardPointerEnd(key, event);
+    if (!guard || guard.reject) {
+      this._attrActivePointers?.delete(key);
+      if (guard?.reject) {
+        this._restoreSliderGuardValue(guard, event?.target);
+        this._clearAttrDraft(key);
+      }
+    }
   }
 
   _onAttrSliderPointerMove(event, cell) {
     if (!event) return;
     const key = this._attrEditKey(cell);
-    if (!key || !this._attrPointerGuards) return;
-    const guard = this._attrPointerGuards.get(key);
-    if (!guard) return;
-    if (guard.allow) return; // już zdecydowaliśmy, że to gest suwaka
-    const x = event.clientX ?? 0;
-    const y = event.clientY ?? 0;
-    const dx = guard.startX !== null && guard.startX !== undefined ? x - guard.startX : 0;
-    const dy = guard.startY !== null && guard.startY !== undefined ? y - guard.startY : 0;
-    const threshold = 6;
-    if (Math.abs(dy) > Math.abs(dx) + threshold) {
-      guard.blocked = true;
-      guard.allow = false;
-      if (guard.startValue !== undefined && event.target) {
-        event.target.value = String(guard.startValue);
-      }
+    const guard = this._sliderGuardForEvent(key, event);
+    if (!guard || !guard.touch) return;
+    this._considerSliderGuardDirection(guard, event);
+    if (guard.reject || guard.blocked) {
       event.stopPropagation?.();
+      this._restoreSliderGuardValue(guard, event.target);
+      this._clearAttrDraft(key);
       return;
     }
-    if (Math.abs(dx) > Math.abs(dy) + threshold) {
-      guard.allow = true;
+    if (guard.allow && guard.pendingValue !== undefined) {
+      const display = Number(guard.pendingValue);
+      const actual = Number.isFinite(display) ? this._rescaleOutputToInput(cell, display) : display;
+      this._setAttrDraft(key, { display, actual });
     }
   }
 
@@ -2579,16 +3096,14 @@ class FlexCellsCard extends LitElement {
     event.stopPropagation?.();
     const key = this._attrEditKey(cell);
     if (!key) return;
-    const guard = this._attrPointerGuards ? this._attrPointerGuards.get(key) : null;
-    if (guard && guard.blocked) {
-      if (guard.startValue !== undefined && event.target) {
-        event.target.value = String(guard.startValue);
-      }
+    const guard = this._sliderGuards ? this._sliderGuards.get(key) : null;
+    if (guard?.restoring) return;
+    if (guard?.touch && !guard.allow) {
+      if (guard.reject || guard.blocked) this._restoreSliderGuardValue(guard, event.target);
+      else if (event.target) guard.pendingValue = event.target.value;
       return;
     }
-    if (guard && !guard.allow && event.pointerType === 'touch') {
-      return;
-    }
+    if (guard?.touch && event.target) guard.pendingValue = event.target.value;
     const raw = event.target?.value ?? '';
     const display = raw === '' ? '' : Number(raw);
     const actual = Number.isFinite(display) ? this._rescaleOutputToInput(cell, display) : display;
@@ -2599,13 +3114,25 @@ class FlexCellsCard extends LitElement {
     if (!event) return;
     event.stopPropagation?.();
     const key = this._attrEditKey(cell);
-    const guard = this._attrPointerGuards ? this._attrPointerGuards.get(key) : null;
-    if (guard && guard.blocked) {
-      if (guard.startValue !== undefined && event.target) {
-        event.target.value = String(guard.startValue);
-      }
+    const guard = key && this._sliderGuards ? this._sliderGuards.get(key) : null;
+    if (this._sliderGuardBlocksCommit(guard)) {
+      this._restoreSliderGuardValue(guard, event.target);
+      this._attrActivePointers?.delete(key);
       this._clearAttrDraft(key);
+      this._endSliderGuard(key);
       return;
+    }
+    if (guard?.touch && !guard.pointerEnded) {
+      if (event.target) guard.pendingValue = event.target.value;
+      guard.deferredChange = true;
+      return;
+    }
+    if (guard && !guard.allow && guard.pendingValue !== undefined && event.target) {
+      event.target.value = String(guard.pendingValue);
+    }
+    if (key) {
+      this._attrActivePointers?.delete(key);
+      this._endSliderGuard(key);
     }
     const attrEdit = this._normalizeAttrEditConfig(cell);
     if (!attrEdit.enabled || !key) return;
@@ -2744,6 +3271,27 @@ class FlexCellsCard extends LitElement {
     const checked = !!event.target?.checked;
     const valueToSend = checked ? attrEdit.checked : attrEdit.unchecked;
     this._setAttrDraft(key, { display: checked, actual: valueToSend });
+    this._callAttrEditService(cell, valueToSend);
+  }
+
+  _toggleAttrSwitch(cell) {
+    const key = this._attrEditKey(cell);
+    const attrEdit = this._normalizeAttrEditConfig(cell);
+    if (!attrEdit.enabled || !key) return;
+    const entityId = cell?.value || '';
+    if (!entityId || !attrEdit.service || !attrEdit.field) return;
+    const draft = this._getAttrDraft(key);
+    let isChecked;
+    if (typeof draft?.display === 'boolean') {
+      isChecked = draft.display;
+    } else {
+      const stateObj = this.hass?.states?.[entityId];
+      const tree = stateObj ? this._buildEntityValueTree(stateObj) : null;
+      const raw = this._resolveEntityValuePath(stateObj, this._attrKeyPath(cell, attrEdit), tree);
+      isChecked = this._attrValuesEqual(raw, attrEdit.checked) || (!this._attrValuesEqual(raw, attrEdit.unchecked) && !!raw);
+    }
+    const valueToSend = isChecked ? attrEdit.unchecked : attrEdit.checked;
+    this._setAttrDraft(key, { display: !isChecked, actual: valueToSend });
     this._callAttrEditService(cell, valueToSend);
   }
 
@@ -4019,7 +4567,7 @@ class FlexCellsCard extends LitElement {
     this._closeConfirmationDialog(false);
   }
 
-  async _runAction(actionCfg = {}, entityId) {
+  async _runAction(actionCfg = {}, entityId, moreInfoView) {
     if (!(await this._confirmAction(actionCfg))) return;
 
     if (actionCfg?.action === 'perform-action' || actionCfg?.action === 'perform_action') {
@@ -4050,9 +4598,13 @@ class FlexCellsCard extends LitElement {
 
     switch (a) {
       case 'default':
-      case 'more-info':
-        this._openMoreInfo(actionEntity || target?.entity_id);
+      case 'more-info': {
+        const opened = actionEntity || target?.entity_id;
+        const ownEntity = !actionCfg.entity && !this._hasActionEntityTarget(actionCfg);
+        if (ownEntity) this._openEntityMoreInfo(opened, moreInfoView);
+        else this._openMoreInfo(opened);
         break;
+      }
       case 'toggle':
         this._callService('homeassistant', 'toggle', undefined, target);
         break;
@@ -4087,16 +4639,12 @@ class FlexCellsCard extends LitElement {
   }
 
   // --- input handling: tap / double-tap / hold ---
-  _onCellKeydown(e, cell, entityId) {
+  _onCellKeydown(e, cell, entityId, defaultTap) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
     e.stopPropagation();
     const tap = this._sanitizeActionForCell(cell, cell?.tap_action);
-    if (this._hasAction(tap)) {
-      this._runAction(tap, entityId);
-    } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
-      this._openMoreInfo(entityId);
-    }
+    this._runValueTap(cell, entityId, tap, defaultTap);
   }
 
   _onCellPointerDown(e, cell, entityId) {
@@ -4105,6 +4653,8 @@ class FlexCellsCard extends LitElement {
     try { e.preventDefault(); } catch (_) { }
     const el = e.currentTarget;
     el.__lastTapTs = el.__lastTapTs || 0;
+    el.__downX = e.clientX ?? 0;
+    el.__downY = e.clientY ?? 0;
 
     const hold = this._sanitizeActionForCell(cell, cell?.hold_action);
     if (this._hasAction(hold)) {
@@ -4112,19 +4662,29 @@ class FlexCellsCard extends LitElement {
       el.__holdTimer = window.setTimeout(() => {
         el.__holdFired = true;
         if (el.__tapTimer) { clearTimeout(el.__tapTimer); el.__tapTimer = null; }
-        this._runAction(hold, entityId);
+        this._runAction(hold, entityId, cell?.more_info_view);
       }, 550);
     }
   }
   _cancelTimers(el) { if (!el) return; if (el.__holdTimer) { clearTimeout(el.__holdTimer); el.__holdTimer = null; } }
   _onCellPointerCancel(e) { e.stopPropagation(); this._cancelTimers(e.currentTarget); }
 
-  _onCellPointerUp(e, cell, entityId) {
+  _onCellPointerUp(e, cell, entityId, defaultTap) {
     e.stopPropagation();
     try { e.preventDefault(); } catch (_) { }
     const el = e.currentTarget;
     if (el.__holdFired) { this._cancelTimers(el); return; }
     this._cancelTimers(el);
+
+    if (typeof defaultTap === 'function') {
+      const movedX = Math.abs((e.clientX ?? 0) - (el.__downX ?? 0));
+      const movedY = Math.abs((e.clientY ?? 0) - (el.__downY ?? 0));
+      if (movedX >= 18 || movedY >= 18) {
+        if (el.__tapTimer) { clearTimeout(el.__tapTimer); el.__tapTimer = null; }
+        el.__lastTapTs = 0;
+        return;
+      }
+    }
 
     const dblWindow = 360;
     const now = e.timeStamp || Date.now();
@@ -4134,13 +4694,12 @@ class FlexCellsCard extends LitElement {
     const tap = this._sanitizeActionForCell(cell, cell?.tap_action);
 
     const hasDouble = this._hasAction(dbl);
-    const hasTap = this._hasAction(tap);
 
     if (hasDouble && since > 0 && since < dblWindow && el.__tapTimer) {
       clearTimeout(el.__tapTimer);
       el.__tapTimer = null;
       el.__lastTapTs = 0;
-      this._runAction(dbl, entityId);
+      this._runAction(dbl, entityId, cell?.more_info_view);
       return;
     }
 
@@ -4150,19 +4709,27 @@ class FlexCellsCard extends LitElement {
       el.__tapTimer = window.setTimeout(() => {
         el.__tapTimer = null;
         el.__lastTapTs = 0;
-        if (hasTap) {
-          this._runAction(tap, entityId);
-        } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
-          this._openMoreInfo(entityId);
-        }
+        this._runValueTap(cell, entityId, tap, defaultTap);
       }, dblWindow);
       return;
     }
 
-    if (hasTap) {
-      this._runAction(tap, entityId);
-    } else if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
-      this._openMoreInfo(entityId);
+    this._runValueTap(cell, entityId, tap, defaultTap);
+  }
+
+  // Dla napisu wartości defaultTap zostaje aktywny, gdy tap nie jest ustawiony.
+  // Komórka encji bez defaultTap zachowuje dotychczasowe more-info.
+  _runValueTap(cell, entityId, tap, defaultTap) {
+    if (this._hasAction(tap)) {
+      this._runAction(tap, entityId, cell?.more_info_view);
+      return;
+    }
+    if (typeof defaultTap === 'function') {
+      if (!this._tapActionIsExplicitNone(cell)) defaultTap();
+      return;
+    }
+    if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
+      this._openEntityMoreInfo(entityId, cell?.more_info_view);
     }
   }
 
@@ -4342,8 +4909,8 @@ class FlexCellsCard extends LitElement {
               role="button"
               tabindex="0"
               aria-label=${aria}
-              @click=${() => this._openMoreInfo(val)}
-              @keydown=${(e) => this._onEntityKeydown(e, val)}>
+              @click=${() => this._openEntityMoreInfo(val, cell?.more_info_view)}
+              @keydown=${(e) => this._onEntityKeydown(e, val, cell?.more_info_view)}>
             ${shown}
           </th>
         `;
@@ -4575,8 +5142,8 @@ class FlexCellsCard extends LitElement {
         descriptor.onMouseLeave = (e) => this._onCellPointerCancel(e);
         descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
       } else if (allowDefault) {
-        descriptor.onClick = () => this._openMoreInfo(val);
-        descriptor.onKeydown = (e) => this._onEntityKeydown(e, val);
+        descriptor.onClick = () => this._openEntityMoreInfo(val, cell?.more_info_view);
+        descriptor.onKeydown = (e) => this._onEntityKeydown(e, val, cell?.more_info_view);
       }
 
       return applyCellTemplate(descriptor);
