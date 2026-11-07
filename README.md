@@ -25,12 +25,13 @@ If you like this card, please consider giving it a ⭐ on GitHub: [![Star on Git
 
 Choose one installation method, via [HACS](https://www.hacs.xyz/docs/use/download/download/) or manually.
 
-### HACS
+HACS is built into Home Assistant as the Marketplace (**Settings → Marketplace**), starting with 2026.11. [What this means for you](https://www.hacs.xyz/docs/marketplace/).
 
-1. In HACS use the search bar and type **Flex Cells Card**.
+### HACS/Marketplace
+
+1. In HACS/Marketplace use the search bar and type **Flex Cells Card**.
 2. Install the card.
-3. The resource is added automatically as `/hacsfiles/flex-cells-card/flex-cells-card.js`.
-4. Reload browser cache or refresh resources in Home Assistant if needed.
+3. Reload browser cache if needed.
 
 ### Manual
 
@@ -409,6 +410,10 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.33.0 —
+  - Climate entities can open more-info on temperature or humidity, when the climate supports humidity.
+  - Cover and valve entities can open more-info on position or buttons, when the entity supports both.
+  - Entities can open more-info on info, history, related, or details.
 - v0.32.0 —
   - Vertical swipes leave slider values unchanged. On some sliders this already worked, on others a vertical swipe still changed the value. Taps without movement still set them.
   - When a control shows its value as a separate text, that text is clickable. With no tap action it opens the entity more-info. Setting hold and/or double-tap does not remove that tap. On a switch, the label still toggles the checkbox unless tap or hold is set; then the label runs those actions, and the checkbox itself still toggles.

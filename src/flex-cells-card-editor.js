@@ -2162,38 +2162,118 @@ _cellAlignChanged(r,c,e){
     if (list.includes('color_temp')) choices.push('color_temp');
     return choices;
   }
-  _showLightMoreInfoView(cell) {
-    const entityId = String(cell?.value || '');
-    if (entityId.split('.')[0] !== 'light') return false;
-    if (cell?.show_control) return false;
-    if (cell?.attr_edit?.enabled) return false;
-    const choices = this._lightMoreInfoViewChoices(entityId);
-    return choices.includes('color') || choices.includes('color_temp');
+  _moreInfoViewDomain(cell) {
+    return String(cell?.value || '').split('.')[0] || '';
   }
-  _shownLightMoreInfoView(cell) {
-    return cell?.more_info_view === 'color' || cell?.more_info_view === 'color_temp'
-      ? cell.more_info_view
-      : 'brightness';
+  _supportsFeatureBits(stateObj, bits) {
+    const raw = Number(stateObj?.attributes?.supported_features);
+    return Number.isFinite(raw) && bits.some((bit) => (raw & bit) !== 0);
   }
-  _lightMoreInfoViewOptions(cell) {
+  _moreInfoViewChoices(entityId) {
+    const domain = String(entityId || '').split('.')[0];
+    if (domain === 'light') return this._lightMoreInfoViewChoices(entityId);
+    const state = this._getStateObject(entityId);
+    if (domain === 'climate') {
+      if (!state) return ['temperature', 'humidity'];
+      return this._supportsFeatureBits(state, [4]) ? ['temperature', 'humidity'] : ['temperature'];
+    }
+    if (domain === 'cover' || domain === 'valve') {
+      if (!state) return ['position', 'button'];
+      const positionBits = domain === 'cover' ? [4, 128] : [4];
+      const buttonBits = domain === 'cover' ? [1, 2, 8, 16, 32, 64] : [1, 2, 8];
+      const choices = [];
+      if (this._supportsFeatureBits(state, positionBits)) choices.push('position');
+      if (this._supportsFeatureBits(state, buttonBits)) choices.push('button');
+      return choices;
+    }
+    return [];
+  }
+  _moreInfoViewDefault(domain) {
+    if (domain === 'light') return 'brightness';
+    if (domain === 'climate') return 'temperature';
+    if (domain === 'cover' || domain === 'valve') return 'position';
+    return '';
+  }
+  _showMoreInfoView(cell) {
+    if (this._shownMoreInfoPage(cell) !== 'info') return false;
+    const domain = this._moreInfoViewDomain(cell);
+    if (!['light', 'climate', 'cover', 'valve'].includes(domain)) return false;
+    if (cell?.show_control || cell?.attr_edit?.enabled) return false;
+    const choices = this._moreInfoViewChoices(cell?.value);
+    if (domain === 'light') return choices.includes('color') || choices.includes('color_temp');
+    if (domain === 'climate') return choices.includes('humidity');
+    return choices.includes('position') && choices.includes('button');
+  }
+  _shownMoreInfoView(cell) {
+    const domain = this._moreInfoViewDomain(cell);
+    const value = cell?.more_info_view;
+    const choices = this._moreInfoViewChoices(cell?.value);
+    return value && choices.includes(value) ? value : this._moreInfoViewDefault(domain);
+  }
+  _moreInfoViewOptions(cell) {
     const labels = {
       brightness: 'editor.attr_edit_swatch_view_brightness',
       color: 'editor.attr_edit_swatch_view_color',
       color_temp: 'editor.attr_edit_swatch_view_color_temp',
+      temperature: 'editor.more_info_view_temperature',
+      humidity: 'editor.more_info_view_humidity',
+      position: 'editor.more_info_view_position',
+      button: 'editor.more_info_view_buttons',
     };
-    const choices = this._lightMoreInfoViewChoices(cell?.value);
-    const shown = this._shownLightMoreInfoView(cell);
+    const choices = this._moreInfoViewChoices(cell?.value);
+    const shown = this._shownMoreInfoView(cell);
+    const values = choices.includes(shown) ? choices : [shown, ...choices];
+    return values.filter((value) => labels[value]).map((value) => ({
+      value,
+      label: t(this.hass, labels[value]),
+    }));
+  }
+  _moreInfoViewChanged(r, c, e) {
+    const raw = e?.detail?.value ?? e?.target?.value;
+    const cell = this.config?.rows?.[r]?.cells?.[c] || {};
+    const fallback = this._moreInfoViewDefault(this._moreInfoViewDomain(cell));
+    const choices = this._moreInfoViewChoices(cell?.value);
+    const value = choices.includes(raw) ? raw : fallback;
+    if (this._shownMoreInfoView(cell) === value) return;
+    const next = { ...cell };
+    if (!value || value === fallback) delete next.more_info_view;
+    else next.more_info_view = value;
+    this._writeCell(r, c, next);
+  }
+  _moreInfoPageChoices(entityId) {
+    const domain = String(entityId || '').split('.')[0];
+    const pages = ['info', 'history', 'related', 'details'];
+    if (domain === 'camera' || domain === 'configurator') return pages.filter((page) => page !== 'history');
+    return pages;
+  }
+  _showMoreInfoPage(cell) {
+    return !(cell?.show_control || cell?.attr_edit?.enabled);
+  }
+  _shownMoreInfoPage(cell) {
+    const value = cell?.more_info_page;
+    return this._moreInfoPageChoices(cell?.value).includes(value) ? value : 'info';
+  }
+  _moreInfoPageOptions(cell) {
+    const labels = {
+      info: 'editor.more_info_page_info',
+      history: 'editor.more_info_page_history',
+      related: 'editor.more_info_page_related',
+      details: 'editor.more_info_page_details',
+    };
+    const choices = this._moreInfoPageChoices(cell?.value);
+    const shown = this._shownMoreInfoPage(cell);
     const values = choices.includes(shown) ? choices : [shown, ...choices];
     return values.map((value) => ({ value, label: t(this.hass, labels[value]) }));
   }
-  _cellMoreInfoViewChanged(r, c, e) {
+  _moreInfoPageChanged(r, c, e) {
     const raw = e?.detail?.value ?? e?.target?.value;
-    const value = raw === 'color' || raw === 'color_temp' ? raw : 'brightness';
     const cell = this.config?.rows?.[r]?.cells?.[c] || {};
-    if (this._shownLightMoreInfoView(cell) === value) return;
+    const choices = this._moreInfoPageChoices(cell?.value);
+    const value = choices.includes(raw) ? raw : 'info';
+    if (this._shownMoreInfoPage(cell) === value) return;
     const next = { ...cell };
-    if (value === 'brightness') delete next.more_info_view;
-    else next.more_info_view = value;
+    if (value === 'info') delete next.more_info_page;
+    else next.more_info_page = value;
     this._writeCell(r, c, next);
   }
   _normalizeAttrSliderValuePosition(position) {
@@ -3839,15 +3919,28 @@ _styleValue(r,c,key,e){
                             @closed=${(e)=>e.stopPropagation()}>
                           </ha-select>
                         </div>
-                        ${this._showLightMoreInfoView(cell) ? html`
+                        ${this._showMoreInfoPage(cell) ? html`
+                          <div class="cell-grid cell-wide">
+                            <ha-select
+                              .label=${t(this.hass, 'editor.more_info_page')}
+                              .value=${this._shownMoreInfoPage(cell)}
+                              naturalMenuWidth
+                              fixedMenuPosition
+                              .options=${this._moreInfoPageOptions(cell)}
+                              @selected=${(e)=> this._moreInfoPageChanged(rIdx, cIdx, e)}
+                              @closed=${(e)=> e.stopPropagation()}>
+                            </ha-select>
+                          </div>
+                        ` : nothing}
+                        ${this._showMoreInfoView(cell) ? html`
                           <div class="cell-grid cell-wide">
                             <ha-select
                               .label=${t(this.hass, 'editor.more_info_view')}
-                              .value=${this._shownLightMoreInfoView(cell)}
+                              .value=${this._shownMoreInfoView(cell)}
                               naturalMenuWidth
                               fixedMenuPosition
-                              .options=${this._lightMoreInfoViewOptions(cell)}
-                              @selected=${(e)=> this._cellMoreInfoViewChanged(rIdx, cIdx, e)}
+                              .options=${this._moreInfoViewOptions(cell)}
+                              @selected=${(e)=> this._moreInfoViewChanged(rIdx, cIdx, e)}
                               @closed=${(e)=> e.stopPropagation()}>
                             </ha-select>
                           </div>
@@ -5188,7 +5281,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.32.0
+        FCC v0.33.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

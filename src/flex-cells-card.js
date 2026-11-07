@@ -505,10 +505,10 @@ class FlexCellsCard extends LitElement {
     // it will auto-clean after its timeout.
     if (!this._ghostClickUntil) this._teardownGhostClickGuard();
     this._clearSliderGuards();
-    this._lightViewToken = (this._lightViewToken || 0) + 1;
-    if (this._lightViewTimer) {
-      clearTimeout(this._lightViewTimer);
-      this._lightViewTimer = null;
+    this._moreInfoViewToken = (this._moreInfoViewToken || 0) + 1;
+    if (this._moreInfoViewTimer) {
+      clearTimeout(this._moreInfoViewTimer);
+      this._moreInfoViewTimer = null;
     }
     super.disconnectedCallback();
   }
@@ -838,25 +838,80 @@ class FlexCellsCard extends LitElement {
   }
 
   // ---------- helpers ----------
-  _openMoreInfo(entityId) {
+  _openMoreInfo(entityId, page) {
     if (!entityId) return;
+    const view = this._normalizeMoreInfoPage(page);
+    const detail = { entityId };
+    if (view) detail.view = view;
     this.dispatchEvent(new CustomEvent('hass-more-info', {
-      detail: { entityId }, bubbles: true, composed: true,
+      detail, bubbles: true, composed: true,
     }));
   }
 
-  _openEntityMoreInfo(entityId, view) {
+  _normalizeMoreInfoPage(page) {
+    const raw = typeof page === 'string' ? page.trim().toLowerCase().replace(/-/g, '_') : '';
+    if (raw === 'history' || raw === 'logbook') return 'history';
+    if (raw === 'related') return 'related';
+    if (raw === 'details' || raw === 'detail') return 'details';
+    return '';
+  }
+
+  _openEntityMoreInfo(entityId, view, page) {
     if (!entityId) return;
-    const control = typeof view === 'string' ? view.trim().toLowerCase().replace(/-/g, '_') : '';
-    if (control === 'color' || control === 'color_wheel' || control === 'wheel') {
-      this._openSwatchView(entityId, 'color');
+    const normalizedPage = this._normalizeMoreInfoPage(page);
+    if (normalizedPage) {
+      this._openMoreInfo(entityId, normalizedPage);
       return;
     }
-    if (control === 'color_temp' || control === 'temperature' || control === 'temp') {
-      this._openSwatchView(entityId, 'color_temp');
+    const domain = String(entityId).split('.')[0];
+    const control = this._normalizeEntityMoreInfoView(domain, view);
+    if (domain === 'light' && control) {
+      this._openSwatchView(entityId, control);
       return;
     }
     this._openMoreInfo(entityId);
+    if (!control || !this._entitySupportsMoreInfoView(entityId, control)) return;
+    this._scheduleMoreInfoView(entityId, control);
+  }
+
+  _normalizeEntityMoreInfoView(domain, view) {
+    const raw = typeof view === 'string' ? view.trim().toLowerCase().replace(/-/g, '_') : '';
+    if (!raw) return '';
+    if (domain === 'light') {
+      if (raw === 'color' || raw === 'color_wheel' || raw === 'wheel') return 'color';
+      if (raw === 'color_temp' || raw === 'temperature' || raw === 'temp') return 'color_temp';
+      return '';
+    }
+    if (domain === 'climate') return raw === 'humidity' || raw === 'target_humidity' ? 'humidity' : '';
+    if (domain === 'cover' || domain === 'valve') return raw === 'button' || raw === 'buttons' ? 'button' : '';
+    return '';
+  }
+
+  _entityFeature(stateObj, bit) {
+    const raw = Number(stateObj?.attributes?.supported_features);
+    return Number.isFinite(raw) && (raw & bit) !== 0;
+  }
+
+  _entitySupportsMoreInfoView(entityId, control) {
+    const domain = String(entityId).split('.')[0];
+    const stateObj = this.hass?.states?.[entityId];
+    if (!stateObj) return false;
+    if (domain === 'light') return this._lightSupportsMainControl(entityId, control);
+    if (domain === 'climate') return control === 'humidity' && this._entityFeature(stateObj, 4);
+    if (domain === 'cover') {
+      const position = this._entityFeature(stateObj, 4) || this._entityFeature(stateObj, 128);
+      const buttons = [1, 2, 8, 16, 32, 64].some((bit) => this._entityFeature(stateObj, bit));
+      if (control === 'position') return position;
+      if (control === 'button') return buttons;
+      return false;
+    }
+    if (domain === 'valve') {
+      const position = this._entityFeature(stateObj, 4);
+      const buttons = [1, 2, 8].some((bit) => this._entityFeature(stateObj, bit));
+      if (control === 'position') return position;
+      if (control === 'button') return buttons;
+    }
+    return false;
   }
 
   _normalizeSwatchView(value) {
@@ -898,25 +953,65 @@ class FlexCellsCard extends LitElement {
     const control = this._normalizeSwatchView(view);
     this._openMoreInfo(entityId);
     if (!this._lightSupportsMainControl(entityId, control)) return;
-    this._scheduleLightMainControl(entityId, control);
+    this._scheduleMoreInfoView(entityId, control);
   }
 
-  _scheduleLightMainControl(entityId, control) {
-    this._lightViewToken = (this._lightViewToken || 0) + 1;
-    const token = this._lightViewToken;
-    if (this._lightViewTimer) {
-      clearTimeout(this._lightViewTimer);
-      this._lightViewTimer = null;
+  _scheduleMoreInfoView(entityId, control) {
+    this._moreInfoViewToken = (this._moreInfoViewToken || 0) + 1;
+    const token = this._moreInfoViewToken;
+    if (this._moreInfoViewTimer) {
+      clearTimeout(this._moreInfoViewTimer);
+      this._moreInfoViewTimer = null;
     }
     const delays = [0, 40, 100, 200, 400, 700, 1100, 1600];
     const attempt = (index) => {
-      if (this._lightViewToken !== token) return;
-      if (this._activateLightMainControl(entityId, control)) return;
+      if (this._moreInfoViewToken !== token) return;
+      if (this._activateMoreInfoView(entityId, control)) return;
       const next = index + 1;
       if (next >= delays.length) return;
-      this._lightViewTimer = window.setTimeout(() => attempt(next), delays[next] - delays[index]);
+      this._moreInfoViewTimer = window.setTimeout(() => attempt(next), delays[next] - delays[index]);
     };
     attempt(0);
+  }
+
+  _activateMoreInfoView(entityId, control) {
+    const domain = String(entityId).split('.')[0];
+    if (domain === 'light') return this._activateLightMainControl(entityId, control);
+    const tag = domain === 'climate'
+      ? 'more-info-climate'
+      : (domain === 'cover' ? 'more-info-cover' : (domain === 'valve' ? 'more-info-valve' : ''));
+    if (!tag) return false;
+    const controlEl = this._findOpenMoreInfoControl(entityId, tag);
+    if (!controlEl?.stateObj) return false;
+    if (domain === 'climate') return this._setMoreInfoControlProp(controlEl, '_mainControl', 'control', control);
+    return this._setMoreInfoControlProp(controlEl, '_mode', 'mode', control);
+  }
+
+  _setMoreInfoControlProp(controlEl, stateProp, buttonProp, value) {
+    if (controlEl[stateProp] === value) return true;
+    const button = this._findMoreInfoControlButton(controlEl, buttonProp, value);
+    // Przycisk jest w drzewie dopiero po pierwszym renderze. Wcześniejszy zapis
+    // widoku potrafi nadpisać willUpdate, które ustawia widok domyślny.
+    if (!button) return false;
+    if (!button.disabled) {
+      button.click();
+      if (controlEl[stateProp] === value) return true;
+    }
+    try {
+      controlEl[stateProp] = value;
+      controlEl.requestUpdate?.();
+    } catch (_) { /* starszy widok more-info */ }
+    return controlEl[stateProp] === value;
+  }
+
+  _findMoreInfoControlButton(controlEl, prop, value) {
+    const root = controlEl?.shadowRoot;
+    if (!root) return null;
+    const nodes = root.querySelectorAll('ha-icon-button-toggle, ha-icon-button, button');
+    for (const el of nodes) {
+      if (el[prop] === value) return el;
+    }
+    return null;
   }
 
   _queryShadow(root, predicate, depth = 0) {
@@ -932,33 +1027,33 @@ class FlexCellsCard extends LitElement {
     return null;
   }
 
-  _findOpenLightMoreInfo(entityId) {
+  _findOpenMoreInfoControl(entityId, tagName) {
     const roots = [];
     const ha = document.querySelector('home-assistant');
     if (ha?.shadowRoot) roots.push(ha.shadowRoot);
     if (document.body) roots.push(document.body);
-    const matchLight = (dialog) => {
+    const matchControl = (dialog) => {
       if (!dialog || (dialog._entityId && dialog._entityId !== entityId)) return null;
-      const light = this._queryShadow(dialog.shadowRoot || dialog, (el) => el.localName === 'more-info-light');
-      if (!light) return null;
-      const lightId = light.stateObj?.entity_id;
-      if (lightId && lightId !== entityId) return null;
-      if (!lightId && dialog._entityId !== entityId) return null;
-      return light;
+      const control = this._queryShadow(dialog.shadowRoot || dialog, (el) => el.localName === tagName);
+      if (!control) return null;
+      const controlId = control.stateObj?.entity_id;
+      if (controlId && controlId !== entityId) return null;
+      if (!controlId && dialog._entityId !== entityId) return null;
+      return control;
     };
     for (const root of roots) {
       const dialogs = root.querySelectorAll?.('ha-more-info-dialog') || [];
       for (const dialog of dialogs) {
-        const light = matchLight(dialog);
-        if (light) return light;
+        const control = matchControl(dialog);
+        if (control) return control;
       }
       const hosts = root.querySelectorAll?.('*') || [];
       for (const host of hosts) {
         if (!host.shadowRoot) continue;
         const nested = host.shadowRoot.querySelectorAll('ha-more-info-dialog');
         for (const dialog of nested) {
-          const light = matchLight(dialog);
-          if (light) return light;
+          const control = matchControl(dialog);
+          if (control) return control;
         }
       }
     }
@@ -983,7 +1078,7 @@ class FlexCellsCard extends LitElement {
   }
 
   _activateLightMainControl(entityId, control) {
-    const light = this._findOpenLightMoreInfo(entityId);
+    const light = this._findOpenMoreInfoControl(entityId, 'more-info-light');
     if (!light) return false;
     if (light._mainControl === control) return true;
     if (typeof light._changeMainControl === 'function') {
@@ -1046,8 +1141,8 @@ class FlexCellsCard extends LitElement {
     });
     return html`<span class="ctrl-wrap">${side === 'left' ? valueNode : nothing}<label class="ctrl-check">${controlNode}</label>${side === 'right' ? valueNode : nothing}</span>`;
   }
-  _onEntityKeydown(e, entityId, view) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._openEntityMoreInfo(entityId, view); }
+  _onEntityKeydown(e, entityId, view, page) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._openEntityMoreInfo(entityId, view, page); }
   }
 
   _isNumericState(state) { const n = Number(state); return Number.isFinite(n); }
@@ -4567,7 +4662,7 @@ class FlexCellsCard extends LitElement {
     this._closeConfirmationDialog(false);
   }
 
-  async _runAction(actionCfg = {}, entityId, moreInfoView) {
+  async _runAction(actionCfg = {}, entityId, moreInfoView, moreInfoPage) {
     if (!(await this._confirmAction(actionCfg))) return;
 
     if (actionCfg?.action === 'perform-action' || actionCfg?.action === 'perform_action') {
@@ -4601,7 +4696,7 @@ class FlexCellsCard extends LitElement {
       case 'more-info': {
         const opened = actionEntity || target?.entity_id;
         const ownEntity = !actionCfg.entity && !this._hasActionEntityTarget(actionCfg);
-        if (ownEntity) this._openEntityMoreInfo(opened, moreInfoView);
+        if (ownEntity) this._openEntityMoreInfo(opened, moreInfoView, moreInfoPage);
         else this._openMoreInfo(opened);
         break;
       }
@@ -4662,7 +4757,7 @@ class FlexCellsCard extends LitElement {
       el.__holdTimer = window.setTimeout(() => {
         el.__holdFired = true;
         if (el.__tapTimer) { clearTimeout(el.__tapTimer); el.__tapTimer = null; }
-        this._runAction(hold, entityId, cell?.more_info_view);
+        this._runAction(hold, entityId, cell?.more_info_view, cell?.more_info_page);
       }, 550);
     }
   }
@@ -4699,7 +4794,7 @@ class FlexCellsCard extends LitElement {
       clearTimeout(el.__tapTimer);
       el.__tapTimer = null;
       el.__lastTapTs = 0;
-      this._runAction(dbl, entityId, cell?.more_info_view);
+      this._runAction(dbl, entityId, cell?.more_info_view, cell?.more_info_page);
       return;
     }
 
@@ -4721,7 +4816,7 @@ class FlexCellsCard extends LitElement {
   // Komórka encji bez defaultTap zachowuje dotychczasowe more-info.
   _runValueTap(cell, entityId, tap, defaultTap) {
     if (this._hasAction(tap)) {
-      this._runAction(tap, entityId, cell?.more_info_view);
+      this._runAction(tap, entityId, cell?.more_info_view, cell?.more_info_page);
       return;
     }
     if (typeof defaultTap === 'function') {
@@ -4729,7 +4824,7 @@ class FlexCellsCard extends LitElement {
       return;
     }
     if (!this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && cell?.type === 'entity' && entityId) {
-      this._openEntityMoreInfo(entityId, cell?.more_info_view);
+      this._openEntityMoreInfo(entityId, cell?.more_info_view, cell?.more_info_page);
     }
   }
 
@@ -4909,8 +5004,8 @@ class FlexCellsCard extends LitElement {
               role="button"
               tabindex="0"
               aria-label=${aria}
-              @click=${() => this._openEntityMoreInfo(val, cell?.more_info_view)}
-              @keydown=${(e) => this._onEntityKeydown(e, val, cell?.more_info_view)}>
+              @click=${() => this._openEntityMoreInfo(val, cell?.more_info_view, cell?.more_info_page)}
+              @keydown=${(e) => this._onEntityKeydown(e, val, cell?.more_info_view, cell?.more_info_page)}>
             ${shown}
           </th>
         `;
@@ -5142,8 +5237,8 @@ class FlexCellsCard extends LitElement {
         descriptor.onMouseLeave = (e) => this._onCellPointerCancel(e);
         descriptor.onKeydown = (e) => this._onCellKeydown(e, cell);
       } else if (allowDefault) {
-        descriptor.onClick = () => this._openEntityMoreInfo(val, cell?.more_info_view);
-        descriptor.onKeydown = (e) => this._onEntityKeydown(e, val, cell?.more_info_view);
+        descriptor.onClick = () => this._openEntityMoreInfo(val, cell?.more_info_view, cell?.more_info_page);
+        descriptor.onKeydown = (e) => this._onEntityKeydown(e, val, cell?.more_info_view, cell?.more_info_page);
       }
 
       return applyCellTemplate(descriptor);
