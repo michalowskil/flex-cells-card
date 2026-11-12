@@ -5584,6 +5584,57 @@ class FlexCellsCard extends LitElement {
     return this._extractTemplateCellText(cell);
   }
 
+  _formatDotNumber(value) {
+    if (!Number.isFinite(value)) return '';
+    if (Object.is(value, -0)) return '0';
+    const text = String(value);
+    if (!/[eE]/.test(text)) return text;
+    return value.toFixed(8).replace(/\.?0+$/, '');
+  }
+
+  _renderTemplateEntityText(entityId, attribute, unitMode = false, raw = false) {
+    const id = typeof entityId === 'string' ? entityId.trim() : '';
+    if (!id) return '';
+    const stateObj = this.hass?.states?.[id];
+    if (!stateObj) return '';
+    const stub = { type: 'entity', value: id };
+    const attr = typeof attribute === 'string' ? attribute.trim() : '';
+    if (attr) stub.attribute = attr;
+    if (unitMode === true) {
+      const entityUnit = stateObj?.attributes?.unit_of_measurement;
+      if (attr) {
+        if (entityUnit) stub.unit = String(entityUnit);
+      } else {
+        stub.use_entity_unit = true;
+      }
+    } else if (typeof unitMode === 'string' && unitMode) {
+      stub.use_entity_unit = false;
+      stub.unit = unitMode;
+    } else {
+      stub.use_entity_unit = false;
+    }
+    if (raw) {
+      const source = attr
+        ? this._resolveEntityValuePath(stateObj, attr)
+        : stateObj.state;
+      if (source === undefined || source === null || source === '') return '';
+      let text;
+      if (this._isNumericState(source)) {
+        text = this._formatDotNumber(this._rescaleIfConfigured(stub, Number(source)));
+      } else {
+        text = (typeof source === 'object') ? JSON.stringify(source) : String(source);
+      }
+      let suffix = '';
+      if (typeof unitMode === 'string' && unitMode) suffix = ` ${unitMode}`;
+      else if (unitMode === true && stub.unit) suffix = ` ${stub.unit}`;
+      else if (unitMode === true && !attr && stateObj?.attributes?.unit_of_measurement) {
+        suffix = ` ${stateObj.attributes.unit_of_measurement}`;
+      }
+      return `${text}${suffix}`;
+    }
+    return this._stringifyTemplateValue(this._formatEntityCell(stub, stateObj, true));
+  }
+
   _renderCustomTemplate(templateHtml, templateRows, tableContent = null, opts = {}) {
     const raw = typeof templateHtml === 'string' ? templateHtml : '';
     if (!raw) return html``;
@@ -5633,8 +5684,31 @@ class FlexCellsCard extends LitElement {
         const classValue = classMatch ? classMatch[1] : '';
         const modeAttr = readAttrValue(attrs, 'mode') ?? readAttrValue(attrs, 'as');
         const normalizedMode = typeof modeAttr === 'string' && modeAttr.trim().toLowerCase() === 'text' ? 'text' : 'node';
+        const entityAttr = readAttrValue(attrs, 'entity');
+        const entityId = typeof entityAttr === 'string' ? entityAttr.trim() : '';
+        const attributeAttr = readAttrValue(attrs, 'attribute') ?? readAttrValue(attrs, 'attr');
+        const attribute = typeof attributeAttr === 'string' ? attributeAttr.trim() : '';
+        const unitAttr = readAttrValue(attrs, 'unit');
+        let unitMode = false;
+        if (unitAttr !== null) {
+          const unitText = unitAttr.trim();
+          if (unitText === '' || /^(true|yes|on|1)$/i.test(unitText)) unitMode = true;
+          else if (/^(false|no|off|0)$/i.test(unitText)) unitMode = false;
+          else unitMode = unitText;
+        } else if (/(?:^|\s)unit(?=\s|$)/i.test(attrs)) {
+          unitMode = true;
+        }
+        const rawAttr = readAttrValue(attrs, 'raw');
+        let rawNumber = false;
+        if (rawAttr !== null) {
+          rawNumber = !/^(false|no|off|0)$/i.test(rawAttr.trim());
+        } else if (/(?:^|\s)raw(?=\s|$)/i.test(attrs)) {
+          rawNumber = true;
+        }
 
-        if (hasRow && (hasCol || !hasColAttr)) {
+        if (entityId) {
+          slots.push({ type: 'entity', entityId, attribute, unitMode, raw: rawNumber });
+        } else if (hasRow && (hasCol || !hasColAttr)) {
           const colNumber = hasCol ? colNumberRaw : null;
           slots.push({ rowNumber, colNumber, styleValue, classValue, outputMode: normalizedMode });
         } else if (!hasRow && !hasColAttr) {
@@ -5670,6 +5744,9 @@ class FlexCellsCard extends LitElement {
     }
 
     const values = cached.slots.map((slot) => {
+      if (slot?.type === 'entity') {
+        return this._renderTemplateEntityText(slot.entityId, slot.attribute, slot.unitMode, !!slot.raw);
+      }
       if (slot?.type === 'table') {
         const content = tableContent || html``;
         const cls = slot.classValue ? slot.classValue.trim() : '';

@@ -159,6 +159,25 @@ Common registry shortcuts are also exposed as `area_name`, `area_id`, `device_na
   <fcc />
   ```
 
+- Read any Home Assistant entity directly. It does not have to be a cell in this card:  
+  `<fcc entity="sensor.living_room_temperature" />` — the entity state, without the unit.  
+  `<fcc entity="sensor.living_room_temperature" unit />` — the same state with the entity unit. `unit="°C"` appends that text instead.  
+  `<fcc entity="sensor.living_room_temperature" raw />` — the number with a dot and no thousands separator, ignoring the profile language. Use this wherever a comma would make the number invalid, for example in CSS. A tag without `raw` stays localized, so a temperature shown in a cell can keep its comma.  
+  `<fcc entity="climate.living_room" attribute="current_temperature" />` — one attribute or metadata path. `attr` is an alias of `attribute`.
+
+  The visual editor edits this HTML in Home Assistant's code editor. Entity suggestions come from that editor. Cell and row custom CSS use the same editor.
+
+  `attribute` also accepts a metadata path, such as `friendly_name`, `area.name`, or `device.name`. See [Metadata paths](#metadata-paths).
+
+  The tag inserts plain text, so it can sit in the page or inside another tag:
+
+  ```html
+  Living room: <fcc entity="sensor.living_room_temperature" />
+  <img src="<fcc entity='camera.front_door' attribute='entity_picture' />" />
+  ```
+
+  A missing entity produces an empty string. A missing attribute produces `n/a`.
+
 - If you want a non-fcc-table element to be dynamic (for example, a `<div>`), you can use the `mode="text"` attribute (alias `as="text"`) for a text-type cell. For example, you can set a dynamic rule like this:
 
   ```yaml
@@ -185,7 +204,7 @@ Common registry shortcuts are also exposed as `area_name`, `area_id`, `device_na
 
 ### Per-cell templates
 - Each cell can render its own HTML when `custom_template_enabled: true`.  
-- The same `<fcc>` tag works inside a cell template; `row`/`col` numbering follows your YAML order (not the current sort order).  
+- The same `<fcc>` tag works inside a cell template; `row`/`col` numbering follows your YAML order (not the current sort order). `<fcc entity="..." />` and `<fcc entity="..." attribute="..." />` read any entity here too.  
 - Use `mode="text"` (or `as="text"`) when you only want the plain text value of a cell (e.g., for `<img src="...">`).
 - Custom CSS, dynamic rules, and actions defined on the referenced cells are preserved.
 
@@ -326,6 +345,10 @@ type: custom:flex-cells-card
 
     ![AV receiver](examples/av-receiver/images/dark-300.png)
     ![AV receiver](examples/av-receiver/images/light-300.png)
+  - [Dynamic color and size](https://github.com/michalowskil/flex-cells-card/blob/main/examples/dynamic-color-and-size/dynamic-color-and-size.md) - temperature bars scaled to the highest reading. One example colors the bar from the temperature, the other uses dynamic rules. [Read more...](https://github.com/michalowskil/flex-cells-card/blob/main/examples/dynamic-color-and-size/dynamic-color-and-size.md)
+
+    ![Dynamic color and size](examples/dynamic-color-and-size/images/dynamic-color-and-size-dark-300.gif)
+    ![Dynamic color and size](examples/dynamic-color-and-size/images/dynamic-color-and-size-light-300.gif)
 
 ## Translations
 If you'd like to help translate FCC editor, or improve an existing translation, please do so! You don't have to translate everything - just one string will do - and it's not difficult.
@@ -410,6 +433,9 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.34.0 —
+  - A template can show an entity state or attribute with `<fcc entity="sensor.temperature" />` and `<fcc entity="sensor.temperature" attribute="battery" />` (`attr` is an alias). The entity does not have to be a cell. The state has no unit unless the tag sets `unit` (entity unit) or `unit="°C"` (that text). `attribute` also accepts a metadata path such as `area.name`. `raw` writes the number with a dot and no thousands separator, so a comma does not break the number, while the rest of the card stays localized.
+  - Card and cell templates, and cell and row custom CSS, use Home Assistant's code editor in the visual editor. Templates get the same entity suggestions as the YAML editor. The editor can be resized and opened fullscreen. Template and CSS text uses the theme text color, because the editor has no HTML or CSS coloring.
 - v0.33.0 —
   - Climate entities can open more-info on temperature or humidity, when the climate supports humidity.
   - Cover and valve entities can open more-info on position or buttons, when the entity supports both.

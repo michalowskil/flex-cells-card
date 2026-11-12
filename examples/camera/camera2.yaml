@@ -101,7 +101,7 @@ custom_template_html: |-
      position: absolute;
      z-index: 1;
      bottom: 0;
-     width: stretch;
+     width: 100%;
      display: block;
      height: 28px;
      padding: 8px 20px;

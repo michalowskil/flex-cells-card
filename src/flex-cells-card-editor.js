@@ -614,6 +614,54 @@ class FlexCellsCardEditor extends LitElement {
       border-color: var(--primary-color, #03a9f4);
       outline: none; box-shadow: 0 0 4px rgba(3,169,244,.4);
     }
+    .template-editor-frame {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      align-self: stretch;
+      box-sizing: border-box;
+      resize: vertical;
+      overflow: auto;
+      min-height: 160px;
+      max-height: 85vh;
+    }
+    .template-editor-frame.card-template {
+      height: 420px;
+      margin-top: 12px;
+    }
+    .template-editor-frame.cell-template {
+      height: 260px;
+      min-height: 120px;
+    }
+    ha-code-editor {
+      --codemirror-keyword: var(--primary-text-color);
+      --codemirror-property: var(--primary-text-color);
+      --codemirror-variable: var(--primary-text-color);
+      --codemirror-variable-2: var(--primary-text-color);
+      --codemirror-qualifier: var(--primary-text-color);
+      --codemirror-def: var(--primary-text-color);
+      --codemirror-number: var(--primary-text-color);
+      --codemirror-operator: var(--primary-text-color);
+      --codemirror-comment: var(--primary-text-color);
+      --codemirror-meta: var(--primary-text-color);
+      --codemirror-atom: var(--primary-text-color);
+      --codemirror-string: var(--primary-text-color);
+      --codemirror-string2: var(--primary-text-color);
+    }
+    .template-editor-frame ha-code-editor:not(.fullscreen) {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .template-editor-frame:has(> ha-code-editor.fullscreen) {
+      overflow: visible;
+      resize: none;
+    }
+    ha-code-editor.fullscreen {
+      z-index: 999 !important;
+    }
     .cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .cols3 > * { min-width: 0; }
     .cols2 > * { min-width: 0; }
@@ -1239,6 +1287,125 @@ class FlexCellsCardEditor extends LitElement {
     this._patchCell(r, c, { custom_template_html: value });
   }
 
+  _renderCodeEditor(size, value, commit) {
+    const card = size === 'card';
+    const current = value || '';
+    if (customElements.get('ha-code-editor')) {
+      return html`
+        <div class=${card ? 'template-editor-frame card-template' : 'template-editor-frame cell-template'}>
+          <ha-code-editor
+            .hass=${this.hass}
+            .value=${current}
+            .autocompleteEntities=${true}
+            .linewrap=${true}
+            @value-changed=${(e) => {
+              e.stopPropagation();
+              const next = e.detail?.value ?? '';
+              if (next === current) return;
+              commit(next);
+            }}
+          ></ha-code-editor>
+        </div>
+      `;
+    }
+    return html`
+      <textarea
+        class="text-input"
+        rows=${card ? '8' : '5'}
+        spellcheck="false"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        style=${card
+          ? 'margin-top:12px; min-height:160px; height:420px; resize:vertical;'
+          : 'width:100%; box-sizing:border-box; font-family:monospace; min-height:120px; height:260px; resize:vertical;'}
+        .value=${current}
+        @input=${(e) => commit(e.target?.value ?? '')}
+      ></textarea>
+    `;
+  }
+
+  updated(changed) {
+    super.updated(changed);
+    this._fitTemplateCodeEditors();
+  }
+
+  async _fitTemplateCodeEditors() {
+    const editors = [...(this.renderRoot?.querySelectorAll('ha-code-editor') || [])];
+    await Promise.all(editors.map((editor) => editor.updateComplete));
+    if (!this.isConnected) return;
+    editors.forEach((editor) => this._fitCodeEditorSurface(editor));
+  }
+
+  _fitCodeEditorSurface(editor) {
+    const surface = editor.codemirror?.dom;
+    if (!surface) return;
+    const fullscreen = editor.classList.contains('fullscreen');
+    const height = fullscreen ? '' : '100%';
+    const width = fullscreen ? '' : '100%';
+    if (surface.style.height !== height) surface.style.height = height;
+    if (surface.style.width !== width) surface.style.width = width;
+    if (editor._fccFullscreenWatch) return;
+    editor._fccFullscreenWatch = true;
+    const observer = new MutationObserver(() => this._fitCodeEditorSurface(editor));
+    observer.observe(editor, { attributes: true, attributeFilter: ['class'] });
+    editor._fccFullscreenObserver = observer;
+    this._bindCodeEditorTooltipFlip(editor);
+  }
+
+  _bindCodeEditorTooltipFlip(editor) {
+    if (editor._fccTooltipFlip) return;
+    const root = editor.shadowRoot;
+    if (!root) return;
+    editor._fccTooltipFlip = true;
+    const flip = () => this._flipCodeEditorTooltips(editor);
+    const observer = new MutationObserver(flip);
+    if (root) {
+      observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+    }
+    if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+    editor._fccTooltipObserver = observer;
+  }
+
+  _flipCodeEditorTooltips(editor) {
+    if (!editor.matches(':focus-within')) return;
+    const root = editor.shadowRoot;
+    const host = editor.getBoundingClientRect();
+    const limit = Math.min(host.bottom, window.innerHeight - 8);
+    const seen = new Set();
+    const tips = [];
+    const collect = (node) => {
+      node?.querySelectorAll?.('.cm-tooltip-autocomplete')?.forEach((tip) => {
+        if (seen.has(tip)) return;
+        seen.add(tip);
+        tips.push(tip);
+      });
+    };
+    collect(root);
+    if (!tips.length) collect(document);
+    tips.forEach((tip) => {
+      const rect = tip.getBoundingClientRect();
+      if (rect.height < 2 || rect.left >= host.right || rect.right <= host.left) return;
+      const placed = `${tip.style.top}|${tip.style.left}`;
+      if (tip.dataset.fccFlip === placed) return;
+      const outside = rect.bottom - limit;
+      const aboveTop = rect.top - rect.height - 6;
+      if (outside < 12 || aboveTop < 8) {
+        if (tip.dataset.fccFlip) {
+          tip.style.transform = '';
+          delete tip.dataset.fccFlip;
+        }
+        return;
+      }
+      if (!tip._fccStyleWatch) {
+        tip._fccStyleWatch = true;
+        const watch = new MutationObserver(() => this._flipCodeEditorTooltips(editor));
+        watch.observe(tip, { attributes: true, attributeFilter: ['style'] });
+      }
+      tip.dataset.fccFlip = placed;
+      tip.style.transform = 'translateY(calc(-100% - 6px))';
+    });
+  }
 
   constructor() {
     super();
@@ -1287,6 +1454,24 @@ class FlexCellsCardEditor extends LitElement {
     this._registryData = null;
     this._registryLoadPromise = null;
     this._registrySource = null;
+    this._codeEditorWait = false;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (customElements.get('ha-code-editor') || this._codeEditorWait) return;
+    this._codeEditorWait = true;
+    customElements.whenDefined('ha-code-editor').then(() => {
+      if (this.isConnected) this.requestUpdate();
+    });
+  }
+
+  disconnectedCallback() {
+    this.renderRoot?.querySelectorAll('ha-code-editor').forEach((editor) => {
+      editor._fccFullscreenObserver?.disconnect();
+      editor._fccTooltipObserver?.disconnect();
+    });
+    super.disconnectedCallback();
   }
   /* === Attribute suggestions helpers === */
   _getStateObject(entityId) {
@@ -4550,14 +4735,11 @@ _styleValue(r,c,key,e){
                               <span class="label">${t(this.hass,'editor.cell_custom_template')}</span>
                             </label>
                             ${cellCustomTemplateEnabled ? html`
-                              <textarea
-                                class="text-input"
-                                rows="5"
-                                style="font-family:monospace; min-height:120px;"
-                                .value=${cellCustomTemplateValue}
-                                @input=${(e)=>this._updateCellCustomTemplate(rIdx, cIdx, e)}>
-                              </textarea>
-                              <div class="muted">${t(this.hass,'editor.cell_custom_template_hint')}</div>
+                              ${this._renderCodeEditor('cell', cellCustomTemplateValue, (value) => this._updateCellCustomTemplate(rIdx, cIdx, { target: { value } }))}
+                              <div class="muted">
+                                ${t(this.hass,'editor.cell_custom_template_hint')}
+                                <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#templates">${t(this.hass, 'editor.template_reference')}</a>
+                              </div>
                             ` : nothing}
                           </div>
                         </div>
@@ -4571,13 +4753,7 @@ _styleValue(r,c,key,e){
                               <span class="label">${t(this.hass,'editor.custom_css')}</span>
                             </label>
                             ${cellCustomCssEnabled ? html`
-                              <textarea
-                                class="text-input"
-                                rows="5"
-                                style="font-family:monospace; min-height:120px;"
-                                .value=${cellCustomCssValue}
-                                @input=${(e)=>this._updateCellCustomCss(rIdx, cIdx, e)}>
-                              </textarea>
+                              ${this._renderCodeEditor('cell', cellCustomCssValue, (value) => this._updateCellCustomCss(rIdx, cIdx, { target: { value } }))}
                             ` : nothing}
                           </div>
                         </div>
@@ -5155,13 +5331,7 @@ _styleValue(r,c,key,e){
                               <span class="label">${t(this.hass,'editor.custom_css')}</span>
                             </label>
                             ${rowCustomCssEnabled ? html`
-                              <textarea
-                                class="text-input"
-                                rows="5"
-                                style="font-family:monospace; min-height:120px;"
-                                .value=${rowCustomCssValue}
-                                @input=${(e)=>this._updateRowCustomCss(rIdx, e)}>
-                              </textarea>
+                              ${this._renderCodeEditor('cell', rowCustomCssValue, (value) => this._updateRowCustomCss(rIdx, { target: { value } }))}
                             ` : nothing}
                           </div>
                         </div>
@@ -5267,21 +5437,16 @@ _styleValue(r,c,key,e){
           <span>${t(this.hass,"editor.custom_template")}</span>
         </label>
         ${this.config.custom_template_enabled ? html`
-          <textarea
-            class="text-input"
-            rows="8"
-            style="margin-top:12px; min-height:160px;"
-            .value=${this.config.custom_template_html || ''}
-            @input=${(e)=>this._updateCustomTemplateHtml(e)}>
-          </textarea>
+          ${this._renderCodeEditor('card', this.config.custom_template_html || '', (value) => this._updateCustomTemplateHtml({ target: { value } }))}
           <div class="muted after-box">
             ${t(this.hass,"editor.custom_template_hint")}
+            <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/#card-level-global-template">${t(this.hass, 'editor.template_reference')}</a>
           </div>
         ` : ''}
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.33.0
+        FCC v0.34.0
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

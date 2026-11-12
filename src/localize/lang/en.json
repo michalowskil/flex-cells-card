@@ -158,7 +158,7 @@
     "add_row": "Add row",
     "add_separator": "Add separator",
     "custom_template": "Custom template",
-    "custom_template_hint": "Use any HTML and the tag <fcc row=\"3\" col=\"2\" /> to insert a cell from a table, or <fcc row=\"3\" /> to insert an entire row. If you want to use global CSS, do this: <style>...</style><fcc />.",
+    "custom_template_hint": "Use any HTML and the tag <fcc row=\"3\" col=\"2\" /> to insert a cell from a table, or <fcc row=\"3\" /> to insert an entire row. If you want to use global CSS, do this: <style>...</style><fcc />. Read an entity with <fcc entity=\"sensor.temperature\" /> (add unit for the entity unit) or <fcc entity=\"sensor.temperature\" attribute=\"battery\" />.",
     "delete_row": "Delete row",
     "separator_title": "Separator",
     "separator_appearance": "Separator appearance",
@@ -198,7 +198,7 @@
     "advanced": "Tap & Hold Actions (cell)",
     "custom_css": "Custom CSS",
     "cell_custom_template": "Custom cell template",
-    "cell_custom_template_hint": "Use custom HTML just for this cell. Insert any table cell with <fcc row=\"1\" col=\"2\" /> (use as=\"text\" for plain text). Leave unchecked to keep the default rendering.",
+    "cell_custom_template_hint": "Use custom HTML just for this cell. Insert any table cell with <fcc row=\"1\" col=\"2\" /> (use as=\"text\" for plain text). Read an entity with <fcc entity=\"sensor.temperature\" /> (add unit for the entity unit) or <fcc entity=\"sensor.temperature\" attribute=\"battery\" />. Leave unchecked to keep the default rendering.",
     "actions_hint": "If any action is set, the default 'more-info' for an entity will be disabled.",
     "action_confirmation": "Require confirmation",
     "action_confirmation_title": "Confirmation title",
@@ -217,6 +217,7 @@
     "datetime_format": "Date/Time format & Text override",
     "available_tokens": "Date/time tokens:",
     "token_reference": "Open token reference",
+    "template_reference": "Open template reference",
     "value": "Value"
   },
   "placeholder": {
