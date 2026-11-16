@@ -433,6 +433,12 @@ Relative examples assume the current time is `2026-04-05T14:34:37` and the local
 | `[literal text]` | Outputs text inside brackets literally, without parsing it as tokens. | Pattern `[Updated: ]YYYY[-]MM[-]DD` gives `Updated: 2026-04-05` |
 
 ## Changelog
+- v0.35.0-beta.1 (Pre-release) —
+  - New cell type: chart. One entity's history, drawn as an area, a line, steps, or bars. The period and the height belong to the cell and have no maximum.
+  - The chart can add a break on a missing reading, a scale rounded to even numbers, an average line, a zero line, the latest value with its difference from the start of the period, and a pointer tooltip.
+  - Background, fill under the line, and line color are separate.
+  - The chart uses the cell's tap, hold, and double-tap actions. A dynamic rule can overwrite the cell with a chart.
+  - History stays in memory for the page. Only the stretch that is not loaded yet is fetched. The last reading before the period is kept for the left edge of the line.
 - v0.34.0 —
   - A template can show an entity state or attribute with `<fcc entity="sensor.temperature" />` and `<fcc entity="sensor.temperature" attribute="battery" />` (`attr` is an alias). The entity does not have to be a cell. The state has no unit unless the tag sets `unit` (entity unit) or `unit="°C"` (that text). `attribute` also accepts a metadata path such as `area.name`. `raw` writes the number with a dot and no thousands separator, so a comma does not break the number, while the rest of the card stays localized.
   - Card and cell templates, and cell and row custom CSS, use Home Assistant's code editor in the visual editor. Templates get the same entity suggestions as the YAML editor. The editor can be resized and opened fullscreen. Template and CSS text uses the theme text color, because the editor has no HTML or CSS coloring.

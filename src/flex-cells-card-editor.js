@@ -685,7 +685,8 @@ class FlexCellsCardEditor extends LitElement {
     .row > .cols2,
     .row > .cols3,
     .row > .cols4,
-    .row > .cols21 {
+    .row > .cols21,
+    .chart-overwrite > .cols1 {
       margin-bottom: 8px;
     }
 
@@ -2173,6 +2174,25 @@ class FlexCellsCardEditor extends LitElement {
     this._patchCell(r,c,patch);
   }
 
+  _cellChartNumberChanged(r, c, key, e) {
+    const raw = String(e?.target?.value ?? '').trim();
+    if (!raw) {
+      this._patchCell(r, c, { [key]: undefined });
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return;
+    this._patchCell(r, c, { [key]: n });
+  }
+  _cellChartStyleChanged(r, c, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    const style = value === 'line' || value === 'step' || value === 'bar' ? value : undefined;
+    this._patchCell(r, c, { chart_style: style });
+  }
+  _cellChartFlagChanged(r, c, key, e) {
+    this._patchCell(r, c, { [key]: e?.target?.checked ? true : undefined });
+  }
+
 _cellValueChanged(r,c,e){ this._patchCell(r,c,{ value:e.target.value }); }
 _cellAlignChanged(r,c,e){
   const value = e?.detail?.value ?? e?.target?.value;
@@ -2755,6 +2775,24 @@ _styleValue(r,c,key,e){
       this._updateRule(r,c,idx,{ [key]: val });
     }
   }
+  _updateRuleChartNumber(r, c, idx, key, e) {
+    const raw = String(e?.target?.value ?? '').trim();
+    if (!raw) {
+      this._updateRule(r, c, idx, { [key]: undefined });
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return;
+    this._updateRule(r, c, idx, { [key]: n });
+  }
+  _updateRuleChartFlag(r, c, idx, key, e) {
+    this._updateRule(r, c, idx, { [key]: e?.target?.checked ? true : undefined });
+  }
+  _updateRuleChartStyle(r, c, idx, e) {
+    const value = e?.detail?.value ?? e?.target?.value;
+    const style = value === 'line' || value === 'step' || value === 'bar' ? value : undefined;
+    this._updateRule(r, c, idx, { chart_style: style });
+  }
   _renderConditionReferenceEditor(cond, update, _idBase, prefix = 'val', labelKey = null){
     const isMax = prefix === 'val2';
     const entityKey = isMax ? 'val2_entity' : 'val_entity';
@@ -3164,7 +3202,7 @@ _styleValue(r,c,key,e){
         continue;
       }
 
-      if (c.type === 'entity') {
+      if (c.type === 'chart' || c.type === 'entity') {
         const st = this.hass?.states?.[c.value];
         const name = st?.attributes?.friendly_name || c.value;
         if (!name) continue;
@@ -3445,9 +3483,10 @@ _styleValue(r,c,key,e){
   _onEntityPicked(rIdx, cIdx, e) {
     const value = e?.detail?.value ?? e?.target?.value ?? '';
     const cell = this.config?.rows?.[rIdx]?.cells?.[cIdx] || {};
+    const isChart = cell.type === 'chart';
     const isCamera = this._isCameraEntityId(value);
-    const patch = { type: 'entity', value };
-    if (!isCamera && this._isCameraDisplay(cell?.entity_display)) {
+    const patch = isChart ? { value } : { type: 'entity', value };
+    if (!isChart && !isCamera && this._isCameraDisplay(cell?.entity_display)) {
       patch.entity_display = 'value';
       patch.camera_snapshot_ttl_ms = undefined;
       patch.camera_height = undefined;
@@ -3996,6 +4035,7 @@ _styleValue(r,c,key,e){
                     const cell = row.cells?.[cIdx] ?? { type: 'string', value: '', align: 'right' };
                     const isEntity = cell.type === 'entity';
                     const isIcon = cell.type === 'icon';
+                    const isChart = cell.type === 'chart';
                     const isNumeric = isEntity && this._isEntityNumeric(cell);
                     const entityDisplay = cell.entity_display || "value";
                     const showEntityIconSize = isEntity && (entityDisplay === "icon" || entityDisplay === "icon_value");
@@ -4050,6 +4090,7 @@ _styleValue(r,c,key,e){
                           fixedMenuPosition
                           .options=${[
                             { value: "entity", label: t(this.hass,"editor.entity_label") },
+                            { value: "chart", label: t(this.hass,"editor.chart_label") },
                             { value: "string", label: t(this.hass,"editor.string_label") },
                             { value: "icon", label: t(this.hass,"editor.icon_label") },
                           ]}
@@ -4495,6 +4536,92 @@ _styleValue(r,c,key,e){
                                   </fcc-textfield>
                           </div>
                         </details>
+                      ` : isChart ? html`
+                        <div class="cell-grid cell-wide">
+                          ${customElements.get('ha-entity-picker') ? html`
+                            <ha-entity-picker
+                              .hass=${this.hass}
+                              .value=${cell.value || ''}
+                              allow-custom-entity
+                              @value-changed=${(e)=>this._onEntityPicked(rIdx,cIdx,e)}>
+                            </ha-entity-picker>
+                          ` : html`
+                            <input list="entities-list" .value=${cell.value || ''} placeholder=${t(this.hass,"placeholder.entity")}
+                              @input=${(e) => this._cellValueChanged(rIdx, cIdx, e)} />
+                          `}
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <fcc-textfield
+                            type="number"
+                            step="any"
+                            .label=${t(this.hass,"editor.chart_hours")}
+                            .placeholder=${"24"}
+                            .value=${cell.chart_hours ?? ''}
+                            @input=${(e)=>this._cellChartNumberChanged(rIdx, cIdx, 'chart_hours', e)}>
+                          </fcc-textfield>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <fcc-textfield
+                            type="number"
+                            step="any"
+                            .label=${t(this.hass,"editor.chart_height")}
+                            .placeholder=${"28"}
+                            .value=${cell.chart_height ?? ''}
+                            @input=${(e)=>this._cellChartNumberChanged(rIdx, cIdx, 'chart_height', e)}>
+                          </fcc-textfield>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <ha-select
+                            .label=${t(this.hass,"editor.chart_style")}
+                            .value=${cell.chart_style || 'area'}
+                            naturalMenuWidth
+                            fixedMenuPosition
+                            .options=${[
+                              { value: "area", label: t(this.hass,"editor.chart_style_area") },
+                              { value: "line", label: t(this.hass,"editor.chart_style_line") },
+                              { value: "step", label: t(this.hass,"editor.chart_style_step") },
+                              { value: "bar", label: t(this.hass,"editor.chart_style_bar") },
+                            ]}
+                            @selected=${(e)=>this._cellChartStyleChanged(rIdx, cIdx, e)}
+                            @closed=${(e)=>e.stopPropagation()}>
+                          </ha-select>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <label class="option full">
+                            <input type="checkbox" .checked=${cell.chart_gaps === true} @change=${(e)=>this._cellChartFlagChanged(rIdx, cIdx, 'chart_gaps', e)} />
+                            ${t(this.hass,"editor.chart_gaps")}
+                          </label>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <label class="option full">
+                            <input type="checkbox" .checked=${cell.chart_nice === true} @change=${(e)=>this._cellChartFlagChanged(rIdx, cIdx, 'chart_nice', e)} />
+                            ${t(this.hass,"editor.chart_nice")}
+                          </label>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <label class="option full">
+                            <input type="checkbox" .checked=${cell.chart_avg === true} @change=${(e)=>this._cellChartFlagChanged(rIdx, cIdx, 'chart_avg', e)} />
+                            ${t(this.hass,"editor.chart_show_avg")}
+                          </label>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <label class="option full">
+                            <input type="checkbox" .checked=${cell.chart_zero === true} @change=${(e)=>this._cellChartFlagChanged(rIdx, cIdx, 'chart_zero', e)} />
+                            ${t(this.hass,"editor.chart_zero")}
+                          </label>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <label class="option full">
+                            <input type="checkbox" .checked=${cell.chart_value === true} @change=${(e)=>this._cellChartFlagChanged(rIdx, cIdx, 'chart_value', e)} />
+                            ${t(this.hass,"editor.chart_value")}
+                          </label>
+                        </div>
+                        <div class="cell-grid cell-wide">
+                          <label class="option full">
+                            <input type="checkbox" .checked=${cell.chart_tooltip === true} @change=${(e)=>this._cellChartFlagChanged(rIdx, cIdx, 'chart_tooltip', e)} />
+                            ${t(this.hass,"editor.chart_tooltip")}
+                          </label>
+                        </div>
                       ` : isIcon ? html`
                         <div class="cell-grid cell-wide">
                           ${customElements.get('ha-icon-picker') ? html`
@@ -4529,6 +4656,7 @@ _styleValue(r,c,key,e){
   <summary style="cursor:pointer;font-weight:600;">
     ${t(this.hass, 'editor.appearance')}
   </summary>
+                      ${isChart ? nothing : html`
                       <!-- WYRÓWNANIE -->
                       <div class="cell-grid cell-wide" style="margin-top: 10px;">
                         <ha-select
@@ -4543,6 +4671,7 @@ _styleValue(r,c,key,e){
                           @closed=${(e)=>e.stopPropagation()}>
                         </ha-select>
                       </div>
+                      `}
 
                       <!-- TRANSFORMACJA -->
                       ${(cell.type === 'string' || cell.type === 'entity') ? html`
@@ -4686,6 +4815,48 @@ _styleValue(r,c,key,e){
                             <input type="checkbox" .checked=${!!st.strike} @change=${(e)=>this._styleToggle(rIdx,cIdx,'strike',e)} />
                             ${t(this.hass,"style.strike")}
                           </label>
+                        </div>
+                      ` : ''}
+
+                      ${isChart ? html`
+                        <div class="cell-grid cell-wide" style="margin-top:10px;margin-bottom:0;">
+                          <div class="inline">
+                            <fcc-textfield
+                              .label=${t(this.hass,"editor.background_color")}
+                              .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                              .value=${st.background || ''}
+                              @input=${(e)=>this._styleValue(rIdx,cIdx,'background',e)}>
+                            </fcc-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'background')}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="cell-grid cell-wide" style="margin-bottom:0;">
+                          <div class="inline">
+                            <fcc-textfield
+                              .label=${t(this.hass,"editor.chart_fill")}
+                              .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                              .value=${st.chart_fill || ''}
+                              @input=${(e)=>this._styleValue(rIdx,cIdx,'chart_fill',e)}>
+                            </fcc-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'chart_fill')}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="cell-grid cell-wide" style="margin-bottom:0;">
+                          <div class="inline">
+                            <fcc-textfield
+                              .label=${t(this.hass,"editor.chart_color")}
+                              .placeholder=${"#ff5722 | red | var(--primary-color)"}
+                              .value=${st.color || ''}
+                              @input=${(e)=>this._styleValue(rIdx,cIdx,'color',e)}>
+                            </fcc-textfield>
+                            <button class="toggle" title="Palette" @click=${(ev) => this._onPaletteClick(ev, rIdx, cIdx, 'color')}>
+                              <ha-icon icon="mdi:palette"></ha-icon>
+                            </button>
+                          </div>
                         </div>
                       ` : ''}
 
@@ -4977,6 +5148,7 @@ _styleValue(r,c,key,e){
                                   { value: "entity", label: t(this.hass, 'dynamic.overwrite_entity_metadata') },
                                   { value: "text", label: t(this.hass, 'dynamic.overwrite_text') },
                                   { value: "icon", label: t(this.hass, 'dynamic.overwrite_icon') },
+                                  { value: "chart", label: t(this.hass, 'dynamic.overwrite_chart') },
                                 ]}
                                 @selected=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite: e.detail?.value ?? e.target?.value })}
                                 @closed=${(e)=>e.stopPropagation()}>
@@ -5110,6 +5282,63 @@ _styleValue(r,c,key,e){
                                     <ha-icon icon="mdi:palette"></ha-icon>
                                   </button>
                                 </div>
+                              </div>
+                            ` : html`` }
+
+                            ${ (rule.overwrite || '') === 'chart' ? html`
+                              <div class="chart-overwrite">
+                              <div class="cols1">
+                                <ha-entity-picker
+                                  .hass=${this.hass}
+                                  .value=${rule.overwrite_entity || (conditions?.[0]?.entity) || ''}
+                                  allow-custom-entity
+                                  @value-changed=${(e)=>this._updateRule(rIdx,cIdx,ridx,{ overwrite_entity: e.detail?.value || e.target.value })}>
+                                </ha-entity-picker>
+                              </div>
+                              <div class="cols1">
+                                <fcc-textfield
+                                  type="number"
+                                  step="any"
+                                  .label=${t(this.hass,"editor.chart_hours")}
+                                  .placeholder=${"24"}
+                                  .value=${rule.overwrite_chart_hours ?? ''}
+                                  @input=${(e)=>this._updateRuleChartNumber(rIdx, cIdx, ridx, 'overwrite_chart_hours', e)}>
+                                </fcc-textfield>
+                              </div>
+                              <div class="cols1">
+                                <fcc-textfield
+                                  type="number"
+                                  step="any"
+                                  .label=${t(this.hass,"editor.chart_height")}
+                                  .placeholder=${"28"}
+                                  .value=${rule.overwrite_chart_height ?? ''}
+                                  @input=${(e)=>this._updateRuleChartNumber(rIdx, cIdx, ridx, 'overwrite_chart_height', e)}>
+                                </fcc-textfield>
+                              </div>
+                              <div class="cols1">
+                                <ha-select
+                                  .label=${t(this.hass,"editor.chart_style")}
+                                  .value=${rule.chart_style || 'area'}
+                                  naturalMenuWidth
+                                  fixedMenuPosition
+                                  .options=${[
+                                    { value: "area", label: t(this.hass,"editor.chart_style_area") },
+                                    { value: "line", label: t(this.hass,"editor.chart_style_line") },
+                                    { value: "step", label: t(this.hass,"editor.chart_style_step") },
+                                    { value: "bar", label: t(this.hass,"editor.chart_style_bar") },
+                                  ]}
+                                  @selected=${(e)=>this._updateRuleChartStyle(rIdx, cIdx, ridx, e)}
+                                  @closed=${(e)=>e.stopPropagation()}>
+                                </ha-select>
+                              </div>
+                              ${['chart_gaps','chart_nice','chart_avg','chart_zero','chart_value','chart_tooltip'].map((key) => html`
+                                <div class="cols1">
+                                  <label class="option full">
+                                    <input type="checkbox" .checked=${rule[key] === true} @change=${(e)=>this._updateRuleChartFlag(rIdx, cIdx, ridx, key, e)} />
+                                    ${t(this.hass, key === 'chart_avg' ? 'editor.chart_show_avg' : `editor.${key}`)}
+                                  </label>
+                                </div>
+                              `)}
                               </div>
                             ` : html`` }
 
@@ -5446,7 +5675,7 @@ _styleValue(r,c,key,e){
       </div>
 
       <div style="font-size: 10px; margin-bottom: 10px;">
-        FCC v0.34.0
+        FCC v0.35.0-beta.1
         <span> • </span>
         <a target="_blank" rel="noopener" href="https://michalowskil.github.io/flex-cells-card/">Documentation</a>
         <span> • </span>

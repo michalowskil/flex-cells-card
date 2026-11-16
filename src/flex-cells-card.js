@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { LitElement, html, css, nothing, svg } from 'lit';
 import { t } from './localize/localize.js';
 import './flex-cells-card-editor.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
@@ -58,6 +58,540 @@ const stateColorProperties = (stateObj, state) => { const compareState = state !
 const stateColorCss = (stateObj, state) => { const compareState = state !== undefined ? state : stateObj?.state; if (compareState === UNAVAILABLE) return 'var(--state-unavailable-color)'; const properties = stateColorProperties(stateObj, state); return properties ? computeCssVariable(properties) : undefined; };
 
 const stateColorBrightness = (stateObj) => { const brightness = stateObj?.attributes?.brightness; if (typeof brightness === 'number' && computeDomain(stateObj.entity_id) !== 'plant') { return 'brightness(' + ((brightness + 245) / 5) + '%)'; } return ''; };
+
+const CHART_DEFAULT_HOURS = 24;
+const CHART_DEFAULT_HEIGHT = 28;
+const CHART_FRESH_MS = 20000;
+const CHART_OVERLAP_MS = 60000;
+const CHART_DRAW_MS = 15000;
+
+const chartCache = new Map();
+let chartFlushTimer = 0;
+const chartFlushQueue = [];
+
+const chartClampHours = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return CHART_DEFAULT_HOURS;
+  return n;
+};
+
+const chartClampHeight = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return CHART_DEFAULT_HEIGHT;
+  return n;
+};
+
+const chartEntry = (entityId) => {
+  let entry = chartCache.get(entityId);
+  if (!entry) {
+    entry = {
+      points: [],
+      from: null,
+      until: null,
+      pending: false,
+      alone: false,
+      error: null,
+      retryAt: 0,
+      listeners: new Map(),
+    };
+    chartCache.set(entityId, entry);
+  }
+  return entry;
+};
+
+const chartReadTime = (raw) => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw < 1e12 ? raw * 1000 : raw;
+  if (typeof raw === 'string' && raw) {
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed)) return parsed;
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n < 1e12 ? n * 1000 : n;
+  }
+  return NaN;
+};
+
+const chartTimeMs = (item) => {
+  if (!item || (typeof item !== 'object' && !Array.isArray(item))) return NaN;
+  const candidates = Array.isArray(item)
+    ? [item[2], item[1]]
+    : [item.lc, item.last_changed, item.last_changed_ts, item.lu, item.last_updated, item.last_updated_ts];
+  for (let i = 0; i < candidates.length; i += 1) {
+    const t = chartReadTime(candidates[i]);
+    if (Number.isFinite(t) && t > 0) return t;
+  }
+  return NaN;
+};
+
+const chartStateRaw = (item) => {
+  if (Array.isArray(item)) return item[0];
+  return item?.s ?? item?.state;
+};
+
+const chartNumber = (raw) => {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : NaN;
+  if (raw === undefined || raw === null) return NaN;
+  const text = String(raw).trim().replace(',', '.');
+  if (!text || text === 'unavailable' || text === 'unknown' || text === 'none' || text === 'null') return NaN;
+  const n = Number(text);
+  if (Number.isFinite(n)) return n;
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return NaN;
+  const extracted = Number(match[0]);
+  return Number.isFinite(extracted) ? extracted : NaN;
+};
+
+const chartLowerBound = (points, time) => {
+  let lo = 0;
+  let hi = points.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].t < time) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+};
+
+const chartMerge = (base, extra) => {
+  if (!extra.length) return base;
+  if (!base.length) return extra;
+  const out = new Array(base.length + extra.length);
+  let i = 0;
+  let j = 0;
+  let k = 0;
+  while (i < base.length && j < extra.length) {
+    const dt = base[i].t - extra[j].t;
+    if (dt < 0) out[k++] = base[i++];
+    else if (dt > 0) out[k++] = extra[j++];
+    else {
+      out[k++] = extra[j];
+      i += 1;
+      j += 1;
+    }
+  }
+  while (i < base.length) out[k++] = base[i++];
+  while (j < extra.length) out[k++] = extra[j++];
+  out.length = k;
+  return out;
+};
+
+const chartMaxHours = (entry) => {
+  let hours = 0;
+  for (const value of entry.listeners.values()) {
+    if (value > hours) hours = value;
+  }
+  return hours || CHART_DEFAULT_HOURS;
+};
+
+const chartTrim = (entry, now) => {
+  if (!entry.listeners.size || !entry.points.length) return;
+  const windowStart = now - chartMaxHours(entry) * 3600000;
+  const idx = chartLowerBound(entry.points, windowStart);
+  const keep = idx > 0 ? idx - 1 : 0;
+  if (keep > 0) entry.points = entry.points.slice(keep);
+  if (entry.from != null && entry.from < windowStart) entry.from = windowStart;
+};
+
+const chartNotify = (entityId) => {
+  const entry = chartCache.get(entityId);
+  if (!entry) return;
+  for (const host of entry.listeners.keys()) {
+    try { host.requestUpdate(); } catch (_e) { /* detached */ }
+  }
+};
+
+const chartParseList = (list) => {
+  if (!Array.isArray(list)) return [];
+  const points = [];
+  for (let i = 0; i < list.length; i += 1) {
+    const item = list[i];
+    const t = chartTimeMs(item);
+    if (!Number.isFinite(t)) continue;
+    const v = chartNumber(chartStateRaw(item));
+    points.push(Number.isFinite(v) ? { t, v } : { t, gap: true });
+  }
+  if (points.length > 1) points.sort((a, b) => a.t - b.t);
+  const deduped = [];
+  for (let i = 0; i < points.length; i += 1) {
+    const point = points[i];
+    const prev = deduped[deduped.length - 1];
+    if (prev && prev.t === point.t) {
+      if (point.gap) {
+        delete prev.v;
+        prev.gap = true;
+      } else {
+        delete prev.gap;
+        prev.v = point.v;
+      }
+    } else deduped.push(point);
+  }
+  return deduped;
+};
+
+const chartApplyFetch = (entityId, start, end, points) => {
+  const entry = chartEntry(entityId);
+  entry.points = chartMerge(entry.points, points);
+  const now = Date.now();
+  const coveredEnd = now - end < 5000 ? now : end;
+  entry.from = entry.from == null ? start : Math.min(entry.from, start);
+  entry.until = entry.until == null ? coveredEnd : Math.max(entry.until, coveredEnd);
+  entry.error = null;
+  entry.retryAt = 0;
+  chartTrim(entry, Date.now());
+};
+
+const chartPlan = (entry, hours, now) => {
+  if (entry.retryAt && now < entry.retryAt) return null;
+  const windowStart = now - hours * 3600000;
+  if (entry.from == null || entry.until == null) return { start: windowStart, end: now };
+  if (entry.from > windowStart + 1000) return { start: windowStart, end: Math.min(entry.from + 1000, now) };
+  if (entry.until < now - CHART_FRESH_MS) {
+    return { start: Math.max(windowStart, entry.until - CHART_OVERLAP_MS), end: now };
+  }
+  return null;
+};
+
+const chartQueueFetch = (entityId, hass) => {
+  const entry = chartEntry(entityId);
+  if (entry.pending) return;
+  if (!hass?.callWS) return;
+  if (!chartPlan(entry, chartMaxHours(entry), Date.now())) return;
+  entry.pending = true;
+  chartFlushQueue.push({ entityId, hass, alone: !!entry.alone });
+  entry.alone = false;
+  if (chartFlushTimer) return;
+  chartFlushTimer = setTimeout(chartFlush, 40);
+};
+
+const chartFinishJob = (entityId, hass, failed) => {
+  const entry = chartEntry(entityId);
+  entry.pending = false;
+  if (failed) {
+    entry.error = failed?.message || 'history';
+    entry.retryAt = Date.now() + 30000;
+  }
+  chartNotify(entityId);
+  if (hass && entry.listeners.size) chartQueueFetch(entityId, hass);
+};
+
+async function chartFlush() {
+  chartFlushTimer = 0;
+  const batch = chartFlushQueue.splice(0, chartFlushQueue.length);
+  if (!batch.length) return;
+  const groups = new Map();
+  const seen = new Set();
+  for (let i = 0; i < batch.length; i += 1) {
+    const job = batch[i];
+    if (seen.has(job.entityId)) continue;
+    seen.add(job.entityId);
+    const entry = chartEntry(job.entityId);
+    const plan = chartPlan(entry, chartMaxHours(entry), Date.now());
+    if (!plan) {
+      entry.pending = false;
+      continue;
+    }
+    const key = job.alone
+      ? `solo:${job.entityId}`
+      : `${Math.floor(plan.start / 60000)}:${Math.floor(plan.end / 60000)}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { start: plan.start, end: plan.end, hass: job.hass, alone: !!job.alone, jobs: [] };
+      groups.set(key, group);
+    }
+    group.start = Math.min(group.start, plan.start);
+    group.end = Math.max(group.end, plan.end);
+    if (!group.hass && job.hass) group.hass = job.hass;
+    group.jobs.push({ entityId: job.entityId, hass: job.hass, start: plan.start, end: plan.end });
+  }
+
+  await Promise.all([...groups.values()].map(async (group) => {
+    const ids = group.jobs.map((job) => job.entityId);
+    let result = null;
+    let failed = null;
+    try {
+      if (!group.hass?.callWS) throw new Error('history');
+      result = await group.hass.callWS({
+        type: 'history/history_during_period',
+        start_time: new Date(group.start).toISOString(),
+        end_time: new Date(group.end).toISOString(),
+        entity_ids: ids,
+        include_start_time_state: true,
+        significant_changes_only: true,
+        minimal_response: true,
+        no_attributes: true,
+      });
+    } catch (err) {
+      failed = err || new Error('history');
+    }
+    if (failed && !group.alone && ids.length > 1) {
+      for (let i = 0; i < group.jobs.length; i += 1) {
+        const job = group.jobs[i];
+        const entry = chartEntry(job.entityId);
+        entry.pending = false;
+        entry.alone = true;
+        chartQueueFetch(job.entityId, job.hass || group.hass);
+      }
+      return;
+    }
+    for (let i = 0; i < group.jobs.length; i += 1) {
+      const job = group.jobs[i];
+      if (!failed) {
+        const list = result && typeof result === 'object' ? result[job.entityId] : null;
+        chartApplyFetch(job.entityId, group.start, group.end, chartParseList(Array.isArray(list) ? list : []));
+      }
+      chartFinishJob(job.entityId, job.hass || group.hass, failed);
+    }
+  }));
+}
+
+const chartWatch = (entityId, host, hours, hass) => {
+  const entry = chartEntry(entityId);
+  entry.listeners.set(host, hours);
+  chartQueueFetch(entityId, hass);
+};
+
+const chartUnwatch = (entityId, host) => {
+  const entry = chartCache.get(entityId);
+  if (!entry) return;
+  entry.listeners.delete(host);
+};
+
+const chartNoteLive = (entityId, stateObj) => {
+  if (!stateObj) return;
+  const entry = chartCache.get(entityId);
+  if (!entry || entry.until == null) return;
+  const v = chartNumber(stateObj.state);
+  const t = chartTimeMs(stateObj) || Date.now();
+  const points = entry.points;
+  const last = points.length ? points[points.length - 1] : null;
+  if (last && t < last.t) return;
+  if (!Number.isFinite(v)) {
+    if (last && last.gap && t === last.t) return;
+    if (last && t === last.t) {
+      delete last.v;
+      last.gap = true;
+      return;
+    }
+    points.push({ t, gap: true });
+  } else if (last && t === last.t) {
+    delete last.gap;
+    last.v = v;
+    return;
+  } else {
+    points.push({ t, v });
+  }
+  chartTrim(entry, Date.now());
+};
+
+const chartSeries = (entityId, windowStart, windowEnd, gaps) => {
+  const entry = chartCache.get(entityId);
+  if (!entry || !entry.points.length) return [];
+  const idx = chartLowerBound(entry.points, windowStart);
+  let before = null;
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    const point = entry.points[i];
+    if (Number.isFinite(point.v) || (gaps && point.gap)) {
+      before = point;
+      break;
+    }
+  }
+  const out = [];
+  if (before && Number.isFinite(before.v)) out.push({ t: windowStart, v: before.v });
+  else if (gaps && before && before.gap) out.push({ t: windowStart, gap: true });
+  for (let i = idx; i < entry.points.length; i += 1) {
+    const point = entry.points[i];
+    if (point.t > windowEnd) break;
+    if (!gaps && !Number.isFinite(point.v)) continue;
+    out.push(point);
+  }
+  if (!out.length) return [];
+  const last = out[out.length - 1];
+  if (last && windowEnd - last.t > 1000) {
+    if (Number.isFinite(last.v)) out.push({ t: windowEnd, v: last.v });
+    else if (gaps && last.gap) out.push({ t: windowEnd, gap: true });
+  }
+  return out;
+};
+
+const chartStyleName = (value) => {
+  const name = String(value || '').trim();
+  if (name === 'line' || name === 'step' || name === 'bar') return name;
+  return 'area';
+};
+
+const chartFormatValue = (n) => {
+  if (!Number.isFinite(n)) return '';
+  const digits = Math.abs(n) >= 100 ? 1 : 2;
+  return String(Number(n.toFixed(digits)));
+};
+
+const chartFormatDelta = (n) => {
+  if (!Number.isFinite(n)) return '';
+  const body = chartFormatValue(Math.abs(n));
+  if (n > 0) return `+${body}`;
+  if (n < 0) return `-${body}`;
+  return '0';
+};
+
+const chartFormatClock = (ms, span) => {
+  const d = new Date(ms);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (span < 6 * 3600000) return `${hh}:${mm}:${String(d.getSeconds()).padStart(2, '0')}`;
+  return `${hh}:${mm}`;
+};
+
+const chartNiceRange = (min, max) => {
+  if (!(max > min)) return { lo: min - 1, hi: max + 1 };
+  const span = max - min;
+  const rough = (span * 1.16) / 4;
+  if (!(rough > 0)) return { lo: min - 1, hi: max + 1 };
+  const pow = 10 ** Math.floor(Math.log10(rough));
+  if (!Number.isFinite(pow) || pow === 0) return { lo: min - 1, hi: max + 1 };
+  const err = rough / pow;
+  const step = err >= 7.5 ? 10 * pow : err >= 3.5 ? 5 * pow : err >= 1.5 ? 2 * pow : pow;
+  const pad = span * 0.08;
+  let lo = Math.floor((min - pad) / step) * step;
+  let hi = Math.ceil((max + pad) / step) * step;
+  if (!(hi > lo)) hi = lo + step;
+  return { lo, hi };
+};
+
+const chartRuns = (points) => {
+  const runs = [];
+  let run = [];
+  for (let i = 0; i < points.length; i += 1) {
+    const point = points[i];
+    if (!Number.isFinite(point.v)) {
+      if (run.length) {
+        runs.push(run);
+        run = [];
+      }
+      continue;
+    }
+    run.push(point);
+  }
+  if (run.length) runs.push(run);
+  return runs;
+};
+
+const chartGeometry = (points, styleName, opts) => {
+  const runs = chartRuns(points);
+  if (!runs.length) return null;
+  let min = Infinity;
+  let max = -Infinity;
+  let first = null;
+  let last = null;
+  for (let r = 0; r < runs.length; r += 1) {
+    const run = runs[r];
+    if (!first) first = run[0];
+    last = run[run.length - 1];
+    for (let i = 0; i < run.length; i += 1) {
+      const v = run[i].v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  const nice = !!(opts && opts.nice);
+  let lo;
+  let hi;
+  if (nice) {
+    const fitted = chartNiceRange(min, max);
+    lo = fitted.lo;
+    hi = fitted.hi;
+  } else if (!(max > min)) {
+    lo = min - 1;
+    hi = max + 1;
+  } else {
+    const pad = (max - min) * 0.08;
+    lo = min - pad;
+    hi = max + pad;
+  }
+  const range = hi - lo || 1;
+  const t0 = points[0].t;
+  const t1 = points[points.length - 1].t;
+  const span = (t1 - t0) || 1;
+  const xOf = (t) => Math.round((((t - t0) / span) * 100) * 100) / 100;
+  const yOf = (v) => Math.round(((1 - (v - lo) / range) * 100) * 100) / 100;
+  const style = chartStyleName(styleName);
+  let line = '';
+  let fill = '';
+  let bars = '';
+  for (let r = 0; r < runs.length; r += 1) {
+    const sampled = runs[r];
+    if (!sampled.length) continue;
+    if (style === 'bar') {
+      if (sampled.length === 1) {
+        const x1n = xOf(sampled[0].t);
+        const x2n = Math.min(100, x1n + 1.5);
+        const y = yOf(sampled[0].v).toFixed(2);
+        bars += `M${x1n.toFixed(2)} ${y}H${x2n.toFixed(2)}V100H${x1n.toFixed(2)}Z`;
+      } else {
+        for (let i = 0; i < sampled.length - 1; i += 1) {
+          const x1 = xOf(sampled[i].t).toFixed(2);
+          const x2 = xOf(sampled[i + 1].t).toFixed(2);
+          if (x2 === x1) continue;
+          const y = yOf(sampled[i].v).toFixed(2);
+          bars += `M${x1} ${y}H${x2}V100H${x1}Z`;
+        }
+      }
+      continue;
+    }
+    const step = style === 'step';
+    let sub = '';
+    let firstX = '';
+    let lastX = '';
+    for (let i = 0; i < sampled.length; i += 1) {
+      const x = xOf(sampled[i].t).toFixed(2);
+      const y = yOf(sampled[i].v).toFixed(2);
+      if (i === 0) {
+        sub = `M${x} ${y}`;
+        firstX = x;
+      } else if (step) {
+        sub += `H${x}V${y}`;
+      } else {
+        sub += `L${x} ${y}`;
+      }
+      lastX = x;
+    }
+    line += sub;
+    if (style !== 'line') fill += `${sub}L${lastX} 100L${firstX} 100Z`;
+  }
+  if (!line && !bars) return null;
+  let acc = 0;
+  let dur = 0;
+  for (let r = 0; r < runs.length; r += 1) {
+    const run = runs[r];
+    for (let i = 0; i < run.length - 1; i += 1) {
+      const dt = run[i + 1].t - run[i].t;
+      if (dt > 0) {
+        acc += run[i].v * dt;
+        dur += dt;
+      }
+    }
+  }
+  const avg = dur > 0 ? acc / dur : first.v;
+  const hover = [];
+  for (let r = 0; r < runs.length; r += 1) {
+    for (let i = 0; i < runs[r].length; i += 1) hover.push(runs[r][i]);
+  }
+  return {
+    style,
+    line,
+    fill,
+    bars,
+    avgY: opts && opts.avg ? yOf(avg).toFixed(2) : '',
+    zeroY: opts && opts.zero && lo < 0 && hi > 0 ? yOf(0).toFixed(2) : '',
+    avg,
+    last: last.v,
+    delta: last.v - first.v,
+    lastY: yOf(last.v),
+    hover,
+    t0,
+    span,
+    lo,
+    range,
+  };
+};
 
 const DEFAULT_SEPARATOR = {
   color: '#d0d7de',
@@ -194,6 +728,111 @@ class FlexCellsCard extends LitElement {
       height: 100%;
       object-fit: contain;
       display: block;
+    }
+    .fcc-chart-wrap {
+      position: relative;
+      display: block;
+      width: 100%;
+      min-width: 96px;
+      contain: layout;
+      isolation: isolate;
+    }
+    .fcc-chart-wrap.has-tip {
+      touch-action: none;
+    }
+    .fcc-chart {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-width: 96px;
+      overflow: visible;
+      transform: translateZ(0);
+    }
+    td.fcc-chart-cell,
+    th.fcc-chart-cell {
+      min-width: 96px;
+    }
+    .fcc-chart-fill {
+      fill: currentColor;
+      opacity: 0.16;
+      stroke: none;
+    }
+    .fcc-chart.is-bar .fcc-chart-fill {
+      opacity: 0.55;
+    }
+    .fcc-chart.has-fill .fcc-chart-fill {
+      fill: var(--fcc-chart-fill);
+      opacity: 1;
+    }
+    .fcc-chart-line,
+    .fcc-chart.is-empty line {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .fcc-chart.is-empty line {
+      opacity: 0.35;
+      stroke-dasharray: 3 4;
+    }
+    .fcc-chart-avg,
+    .fcc-chart-zero {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
+    .fcc-chart-avg {
+      stroke-dasharray: 4 3;
+      opacity: 0.75;
+    }
+    .fcc-chart-zero {
+      opacity: 0.35;
+    }
+    .fcc-chart-guide {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 1px;
+      background: currentColor;
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .fcc-chart-mark,
+    .fcc-chart-now,
+    .fcc-chart-tip {
+      position: absolute;
+      pointer-events: none;
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+      color: var(--primary-text-color);
+      background: var(--card-background-color, #111);
+      border: 1px solid var(--divider-color, rgba(127,127,127,.45));
+      border-radius: 4px;
+      padding: 1px 4px;
+    }
+    .fcc-chart-tip {
+      left: 0;
+      top: 0;
+    }
+    .fcc-chart-mark {
+      left: 4px;
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+    .fcc-chart-now {
+      right: 4px;
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+    .fcc-chart-tip {
+      z-index: 2;
+      padding: 2px 5px;
     }
     .fcc-camera-stream {
       overflow: hidden;
@@ -510,6 +1149,7 @@ class FlexCellsCard extends LitElement {
       clearTimeout(this._moreInfoViewTimer);
       this._moreInfoViewTimer = null;
     }
+    this._releaseChartWatch();
     super.disconnectedCallback();
   }
 
@@ -1795,9 +2435,33 @@ class FlexCellsCard extends LitElement {
     return textSpan || '';
   }
 
+  _chartCellFromOverwrite(cell, dyn) {
+    const fromRule = typeof dyn?.overwrite_entity === 'string' ? dyn.overwrite_entity.trim() : '';
+    const fromCell = typeof cell?.value === 'string' ? cell.value.trim() : '';
+    const fromCond = typeof dyn?.entity === 'string' ? dyn.entity.trim() : '';
+    const entity = fromRule || (fromCell.includes('.') ? fromCell : '') || fromCond;
+    const next = { ...(cell || {}), type: 'chart', value: entity };
+    if (dyn?.overwrite_chart_hours != null && dyn.overwrite_chart_hours !== '') next.chart_hours = dyn.overwrite_chart_hours;
+    if (dyn?.overwrite_chart_height != null && dyn.overwrite_chart_height !== '') next.chart_height = dyn.overwrite_chart_height;
+    if (dyn?.chart_style) next.chart_style = dyn.chart_style;
+    next.chart_gaps = dyn?.chart_gaps === true;
+    next.chart_nice = dyn?.chart_nice === true;
+    next.chart_avg = dyn?.chart_avg === true;
+    next.chart_zero = dyn?.chart_zero === true;
+    next.chart_value = dyn?.chart_value === true;
+    next.chart_tooltip = dyn?.chart_tooltip === true;
+    return next;
+  }
+
+  _renderDynamicChartContent(cell, dyn) {
+    if (!dyn || String(dyn.overwrite || '').toLowerCase() !== 'chart') return null;
+    return this._renderChartSvg(this._chartCellFromOverwrite(cell, dyn));
+  }
+
   _resolveDynamicOverwriteContent(cell, dyn, textDecoration) {
     if (!dyn) return null;
     const overwrite = (dyn.overwrite || '').toLowerCase();
+    if (overwrite === 'chart') return this._renderDynamicChartContent(cell, dyn);
     if (overwrite === 'icon') {
       const iconName = dyn.icon != null ? String(dyn.icon) : '';
       return this._renderIconWithOptionalText(iconName, dyn, cell, textDecoration);
@@ -1842,6 +2506,11 @@ class FlexCellsCard extends LitElement {
       if (dyn.mask != null) return String(dyn.mask);
       return '';
     }
+    if (overwrite === 'chart') {
+      const chartCell = this._chartCellFromOverwrite(cell, dyn);
+      const state = chartCell.value ? this.hass?.states?.[chartCell.value]?.state : undefined;
+      return state != null ? String(state) : '';
+    }
     if (overwrite === 'hide' || dyn.hide) {
       if (dyn.mask != null) return String(dyn.mask);
       return '';
@@ -1863,6 +2532,15 @@ class FlexCellsCard extends LitElement {
     const cells = Array.isArray(row?.cells) ? row.cells : [];
     const cell = cells[colIndex] ?? { type: 'string', value: '', align: 'right' };
     const type = cell?.type || 'string';
+
+    if (type === 'chart') {
+      const entityId = cell?.value != null ? String(cell.value) : '';
+      const stateObj = entityId ? this.hass?.states?.[entityId] : undefined;
+      const stateText = stateObj?.state != null ? String(stateObj.state) : '';
+      const dyn = this._evaluateDynColor(cell, type, stateText);
+      const shown = this._resolveDisplayWithDynamics(stateText, dyn, cell);
+      return this._buildSortKey(shown);
+    }
 
     if (type === 'icon') {
       const base = cell?.value != null ? String(cell.value) : '';
@@ -4212,6 +4890,23 @@ class FlexCellsCard extends LitElement {
           if (r.overwrite_scale_out_min !== undefined) res.overwrite_scale_out_min = r.overwrite_scale_out_min;
           if (r.overwrite_scale_out_max !== undefined) res.overwrite_scale_out_max = r.overwrite_scale_out_max;
           if (r.overwrite_unit !== undefined) res.overwrite_unit = r.overwrite_unit;
+        } else if (ow === 'chart') {
+          res.hide = true;
+          res.overwrite = 'chart';
+          const condEntity = Array.isArray(r.conditions) && r.conditions[0]?.entity
+            ? r.conditions[0].entity
+            : r.entity;
+          if (r.overwrite_entity) res.overwrite_entity = r.overwrite_entity;
+          else if (condEntity) res.overwrite_entity = condEntity;
+          if (r.overwrite_chart_hours !== undefined) res.overwrite_chart_hours = r.overwrite_chart_hours;
+          if (r.overwrite_chart_height !== undefined) res.overwrite_chart_height = r.overwrite_chart_height;
+          if (r.chart_style) res.chart_style = r.chart_style;
+          res.chart_gaps = r.chart_gaps === true;
+          res.chart_nice = r.chart_nice === true;
+          res.chart_avg = r.chart_avg === true;
+          res.chart_zero = r.chart_zero === true;
+          res.chart_value = r.chart_value === true;
+          res.chart_tooltip = r.chart_tooltip === true;
         } else {
           if (r.hide !== undefined) res.hide = !!r.hide;
           if (r.mask !== undefined) res.mask = r.mask;
@@ -4488,6 +5183,9 @@ class FlexCellsCard extends LitElement {
         return dynamicValue;
       }
       return dyn?.mask || "";
+    }
+    if (overwrite === "chart") {
+      return this._renderDynamicChartContent(cell, dyn);
     }
     if (overwrite === "hide") {
       return dyn?.mask || "";
@@ -4855,6 +5553,238 @@ class FlexCellsCard extends LitElement {
 
   // ---------- render ----------
 
+  _releaseChartWatch() {
+    const watched = this._chartWatched;
+    if (!watched) return;
+    for (const id of watched.keys()) chartUnwatch(id, this);
+    this._chartWatched = new Map();
+  }
+
+  _syncChartWatch(rows) {
+    const wanted = new Map();
+    const visit = (cell) => {
+      if (!cell) return;
+      const note = (id, hours) => {
+        const entityId = typeof id === 'string' ? id.trim() : '';
+        if (!entityId || !entityId.includes('.')) return;
+        const span = chartClampHours(hours);
+        const prev = wanted.get(entityId);
+        if (!prev || span > prev) wanted.set(entityId, span);
+      };
+      if (cell.type === 'chart') note(cell.value, cell.chart_hours);
+      const probe = (cell.type === 'entity' || cell.type === 'chart')
+        ? (this.hass?.states?.[cell.value]?.state ?? '')
+        : (cell.value ?? '');
+      const dyn = this._evaluateDynColor(cell, cell.type || 'string', String(probe ?? ''));
+      if (dyn && String(dyn.overwrite || '').toLowerCase() === 'chart') {
+        const chartCell = this._chartCellFromOverwrite(cell, dyn);
+        note(chartCell.value, chartCell.chart_hours);
+      }
+    };
+    const list = Array.isArray(rows) ? rows : [];
+    for (let i = 0; i < list.length; i += 1) {
+      const cells = list[i]?.cells;
+      if (!Array.isArray(cells)) continue;
+      for (let c = 0; c < cells.length; c += 1) visit(cells[c]);
+    }
+    for (const [id, hours] of wanted) {
+      const stateObj = this.hass?.states?.[id];
+      if (stateObj) chartNoteLive(id, stateObj);
+      chartWatch(id, this, hours, this.hass);
+    }
+    const prev = this._chartWatched;
+    if (prev) {
+      for (const id of prev.keys()) {
+        if (!wanted.has(id)) chartUnwatch(id, this);
+      }
+    }
+    this._chartWatched = wanted;
+  }
+
+  _onChartPointerMove(e) {
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      try { e.preventDefault(); } catch (_) { /* passive listener */ }
+    }
+    const wrap = e.currentTarget;
+    const model = wrap ? this._chartModels?.get(wrap.dataset.chartKey) : null;
+    const tip = wrap?.querySelector('.fcc-chart-tip');
+    const guide = wrap?.querySelector('.fcc-chart-guide');
+    if (!model || !tip || !model.hover.length) return;
+    const rect = wrap._fccBox;
+    if (!rect || !(rect.width > 0)) {
+      const next = wrap.getBoundingClientRect();
+      wrap._fccBox = { left: next.left, width: next.width, height: next.height };
+    }
+    const box = wrap._fccBox;
+    if (!(box.width > 0)) return;
+    const ratio = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
+    const t = model.t0 + ratio * model.span;
+    const pts = model.hover;
+    let best = pts[0];
+    let bestD = Math.abs(pts[0].t - t);
+    for (let i = 1; i < pts.length; i += 1) {
+      const d = Math.abs(pts[i].t - t);
+      if (d < bestD) {
+        best = pts[i];
+        bestD = d;
+      }
+    }
+    const left = ratio * box.width;
+    const y = (1 - (best.v - model.lo) / model.range) * box.height;
+    const label = `${chartFormatClock(best.t, model.span)}  ${chartFormatValue(best.v)}`;
+    tip.hidden = false;
+    if (tip.textContent !== label) tip.textContent = label;
+    const tipWidth = label.length * 6.5 + 10;
+    const tipHeight = 18;
+    const gap = 6;
+    let tipLeft = left - tipWidth / 2;
+    tipLeft = Math.max(0, Math.min(tipLeft, Math.max(0, box.width - tipWidth)));
+    let tipTop = y - tipHeight - gap;
+    if (tipTop < 0) tipTop = y + gap;
+    if (tipTop + tipHeight > box.height) tipTop = Math.max(0, box.height - tipHeight);
+    tip.style.transform = `translate(${tipLeft}px, ${tipTop}px)`;
+    if (guide) {
+      guide.hidden = false;
+      guide.style.transform = `translateX(${left}px)`;
+    }
+  }
+
+  _hideChartTip(wrap) {
+    const tip = wrap?.querySelector('.fcc-chart-tip');
+    const guide = wrap?.querySelector('.fcc-chart-guide');
+    if (tip) tip.hidden = true;
+    if (guide) guide.hidden = true;
+  }
+
+  _onChartPointerLeave(e) {
+    const wrap = e.currentTarget;
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') return;
+    if (wrap?.hasPointerCapture?.(e.pointerId)) return;
+    if (wrap) wrap._fccBox = null;
+    this._hideChartTip(wrap);
+  }
+
+  _renderChartSvg(cell) {
+    const entityId = typeof cell?.value === 'string' ? cell.value.trim() : '';
+    const hours = chartClampHours(cell?.chart_hours);
+    const height = chartClampHeight(cell?.chart_height);
+    const now = Math.floor(Date.now() / CHART_DRAW_MS) * CHART_DRAW_MS;
+    const windowStart = now - hours * 3600000;
+    const points = entityId ? chartSeries(entityId, windowStart, now, cell?.chart_gaps === true) : [];
+    const showAvg = cell?.chart_avg === true;
+    const showZero = cell?.chart_zero === true;
+    const showValue = cell?.chart_value === true;
+    const showTip = cell?.chart_tooltip === true;
+    const geom = chartGeometry(points, cell?.chart_style, {
+      nice: cell?.chart_nice === true,
+      avg: showAvg,
+      zero: showZero,
+    });
+    const fill = String(cell?.style?.chart_fill || '').trim();
+    const wrapStyle = `height:${height}px`;
+    const interactive = !!entityId || this._hasCellActions(cell);
+    const defaultTap = entityId
+      ? () => this._openEntityMoreInfo(entityId, cell?.more_info_view, cell?.more_info_page)
+      : undefined;
+    const onDown = (e) => {
+      e.stopPropagation();
+      if (showTip) {
+        const next = e.currentTarget.getBoundingClientRect();
+        e.currentTarget._fccBox = { left: next.left, width: next.width, height: next.height };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* pointer already gone */ }
+      }
+      if (interactive) this._onCellPointerDown(e, cell, entityId);
+    };
+    const onUp = (e) => {
+      e.stopPropagation();
+      if (showTip && (e.pointerType === 'touch' || e.pointerType === 'pen')) {
+        e.currentTarget._fccBox = null;
+        this._hideChartTip(e.currentTarget);
+      }
+      if (interactive) this._onCellPointerUp(e, cell, entityId, defaultTap);
+    };
+    const onCancel = (e) => {
+      e.stopPropagation();
+      if (showTip) {
+        e.currentTarget._fccBox = null;
+        this._hideChartTip(e.currentTarget);
+      }
+      if (interactive) this._onCellPointerCancel(e);
+    };
+    if (!geom) {
+      return html`
+        <span class="fcc-chart-wrap" style=${wrapStyle}
+          @pointerdown=${onDown}
+          @pointerup=${onUp}
+          @pointercancel=${onCancel}
+          @mouseleave=${interactive ? (e) => { e.stopPropagation(); this._onCellPointerCancel(e); } : nothing}
+          @click=${interactive ? (e) => e.stopPropagation() : nothing}>
+          ${svg`
+            <svg class="fcc-chart is-empty" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <line x1="0" y1="50" x2="100" y2="50"></line>
+            </svg>
+          `}
+        </span>
+      `;
+    }
+    const chartKey = `${entityId}|${hours}|${geom.style}`;
+    if (!this._chartModels) this._chartModels = new Map();
+    this._chartModels.set(chartKey, {
+      hover: geom.hover,
+      t0: geom.t0,
+      span: geom.span,
+      lo: geom.lo,
+      range: geom.range,
+    });
+    const classes = ['fcc-chart'];
+    if (fill) classes.push('has-fill');
+    if (geom.style === 'bar') classes.push('is-bar');
+    const svgStyle = fill ? `--fcc-chart-fill:${fill}` : nothing;
+    const avgLabel = showAvg ? `${t(this.hass, 'editor.chart_avg')} ${chartFormatValue(geom.avg)}` : '';
+    const nowLabel = showValue ? `${chartFormatValue(geom.last)} ${chartFormatDelta(geom.delta)}`.trim() : '';
+    return html`
+      <span class="fcc-chart-wrap ${showTip ? 'has-tip' : ''}" style=${wrapStyle} data-chart-key=${showTip ? chartKey : nothing}
+        @pointerdown=${onDown}
+        @pointerup=${onUp}
+        @pointercancel=${onCancel}
+        @mouseleave=${interactive ? (e) => { e.stopPropagation(); this._onCellPointerCancel(e); } : nothing}
+        @click=${interactive ? (e) => e.stopPropagation() : nothing}
+        @pointermove=${showTip ? (e) => this._onChartPointerMove(e) : nothing}
+        @pointerleave=${showTip ? (e) => this._onChartPointerLeave(e) : nothing}>
+        ${svg`
+          <svg class=${classes.join(' ')} style=${svgStyle} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            ${geom.zeroY !== '' ? svg`<line class="fcc-chart-zero" x1="0" y1=${geom.zeroY} x2="100" y2=${geom.zeroY}></line>` : nothing}
+            ${geom.avgY !== '' ? svg`<line class="fcc-chart-avg" x1="0" y1=${geom.avgY} x2="100" y2=${geom.avgY}></line>` : nothing}
+            ${geom.bars ? svg`<path class="fcc-chart-fill" d=${geom.bars}></path>` : nothing}
+            ${geom.fill ? svg`<path class="fcc-chart-fill" d=${geom.fill}></path>` : nothing}
+            ${geom.line ? svg`<path class="fcc-chart-line" d=${geom.line}></path>` : nothing}
+          </svg>
+        `}
+        ${showTip ? html`<span class="fcc-chart-guide" hidden></span>` : nothing}
+        ${avgLabel ? html`<span class="fcc-chart-mark" style=${`top:${geom.avgY}%`}>${avgLabel}</span>` : nothing}
+        ${nowLabel ? html`<span class="fcc-chart-now" style=${`top:${geom.lastY}%`}>${nowLabel}</span>` : nothing}
+        ${showTip ? html`<span class="fcc-chart-tip" hidden></span>` : nothing}
+      </span>
+    `;
+  }
+
+  _chartCellParts(cell, dyn, textDecoration) {
+    const entityId = typeof cell?.value === 'string' ? cell.value.trim() : '';
+    const overwrite = this._resolveDynamicOverwriteContent(cell, dyn, textDecoration);
+    const replaced = overwrite !== null && overwrite !== undefined;
+    const stateObj = entityId ? this.hass?.states?.[entityId] : undefined;
+    const stateText = stateObj?.state != null ? String(stateObj.state) : '';
+    const title = entityId ? (stateText ? `${entityId}: ${stateText}` : entityId) : '';
+    return {
+      entityId,
+      content: replaced ? overwrite : this._renderChartSvg(cell),
+      hasActions: this._hasCellActions(cell),
+      allowDefault: !replaced && !this._hasCellActions(cell) && !this._tapActionIsExplicitNone(cell) && !!entityId,
+      hidden: !!(dyn && dyn.hide && !dyn.mask && (!dyn.overwrite || dyn.overwrite === 'hide')),
+      title,
+    };
+  }
+
   _renderHeaderCell(cell, colSpan = 1, rowIndex = null, cellIndex = null) {
     const numericSpan = Number(colSpan);
     const span = Number.isFinite(numericSpan) && numericSpan > 1 ? numericSpan : 1;
@@ -4872,7 +5802,10 @@ class FlexCellsCard extends LitElement {
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
       let content;
-      if (dyn && dyn.overwrite === 'icon') {
+      const chartContent = this._renderDynamicChartContent(cell, dyn);
+      if (chartContent) {
+        content = chartContent;
+      } else if (dyn && dyn.overwrite === 'icon') {
         content = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
       } else if (dyn && dyn.overwrite === 'entity') {
         const dynContent = this._renderDynamicEntityContent(cell, dyn);
@@ -5015,12 +5948,48 @@ class FlexCellsCard extends LitElement {
       return html`<th class=${entityClassAttr || nothing} colspan=${span} style=${thStyle} title=${val}>${shown}</th>`;
     }
 
+    if (type === 'chart') {
+      const stateObj = this.hass?.states?.[val];
+      const stateText = stateObj?.state != null ? String(stateObj.state) : '';
+      const dyn = this._evaluateDynColor(cell, type, stateText);
+      const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
+      const parts = this._chartCellParts(cell, dyn, textDecoration);
+      const classTokens = ['fcc-chart-cell'];
+      if (cellCssClass) classTokens.push(cellCssClass);
+      if (parts.hasActions || parts.allowDefault) classTokens.push('clickable');
+      const classAttr = classTokens.join(' ');
+      const onKey = (e) => this._onCellKeydown(
+        e,
+        cell,
+        parts.entityId,
+        () => this._openEntityMoreInfo(parts.entityId, cell?.more_info_view, cell?.more_info_page),
+      );
+      if (parts.hasActions || parts.allowDefault) {
+        return html`
+          <th class=${classAttr}
+              colspan=${span}
+              style=${thStyle}
+              title=${parts.title || nothing}
+              role="button"
+              tabindex="0"
+              aria-label=${parts.title || 'chart'}
+              @keydown=${onKey}>
+            ${parts.content}
+          </th>
+        `;
+      }
+      return html`<th class=${classAttr} colspan=${span} style=${thStyle} title=${parts.title || nothing}>${parts.content}</th>`;
+    }
+
     const display = val ?? '';
     const dyn = this._evaluateDynColor(cell, type, display);
     const { style: thStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     let shown;
-    if (dyn && dyn.overwrite === 'icon') {
+    const headerChart = this._renderDynamicChartContent(cell, dyn);
+    if (headerChart) {
+      shown = headerChart;
+    } else if (dyn && dyn.overwrite === 'icon') {
       shown = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
     } else if (dyn && dyn.overwrite === 'entity') {
       const dynContent = this._renderDynamicEntityContent(cell, dyn);
@@ -5124,7 +6093,10 @@ class FlexCellsCard extends LitElement {
       const hasActions = this._hasCellActions(cell);
       const iconStyle = this._buildIconStyle(cell, dyn);
       let content;
-      if (dyn && dyn.overwrite === 'icon') {
+      const chartContent = this._renderDynamicChartContent(cell, dyn);
+      if (chartContent) {
+        content = chartContent;
+      } else if (dyn && dyn.overwrite === 'icon') {
         content = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
       } else if (dyn && dyn.overwrite === 'entity') {
         const dynContent = this._renderDynamicEntityContent(cell, dyn);
@@ -5244,13 +6216,44 @@ class FlexCellsCard extends LitElement {
       return applyCellTemplate(descriptor);
     }
 
+    if (type === 'chart') {
+      const stateObj = this.hass?.states?.[val];
+      const stateText = stateObj?.state != null ? String(stateObj.state) : '';
+      const cellDyn = this._evaluateDynColor(cell, type, stateText);
+      const dyn = mergeDyn(cellDyn);
+      const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
+      const parts = this._chartCellParts(cell, dyn, textDecoration);
+      const classTokens = ['fcc-chart-cell'];
+      if (parts.hasActions || parts.allowDefault) classTokens.push('clickable');
+      descriptor.className = classTokens.join(' ');
+      descriptor.style = tdStyle;
+      descriptor.title = parts.title || null;
+      descriptor.ariaLabel = parts.title || null;
+      descriptor.content = parts.content;
+      descriptor.hidden = parts.hidden;
+      if (parts.hasActions || parts.allowDefault) {
+        descriptor.role = 'button';
+        descriptor.tabIndex = 0;
+        descriptor.onKeydown = (e) => this._onCellKeydown(
+          e,
+          cell,
+          parts.entityId,
+          () => this._openEntityMoreInfo(parts.entityId, cell?.more_info_view, cell?.more_info_page),
+        );
+      }
+      return applyCellTemplate(descriptor);
+    }
+
     const display = val ?? '';
     const cellDyn = this._evaluateDynColor(cell, type, display);
     const dyn = mergeDyn(cellDyn);
     const { style: tdStyle, textDecoration } = this._buildTextStyle(cell, type, align, dyn);
     const hasActions = this._hasCellActions(cell);
     let shown;
-    if (dyn && dyn.overwrite === 'icon') {
+    const bodyChart = this._renderDynamicChartContent(cell, dyn);
+    if (bodyChart) {
+      shown = bodyChart;
+    } else if (dyn && dyn.overwrite === 'icon') {
       shown = this._renderIconWithOptionalText(dyn.icon || '', dyn, cell, textDecoration);
     } else if (dyn && dyn.overwrite === 'entity') {
       const dynContent = this._renderDynamicEntityContent(cell, dyn);
@@ -5552,6 +6555,15 @@ class FlexCellsCard extends LitElement {
   _extractTemplateCellText(cell) {
     if (!cell) return '';
     const type = cell?.type || 'string';
+    if (type === 'chart') {
+      const entityId = this._stringifyTemplateValue(cell?.value);
+      if (!entityId) return '';
+      const stateObj = this.hass?.states?.[entityId];
+      const stateText = stateObj?.state != null ? String(stateObj.state) : '';
+      const dyn = this._evaluateDynColor(cell, type, stateText);
+      const shown = this._resolveDisplayWithDynamics(stateText, dyn, cell);
+      return this._stringifyTemplateValue(shown);
+    }
     if (type === 'entity') {
       const entityId = this._stringifyTemplateValue(cell?.value);
       if (!entityId) return '';
@@ -5920,6 +6932,7 @@ class FlexCellsCard extends LitElement {
     const rows = (autoEntities?.rows && autoEntities.rows.length)
       ? autoEntities.rows
       : (Array.isArray(cfg.rows) ? cfg.rows : []);
+    this._syncChartWatch(rows);
     const colCount = (() => {
       const explicit = Number.isInteger(cfg.column_count) && cfg.column_count > 0 ? cfg.column_count : null;
       if (explicit) return explicit;
